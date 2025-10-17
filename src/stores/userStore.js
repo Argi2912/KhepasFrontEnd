@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import userService  from '../services/userService'
+import userService from '../services/userService'
 import { Notyf } from 'notyf'
 
 let notyf = new Notyf()
@@ -20,7 +20,7 @@ export const useUserStore = defineStore('user', {
       this.loading = true
       this.error = null
       try {
-        const response = await userService.getUsers()
+        const response = await userService.getAllUsers()
         this.users = response.data
       } catch (error) {
         this.error = error.message || 'Error al cargar usuarios.'

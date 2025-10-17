@@ -1,8 +1,3 @@
-<script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-</script>
-
 <template>
   <header>
     <img alt="Vue logo" class="logo" src="@/assets/7.png" width="125" height="125" />
@@ -14,13 +9,26 @@ import HelloWorld from './components/HelloWorld.vue'
         <RouterLink to="/users">Users</RouterLink>
         <RouterLink to="/Register">Register</RouterLink>
         <RouterLink to="/Login">Login</RouterLink>
-        <RouterLink to="/Logout">Logout</RouterLink>
+        <button v-if="isLoggedIn" @click="logout">Cerrar Sesión</button>
       </nav>
     </div>
   </header>
 
   <RouterView />
 </template>
+
+<script setup>
+import { RouterLink, RouterView } from 'vue-router'
+import HelloWorld from './components/HelloWorld.vue'
+import { useAuthStore } from './stores/authStore'
+
+const authStore = useAuthStore()
+const isLoggedIn = authStore.isLoggedIn
+
+function logout() {
+  authStore.handleLogout()
+}
+</script>
 
 <style scoped>
 body {

@@ -23,7 +23,6 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem('user', JSON.stringify(user))
     },
     async handleLogin(credentials) {
-      console.log(credentials.email, credentials.password)
       this.loading = true
       this.authError = null
       try {
@@ -40,7 +39,9 @@ export const useAuthStore = defineStore('auth', {
 
         this.setAuth(tokenData, userData)
         router.push({ name: 'users' })
-        notyf.success(`Bienvenido: ${this.user.name}`)
+        if (this.user) {
+          notyf.success(`Bienvenido: ${this.user.name}`)
+        }
       } catch (error) {
         localStorage.removeItem('token')
         this.token = null
