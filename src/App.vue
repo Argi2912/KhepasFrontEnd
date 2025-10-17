@@ -8,14 +8,13 @@ import HelloWorld from './components/HelloWorld.vue'
     <img alt="Vue logo" class="logo" src="@/assets/7.png" width="125" height="125" />
 
     <div class="wrapper">
-
-
       <nav>
         <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/about">About</RouterLink>
         <RouterLink to="/users">Users</RouterLink>
         <RouterLink to="/Register">Register</RouterLink>
         <RouterLink to="/Login">Login</RouterLink>
+        <RouterLink to="/Logout">Logout</RouterLink>
       </nav>
     </div>
   </header>

@@ -22,20 +22,28 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem('token', token)
       localStorage.setItem('user', JSON.stringify(user))
     },
-    async handleLogin(email, password) {
+    async handleLogin(credentials) {
+      console.log(credentials.email, credentials.password)
       this.loading = true
       this.authError = null
       try {
-        const tokenResponse = await authService.login(email, password)
-        const tokenData = tokenResponse.tokenData
+        const tokenResponse = await authService.login(credentials.email, credentials.password)
+
+        const tokenData = tokenResponse.data.access_token
+
+        localStorage.setItem('token', tokenData)
+        this.token = tokenData
 
         const userResponse = await authService.getMe()
+
         const userData = userResponse.data
 
         this.setAuth(tokenData, userData)
-        router.push({ name: 'dashboard' })
+        router.push({ name: 'users' })
         notyf.success(`Bienvenido: ${this.user.name}`)
       } catch (error) {
+        localStorage.removeItem('token')
+        this.token = null
         this.authError = error.message || 'Error al iniciar sesión.'
         if (error.response) {
           notyf.error(error.response.data.message)
