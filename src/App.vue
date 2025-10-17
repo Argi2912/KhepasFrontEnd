@@ -24,6 +24,15 @@ import HelloWorld from './components/HelloWorld.vue'
 </template>
 
 <style scoped>
+body {
+  background: linear-gradient(135deg, #0a0f1f, #0f172a);
+  font-family: 'Poppins', sans-serif;
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 header {
   text-align: column;
   padding: 2rem 1rem;

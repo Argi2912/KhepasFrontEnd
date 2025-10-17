@@ -128,15 +128,7 @@ const submitLogin = async () => {
 <style>
 
 /* ===== Fondo general ===== */
-body {
-  background: linear-gradient(135deg, #0a0f1f, #0f172a);
-  font-family: 'Poppins', sans-serif;
-  color: #fff;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+
 
 /* ===== Tarjeta principal ===== */
 .card {
