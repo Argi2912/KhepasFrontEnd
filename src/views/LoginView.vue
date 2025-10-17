@@ -125,12 +125,205 @@ const submitLogin = async () => {
 }
 </script>
 
-<style scoped>
-/* Estilos si fueran necesarios */
+<style>
+
+/* ===== Fondo general ===== */
+body {
+  background: linear-gradient(135deg, #0a0f1f, #0f172a);
+  font-family: 'Poppins', sans-serif;
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== Tarjeta principal ===== */
+.card {
+  background: #0f172a;
+  border: 1px solid rgba(0, 170, 255, 0.3);
+  border-radius: 15px;
+  box-shadow: 0 0 30px rgba(0, 170, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 40px rgba(0, 170, 255, 0.25);
+}
+
+/* ===== Encabezado ===== */
 .card-header {
+  background: linear-gradient(135deg, #007bff, #00bfff) !important;
   border-bottom: none;
+  border-radius: 15px 15px 0 0 !important;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
-.shadow-lg {
-  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175) !important;
+
+.card-header h4 {
+  justify-content: center;
+  display: flex;
+  font-weight: 600;
+  font-size: 22px;
+  color: #fff;
+  margin: 0;
 }
+
+/* ===== Cuerpo de la tarjeta ===== */
+.card-body {
+  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background-color: #0f172a;
+  border-radius: 0 0 15px 15px;
+  padding: 40px;
+}
+
+/* ===== Formularios ===== */
+.form-label {
+  justify-content: center;
+  display: flex;
+  margin-bottom: 8px;
+  color: #cdd6f4;
+  font-weight: 500;
+}
+
+.form-control {
+  border: 1px solid #1e2a3a;
+  background: #101a2a;
+  color: #fff;
+  border-radius: 30px;
+  padding: 14px 18px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus {
+  background: #162337;
+  border-color: #00aaff;
+  box-shadow: 0 0 8px rgba(0, 170, 255, 0.3);
+}
+
+/* ===== Botón azul con efecto brillante ===== */
+.btn-primary {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+  overflow: hidden;
+  background: linear-gradient(135deg, #007bff, #00bfff);
+  border: none;
+  border-radius: 30px;
+  padding: 14px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #fff;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 10px rgba(0, 170, 255, 0.4);
+}
+
+.btn-primary::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0.15) 100%
+  );
+  transform: skewX(-25deg);
+  transition: all 0.5s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 170, 255, 0.6);
+  background: linear-gradient(135deg, #00aaff, #007bff);
+}
+
+.btn-primary:hover::before {
+  left: 130%;
+  transition: all 0.8s ease;
+}
+
+.btn-primary:active {
+  background: linear-gradient(135deg, #0066cc, #0099ff);
+  transform: translateY(1px);
+}
+
+/* ===== Alertas ===== */
+.alert {
+  border-radius: 10px;
+  text-align: center;
+  font-size: 14px;
+  background: rgba(0, 170, 255, 0.1);
+  color: #33c9ff;
+  border: 1px solid #00aaff;
+}
+
+/* ===== Animaciones decorativas ===== */
+body::before,
+body::after {
+  content: "";
+  position: absolute;
+  opacity: 0.4;
+  animation: float 10s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Círculo flotante */
+body::before {
+  width: 24px;
+  height: 24px;
+  background: #00bfff;
+  border-radius: 50%;
+  top: 25%;
+  left: 25%;
+}
+
+/* Triángulo flotante */
+body::after {
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 18px solid #00aaff;
+  top: 60%;
+  left: 15%;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(15deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+/* ===== Responsivo ===== */
+@media (max-width: 768px) {
+  .card-body {
+    padding: 30px 20px;
+  }
+}
+/* Espaciado extra para separar el botón del input de contraseña */
+.d-grid.gap-2 {
+  margin-top: 10px; /* puedes ajustar entre 20px y 40px según prefieras */
+}
+
+
+
 </style>

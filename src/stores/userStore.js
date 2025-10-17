@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { userService } from '../services/userService'
+import userService  from '../services/userService'
 import { Notyf } from 'notyf'
 
 let notyf = new Notyf()
