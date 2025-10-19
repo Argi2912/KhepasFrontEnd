@@ -1,58 +1,40 @@
 <template>
-  <div class="container mt-5">
-    <div class="row justify-content-center">
-      <div class="col-md-6">
-        <div class="card shadow-lg">
-          <div class="card-header bg-primary text-white text-center">
-            <h4>Iniciar Sesión</h4>
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white text-center">
+          <h4>Iniciar Sesión</h4>
+        </div>
+        <div class="card-body">
+          <div v-if="authStore.authError" class="alert alert-danger" role="alert">
+            {{ authStore.authError }}
           </div>
-          <div class="card-body">
-            <div v-if="authStore.authError" class="alert alert-danger" role="alert">
-              {{ authStore.authError }}
+
+          <form @submit.prevent="submitLogin">
+            <div class="mb-3">
+              <label for="email" class="form-label">Correo Electrónico</label>
+              <input type="email" class="form-control" :class="{ 'is-invalid': inputError.email }" id="email"
+                v-model="credentials.email" required />
+              <div class="invalid-feedback" v-if="inputError.email">{{ inputError.email }}</div>
             </div>
 
-            <form @submit.prevent="submitLogin">
-              <div class="mb-3">
-                <label for="email" class="form-label">Correo Electrónico</label>
-                <input
-                  type="email"
-                  class="form-control"
-                  :class="{ 'is-invalid': inputError.email }"
-                  id="email"
-                  v-model="credentials.email"
-                  required
-                />
-                <div class="invalid-feedback" v-if="inputError.email">{{ inputError.email }}</div>
+            <div class="mb-3">
+              <label for="password" class="form-label">Contraseña</label>
+              <input type="password" class="form-control" :class="{ 'is-invalid': inputError.password }" id="password"
+                v-model="credentials.password" required />
+              <div class="invalid-feedback" v-if="inputError.password">
+                {{ inputError.password }}
               </div>
+            </div>
 
-              <div class="mb-3">
-                <label for="password" class="form-label">Contraseña</label>
-                <input
-                  type="password"
-                  class="form-control"
-                  :class="{ 'is-invalid': inputError.password }"
-                  id="password"
-                  v-model="credentials.password"
-                  required
-                />
-                <div class="invalid-feedback" v-if="inputError.password">
-                  {{ inputError.password }}
-                </div>
-              </div>
-
-              <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-primary btn-lg" :disabled="authStore.loading">
-                  <span
-                    v-if="authStore.loading"
-                    class="spinner-border spinner-border-sm"
-                    role="status"
-                    aria-hidden="true"
-                  ></span>
-                  {{ authStore.loading ? 'Conectando...' : 'Entrar' }}
-                </button>
-              </div>
-            </form>
-          </div>
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary btn-lg" :disabled="authStore.loading">
+                <span v-if="authStore.loading" class="spinner-border spinner-border-sm" role="status"
+                  aria-hidden="true"></span>
+                {{ authStore.loading ? 'Conectando...' : 'Entrar' }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -120,7 +102,7 @@ const submitLogin = async () => {
     // Si hubo un error (authStore.authError ya estará lleno):
 
     // Notificación de error con Notyf
-    $notyf.error(authStore.authError || 'Ocurrió un error inesperado al iniciar sesión.')
+    $notyf.error(authStore.authError || 'Bienvenido!')
   }
 }
 </script>
@@ -128,58 +110,84 @@ const submitLogin = async () => {
 <style>
 
 /* ===== Fondo general ===== */
+body {
+ 
+  background-color: #0a1120;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  /* Centra horizontalmente */
+  align-items: center;
+  /* Centra verticalmente */
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Poppins', sans-serif;
+  position: center;
+}
 
-
-/* ===== Tarjeta principal ===== */
+/* ===== Tarjeta ===== */
 .card {
+   margin-left: 35px;
   background: #0f172a;
   border: 1px solid rgba(0, 170, 255, 0.3);
-  border-radius: 15px;
-  box-shadow: 0 0 30px rgba(0, 170, 255, 0.15);
+  border-radius: 40px;
   transition: all 0.3s ease;
+  width: 90%;
+  max-width: 600px;
+  min-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 10;
+  /* asegura que esté por encima */
+  box-shadow: none;
+  /* 👈 elimina el brillo o sombra exterior */
 }
 
 .card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 0 40px rgba(0, 170, 255, 0.25);
+  box-shadow: none;
+  /* 👈 sin sombras al pasar el ratón */
 }
 
 /* ===== Encabezado ===== */
 .card-header {
-  background: linear-gradient(135deg, #007bff, #00bfff) !important;
+  background: linear-gradient(135deg, #007bff, #00bfff);
   border-bottom: none;
-  border-radius: 15px 15px 0 0 !important;
+  border-radius: 40px 40px 0 0;
+  padding: 25px;
+  text-align: center;
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .card-header h4 {
-  justify-content: center;
-  display: flex;
   font-weight: 600;
-  font-size: 22px;
+  font-size: 26px;
   color: #fff;
   margin: 0;
 }
 
-/* ===== Cuerpo de la tarjeta ===== */
+/* ===== Cuerpo ===== */
 .card-body {
-  justify-content: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  background-color: #0f172a;
-  border-radius: 0 0 15px 15px;
-  padding: 40px;
+  background-color: #1e2a3a;
+  border-radius: 0 0 40px 40px;
+  padding: 40px 60px;
+  flex-grow: 1;
+  justify-content: center;
 }
 
 /* ===== Formularios ===== */
 .form-label {
-  justify-content: center;
-  display: flex;
   margin-bottom: 8px;
   color: #cdd6f4;
   font-weight: 500;
+  text-align: left;
+  width: 100%;
 }
 
 .form-control {
@@ -190,6 +198,8 @@ const submitLogin = async () => {
   padding: 14px 18px;
   font-size: 14px;
   transition: all 0.3s ease;
+  width: 100%;
+  margin-bottom: 20px;
 }
 
 .form-control:focus {
@@ -198,7 +208,7 @@ const submitLogin = async () => {
   box-shadow: 0 0 8px rgba(0, 170, 255, 0.3);
 }
 
-/* ===== Botón azul con efecto brillante ===== */
+/* ===== Botón ===== */
 .btn-primary {
   position: relative;
   display: inline-block;
@@ -210,12 +220,12 @@ const submitLogin = async () => {
   background: linear-gradient(135deg, #007bff, #00bfff);
   border: none;
   border-radius: 30px;
-  padding: 14px;
+  padding: 14px 28px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
   color: #fff;
   transition: all 0.25s ease;
-  box-shadow: 0 4px 10px rgba(0, 170, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 170, 255, 0.5);
 }
 
 .btn-primary::before {
@@ -225,19 +235,14 @@ const submitLogin = async () => {
   left: -75%;
   width: 50%;
   height: 100%;
-  background: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0.15) 0%,
-    rgba(255, 255, 255, 0.45) 50%,
-    rgba(255, 255, 255, 0.15) 100%
-  );
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.45) 50%, rgba(255, 255, 255, 0.15) 100%);
   transform: skewX(-25deg);
   transition: all 0.5s ease;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 170, 255, 0.6);
+  box-shadow: 0 6px 20px rgba(0, 170, 255, 0.6);
   background: linear-gradient(135deg, #00aaff, #007bff);
 }
 
@@ -269,27 +274,27 @@ body::after {
   opacity: 0.4;
   animation: float 10s ease-in-out infinite;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
 /* Círculo flotante */
 body::before {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   background: #00bfff;
   border-radius: 50%;
-  top: 25%;
-  left: 25%;
+  top: 20%;
+  left: 30%;
 }
 
 /* Triángulo flotante */
 body::after {
   width: 0;
   height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-bottom: 18px solid #00aaff;
-  top: 60%;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 20px solid #00aaff;
+  top: 70%;
   left: 15%;
 }
 
@@ -297,9 +302,11 @@ body::after {
   0% {
     transform: translateY(0) rotate(0deg);
   }
+
   50% {
-    transform: translateY(-8px) rotate(15deg);
+    transform: translateY(-10px) rotate(15deg);
   }
+
   100% {
     transform: translateY(0) rotate(0deg);
   }
@@ -307,15 +314,13 @@ body::after {
 
 /* ===== Responsivo ===== */
 @media (max-width: 768px) {
+  .card {
+    width: 95%;
+    min-height: 85vh;
+  }
+
   .card-body {
     padding: 30px 20px;
   }
 }
-/* Espaciado extra para separar el botón del input de contraseña */
-.d-grid.gap-2 {
-  margin-top: 10px; /* puedes ajustar entre 20px y 40px según prefieras */
-}
-
-
-
 </style>
