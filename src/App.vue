@@ -4,12 +4,7 @@
 
     <div class="wrapper">
       <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-        <RouterLink to="/users">Users</RouterLink>
-        <RouterLink to="/Register">Register</RouterLink>
-        <RouterLink to="/Login">Login</RouterLink>
-        <button v-if="isLoggedIn" @click="logout">Cerrar Sesión</button>
+        <router-view />
       </nav>
     </div>
   </header>
@@ -19,15 +14,6 @@
 
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-import { useAuthStore } from './stores/authStore'
-
-const authStore = useAuthStore()
-const isLoggedIn = authStore.isLoggedIn
-
-function logout() {
-  authStore.handleLogout()
-}
 </script>
 
 <style scoped>
