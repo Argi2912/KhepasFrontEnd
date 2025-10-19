@@ -1,6 +1,8 @@
 @import './base.css';
 
+
 body {
+  
   background: linear-gradient(135deg, #0a0f1f, #0f172a);
   font-family: 'Poppins', sans-serif;
   color: #fff;

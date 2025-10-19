@@ -6,6 +6,9 @@
           <h4>Iniciar Sesión</h4>
         </div>
         <div class="card-body">
+          <img height="40" width="40" src="../assets/7.png" alt="">
+
+
           <div v-if="authStore.authError" class="alert alert-danger" role="alert">
             {{ authStore.authError }}
           </div>
@@ -108,10 +111,20 @@ const submitLogin = async () => {
 </script>
 
 <style>
+.card-body img {
+    display: block;
+   margin-top: -100px;
+  margin-bottom: -0px;
+  margin-left: auto; 
+  margin-right: auto;
+  width: 10vh;
+  height: 10vh;
+  border-radius: 50%; 
+  
+}
 
 /* ===== Fondo general ===== */
 body {
- 
   background-color: #0a1120;
   min-height: 100vh;
   display: flex;
@@ -128,7 +141,7 @@ body {
 
 /* ===== Tarjeta ===== */
 .card {
-   margin-left: 35px;
+  margin-left: 35px;
   background: #0f172a;
   border: 1px solid rgba(0, 170, 255, 0.3);
   border-radius: 40px;
@@ -165,8 +178,9 @@ body {
   font-weight: 600;
   font-size: 26px;
   color: #fff;
-  margin: 0;
-}
+  margin: -0px;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+  }
 
 /* ===== Cuerpo ===== */
 .card-body {
