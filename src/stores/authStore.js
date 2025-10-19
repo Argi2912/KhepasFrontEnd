@@ -114,20 +114,51 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.authError = null
       try {
-        await authService.logout() // 1. Llama al API
+        const token = localStorage.getItem('token')
+        console.log(
+          'Attempting logout with token:',
+          token ? token.substring(0, 20) + '...' : 'No token found',
+        )
+
+        if (token) {
+          await authService.logout() // Attempt server-side logout if token exists
+          console.log('Server-side logout successful')
+        } else {
+          console.warn('No token found in localStorage, proceeding with client-side logout')
+        }
+
+        // Clear state and localStorage regardless of server response
         this.token = null
         this.user = null
-        localStorage.removeItem('token') // 2. Limpia Storage
+        localStorage.removeItem('token')
         localStorage.removeItem('user')
-        router.push({ name: 'login' }) // 3. Redirige
-        notyf.success('Hasta luego') // 4. Notifica
+        await router.push({ name: 'login' })
+        notyf.success('Hasta luego')
       } catch (error) {
-        this.authError = error.message || 'Error al cerrar sesión.'
-        if (error.response) {
-          notyf.error(error.response.data.message)
+        console.error('Error in handleLogout:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          code: error.code,
+        })
+
+        // Treat 401 as non-critical for logout (user is logged out client-side)
+        if (error.response?.status === 401) {
+          console.warn('Token invalid or expired, proceeding with client-side logout')
+          this.token = null
+          this.user = null
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          await router.push({ name: 'login' })
+          notyf.success('Hasta luego')
+        } else {
+          // Handle other errors
+          this.authError = error.response?.data?.message || 'Error al cerrar sesión.'
+          notyf.error(this.authError)
         }
       } finally {
         this.loading = false
+        console.log('handleLogout finalizado, loading:', this.loading)
       }
     },
   },
