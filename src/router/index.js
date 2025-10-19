@@ -53,7 +53,7 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
-    
+        
 
     /*
     {
