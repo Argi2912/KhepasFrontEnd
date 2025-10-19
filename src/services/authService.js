@@ -5,6 +5,10 @@ export default {
     return api.post('/auth/login', { email, password })
   },
 
+  register: (credentials) => {
+    return api.post('/register/register', credentials)
+  },
+
   logout: () => {
     return api.post('/auth/logout')
   },

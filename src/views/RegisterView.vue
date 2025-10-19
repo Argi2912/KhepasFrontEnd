@@ -2,30 +2,19 @@
   <div class="auth-page">
     <div class="register-card">
       <div class="form-header">
-                <h2>Crea una Cuenta</h2>
+        <h2>Crea una Cuenta</h2>
       </div>
 
       <form @submit.prevent="handleSubmit">
         <div class="form-group">
-          <label for="usuario">Usuario</label>
+          <label for="name">Nombre Completo</label>
           <input
             type="text"
-            id="usuario"
-            v-model="form.usuario"
-            placeholder="Ingresa tu nombre de usuario"
-          />
-          <span v-if="errors.usuario" class="error">{{ errors.usuario }}</span>
-        </div>
-
-        <div class="form-group">
-          <label for="nombreCompleto">Nombre Completo</label>
-          <input
-            type="text"
-            id="nombreCompleto"
-            v-model="form.nombreCompleto"
+            id="name"
+            v-model="form.name"
             placeholder="Ingresa tu nombre completo"
           />
-          <span v-if="errors.nombreCompleto" class="error">{{ errors.nombreCompleto }}</span>
+          <span v-if="errors.name" class="error">{{ errors.name }}</span>
         </div>
 
         <div class="form-group">
@@ -73,53 +62,63 @@
 </template>
 
 <script>
-import { RouterLink } from 'vue-router';
+import { RouterLink } from 'vue-router'
+import { useAuthStore } from '../stores/authStore'
+// No instancies el store aquí afuera, hazlo en 'setup' o 'created'
+// const authStore = useAuthStore() <--- Quitar esto
 
 export default {
+  // CAMBIO: Importar 'useAuthStore' para usarlo en 'methods'
+  setup() {
+    const authStore = useAuthStore()
+    return { authStore }
+  },
   data() {
     return {
       form: {
-        usuario: '',
-        nombreCompleto: '',
+        // CAMBIO: 'name' en lugar de 'nombreCompleto' y 'usuario'
+        name: '',
         email: '',
         password: '',
         repetirPassword: '',
       },
       errors: {},
-    };
+    }
   },
   methods: {
     validateForm() {
-      this.errors = {};
-      if (!this.form.usuario) this.errors.usuario = 'El nombre de usuario es obligatorio.';
-      if (!this.form.nombreCompleto)
-        this.errors.nombreCompleto = 'El nombre completo es obligatorio.';
+      this.errors = {}
+      // CAMBIO: Validar 'name' y quitar 'usuario'
+      if (!this.form.name) this.errors.name = 'El nombre completo es obligatorio.'
       if (!this.form.email) {
-        this.errors.email = 'El correo electrónico es obligatorio.';
+        this.errors.email = 'El correo electrónico es obligatorio.'
       } else if (!/\S+@\S+\.\S+/.test(this.form.email)) {
-        this.errors.email = 'El correo electrónico no es válido.';
+        this.errors.email = 'El correo electrónico no es válido.'
       }
-      if (!this.form.password) this.errors.password = 'La contraseña es obligatoria.';
+      if (!this.form.password) {
+        this.errors.password = 'La contraseña es obligatoria.'
+      } else if (this.form.password.length < 6) {
+        // Añadida validación de longitud
+        this.errors.password = 'La contraseña debe tener al menos 6 caracteres.'
+      }
       if (this.form.password !== this.form.repetirPassword)
-        this.errors.repetirPassword = 'Las contraseñas no coinciden.';
-      return Object.keys(this.errors).length === 0;
+        this.errors.repetirPassword = 'Las contraseñas no coinciden.'
+
+      return Object.keys(this.errors).length === 0
     },
     handleSubmit() {
       if (this.validateForm()) {
-        alert('¡Registro exitoso!');
-        console.log('Datos del formulario:', this.form);
+        // CAMBIO: Llamar al store desde 'this'
+        this.authStore.handleRegister(this.form)
       }
     },
   },
-};
+}
 </script>
 
 <style scoped>
-
-
 /* ===== Fondo general elegante ===== */
 .auth-page {
-  
   height: 100vh;
   display: flex;
   align-items: center;
@@ -141,7 +140,9 @@ export default {
   border-radius: 15px;
   box-shadow: 0 0 30px rgba(0, 170, 255, 0.15);
   overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .auth-card:hover {
@@ -278,8 +279,6 @@ export default {
   opacity: 0.25;
 }
 
-
-
 /* ===== CARD DEL FORMULARIO ===== */
 .register-card {
   position: relative;
@@ -400,5 +399,4 @@ export default {
 .login-link a:hover {
   text-decoration: underline;
 }
-
 </style>

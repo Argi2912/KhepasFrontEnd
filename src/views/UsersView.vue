@@ -2,16 +2,7 @@
   <div class="home">
     <h1>Usuarios</h1>
     <div class="actions">
-      <button @click="showModal = true" class="btn-add">Agregar Usuario</button>
-      <button @click="authStore.handleLogout()" class="btn-logout" :disabled="authStore.loading">
-        <span
-          v-if="authStore.loading"
-          class="spinner-border spinner-border-sm"
-          role="status"
-          aria-hidden="true"
-        ></span>
-        {{ authStore.loading ? 'Saliendo...' : 'Cerrar Sesión' }}
-      </button>
+      <button @click="showModal = true" class="btn-action">Agregar Usuario</button>
     </div>
 
     <div class="container">

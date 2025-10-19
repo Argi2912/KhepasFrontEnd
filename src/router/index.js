@@ -5,6 +5,11 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/',
+      name: 'home',
+      component: () => import('../views/HomeView.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
@@ -22,6 +27,7 @@ const router = createRouter({
     },
     {
       component: Layout,
+      meta: { requiresAuth: true },
       children: [
         {
           path: '/dashboard',
@@ -40,30 +46,6 @@ const router = createRouter({
         },
       ],
     },
-
-    /*
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('../views/RegisterView.vue'),
-      meta: {
-        isGuest: true,
-      },
-    },
-    
-    {
-      path: '/profile',
-      name: 'profile',
-      component: () => import('../views/ProfileView.vue'),
-      meta: {
-        requiresAuth: true,
-      },
-    },
-    {
-      path: '/:catchAll(.*)',
-      name: 'notFound',
-      component: () => import('../views/NotFoundView.vue'),
-    }, */
   ],
 })
 
@@ -74,7 +56,7 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !isLoggedIn) {
     next({ name: 'login' })
   } else if (to.meta.isGuest && isLoggedIn) {
-    next({ name: 'users' })
+    next({ name: 'dashboard' })
   } else {
     next()
   }

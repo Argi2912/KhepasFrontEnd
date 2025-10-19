@@ -161,5 +161,35 @@ export const useAuthStore = defineStore('auth', {
         console.log('handleLogout finalizado, loading:', this.loading)
       }
     },
+    async handleRegister(credentials) {
+      this.loading = true
+      this.authError = null
+      try {
+        const response = await authService.register(credentials)
+        const tokenData = response.data?.access_token
+        if (!tokenData) {
+          console.error('No se recibió un token en la respuesta:', response.data)
+          throw new Error('No se recibió un token de autenticación')
+        }
+        localStorage.setItem('token', tokenData)
+        this.token = tokenData
+        console.log('Token almacenado:', tokenData.substring(0, 20) + '...')
+        await router.push({ name: 'dashboard' })
+        console.log('Redirigido a la ruta "users"')
+        notyf.success('Registro exitoso')
+      } catch (error) {
+        console.error('Error en handleRegister:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          code: error.code,
+        })
+        this.authError = error.response?.data?.message || 'Error al registrar.'
+        notyf.error(this.authError)
+      } finally {
+        this.loading = false
+        console.log('handleRegister finalizado, loading:', this.loading)
+      }
+    },
   },
 })
