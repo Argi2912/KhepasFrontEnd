@@ -267,7 +267,11 @@ function submit() {
   background: rgba(15, 23, 42, 0.98);
   border-radius: 18px;
   padding: 30px 28px;
-  width: 560px;
+  margin-top: 30px;
+  margin-left: auto;
+  margin-right: auto;
+   width: 960px;
+  max-width: auto;
   border: 1px solid rgba(0, 180, 255, 0.22);
   box-shadow: 0 0 30px rgba(0, 150, 255, 0.12);
   transition: transform 0.25s ease, box-shadow 0.25s ease;

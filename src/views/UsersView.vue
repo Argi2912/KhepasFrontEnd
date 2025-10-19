@@ -80,16 +80,19 @@ onMounted(() => {
 <style>
 /* ===== Fondo que cubre toda la ventana ===== */
 .home {
-  min-height: 100vh; /* Ocupa toda la altura visible */
-  width: 60vw; /* Ocupa todo el ancho visible */
-  background-size: cover;
+  min-height: 100vh;
+  /* Ocupa toda la altura visible */
+  min-width: 100vw;
+  /* Ocupa todo el ancho visible */
+  background-size: auto 100%;
   background-position: center;
   color: #fff;
   font-family: 'Poppins', sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* Empieza desde arriba, pero puedes poner center si quieres centrar todo */
+  justify-content: flex-start;
+  /* Empieza desde arriba, pero puedes poner center si quieres centrar todo */
   padding: 60px 40px;
   box-sizing: border-box;
   overflow-x: hidden;
@@ -105,7 +108,7 @@ onMounted(() => {
 }
 
 /* ===== Botón principal (Agregar Usuario) ===== */
-.home > button {
+.home>button {
   margin-left: 550px;
   background: linear-gradient(135deg, #00b4ff, #0077ff);
   border: none;
@@ -121,7 +124,7 @@ onMounted(() => {
   margin-bottom: 15px;
 }
 
-.home > button:hover {
+.home>button:hover {
   background: linear-gradient(135deg, #0092e0, #0066cc);
   box-shadow: 0 6px 15px rgba(0, 180, 255, 0.6);
   transform: translateY(-2px);
@@ -253,6 +256,7 @@ onMounted(() => {
     opacity: 0;
     transform: translateY(40px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -261,6 +265,7 @@ onMounted(() => {
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
+
   .table th,
   .table td {
     padding: 10px 8px;

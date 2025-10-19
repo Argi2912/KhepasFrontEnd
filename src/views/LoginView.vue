@@ -111,39 +111,26 @@ const submitLogin = async () => {
 </script>
 
 <style>
-.card-body img {
-    display: block;
-   margin-top: -100px;
-  margin-bottom: -0px;
-  margin-left: auto; 
-  margin-right: auto;
-  width: 10vh;
-  height: 10vh;
-  border-radius: 50%; 
-  
-}
-
-/* ===== Fondo general ===== */
+/* ===== Fondo general (Manteniendo el color muy oscuro) ===== */
 body {
-  background-color: #0a1120;
-  min-height: 100vh;
+ height: 100vh;
   display: flex;
-  justify-content: center;
-  /* Centra horizontalmente */
   align-items: center;
-  /* Centra verticalmente */
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
+  justify-content: center;
+  background: linear-gradient(120deg, #1e3c72, #2a5298);
   font-family: 'Poppins', sans-serif;
-  position: center;
+  overflow: hidden;
 }
 
-/* ===== Tarjeta ===== */
+/* ===== Tarjeta (Fondo más claro que el body, pero oscuro) ===== */
 .card {
   margin-left: 35px;
-  background: #0f172a;
-  border: 1px solid rgba(0, 170, 255, 0.3);
+  /* El fondo del modal en la imagen es un tono oscuro pero más claro que el fondo general */
+  background: #1e2a3a;
+  /* Un azul oscuro que contrasta */
+  /* El borde en la imagen parece ser un azul más claro */
+  border: 1px solid rgba(15, 76, 117, 0.5);
+  /* Usando el nuevo azul como acento */
   border-radius: 40px;
   transition: all 0.3s ease;
   width: 90%;
@@ -153,20 +140,18 @@ body {
   flex-direction: column;
   justify-content: space-between;
   z-index: 10;
-  /* asegura que esté por encima */
   box-shadow: none;
-  /* 👈 elimina el brillo o sombra exterior */
 }
 
 .card:hover {
   transform: translateY(-4px);
   box-shadow: none;
-  /* 👈 sin sombras al pasar el ratón */
 }
 
-/* ===== Encabezado ===== */
+/* ===== Encabezado (Generalmente un área destacada, usaremos un color más claro) ===== */
 .card-header {
-  background: linear-gradient(135deg, #007bff, #00bfff);
+  /* Gradient más claro para imitar el brillo/color de la cabecera en la imagen */
+  background: linear-gradient(135deg, #189ab4, #73a9ad);
   border-bottom: none;
   border-radius: 40px 40px 0 0;
   padding: 25px;
@@ -178,36 +163,55 @@ body {
   font-weight: 600;
   font-size: 26px;
   color: #fff;
+  /* Color de texto blanco */
   margin: -0px;
-  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
-  }
+  /* Sombra de texto usando el azul de acento */
+  text-shadow: 0 0 10px rgba(15, 76, 117, 0.5);
+}
 
-/* ===== Cuerpo ===== */
+.card-body img {
+  display: block;
+  justify-content: center;
+  margin-top: -100px;
+  margin-bottom: -10px;
+  margin-left: auto; 
+  margin-right: auto;
+  width: 10vh;
+  height: 10vh;
+
+} 
+
+/* ===== Cuerpo (Fondo blanco/muy claro para el área de contenido principal, como en la imagen) ===== */
 .card-body {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  background-color: #1e2a3a;
+  /* El fondo blanco o muy claro de la tarjeta en la imagen */
+  background-color: #ffffff;
   border-radius: 0 0 40px 40px;
   padding: 40px 60px;
   flex-grow: 1;
   justify-content: center;
 }
 
-/* ===== Formularios ===== */
+/* ===== Formularios (Texto e inputs dentro del cuerpo blanco) ===== */
 .form-label {
-  margin-bottom: 8px;
-  color: #cdd6f4;
+  margin-bottom: 10;
+  /* Texto más oscuro para contrastar con el fondo blanco */
+  color: #333333;
   font-weight: 500;
   text-align: left;
   width: 100%;
 }
 
 .form-control {
-  border: 1px solid #1e2a3a;
-  background: #101a2a;
-  color: #fff;
+  /* Borde sutil */
+  border: 1px solid #cccccc;
+  /* Fondo blanco/casi blanco para el input */
+  background: #f9f9f9;
+  /* Color de texto oscuro */
+  color: #333333;
   border-radius: 30px;
   padding: 14px 18px;
   font-size: 14px;
@@ -217,12 +221,15 @@ body {
 }
 
 .form-control:focus {
-  background: #162337;
-  border-color: #00aaff;
-  box-shadow: 0 0 8px rgba(0, 170, 255, 0.3);
+  /* El fondo puede ser un poco más oscuro al enfocar */
+  background: #ffffff;
+  /* Borde de enfoque con el color de acento */
+  border-color: #0f4c75;
+  /* Sombra de enfoque con el color de acento */
+  box-shadow: 0 0 8px rgba(15, 76, 117, 0.3);
 }
 
-/* ===== Botón ===== */
+/* ===== Botón (Usando el azul brillante de la imagen) ===== */
 .btn-primary {
   position: relative;
   display: inline-block;
@@ -231,7 +238,8 @@ body {
   text-decoration: none;
   text-transform: uppercase;
   overflow: hidden;
-  background: linear-gradient(135deg, #007bff, #00bfff);
+  /* Gradient con el color azul brillante de la imagen */
+  background: linear-gradient(135deg, #3792cb, #0f4c75);
   border: none;
   border-radius: 30px;
   padding: 14px 28px;
@@ -239,7 +247,8 @@ body {
   font-size: 16px;
   color: #fff;
   transition: all 0.25s ease;
-  box-shadow: 0 4px 15px rgba(0, 170, 255, 0.5);
+  /* Sombra con el color de acento */
+  box-shadow: 0 4px 15px rgba(15, 76, 117, 0.5);
 }
 
 .btn-primary::before {
@@ -256,8 +265,10 @@ body {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 170, 255, 0.6);
-  background: linear-gradient(135deg, #00aaff, #007bff);
+  /* Aumentar la sombra en hover */
+  box-shadow: 0 6px 20px rgba(15, 76, 117, 0.7);
+  /* Cambiar ligeramente el color en hover */
+  background: linear-gradient(135deg, #0f4c75, #3792cb);
 }
 
 .btn-primary:hover::before {
@@ -266,21 +277,25 @@ body {
 }
 
 .btn-primary:active {
-  background: linear-gradient(135deg, #0066cc, #0099ff);
+  /* Color más oscuro en estado activo */
+  background: linear-gradient(135deg, #003366, #0f4c75);
   transform: translateY(1px);
 }
 
-/* ===== Alertas ===== */
+/* ===== Alertas (Usando el color de acento) ===== */
 .alert {
   border-radius: 10px;
   text-align: center;
   font-size: 14px;
-  background: rgba(0, 170, 255, 0.1);
-  color: #33c9ff;
-  border: 1px solid #00aaff;
+  /* Fondo muy claro con toque de azul */
+  background: rgba(15, 76, 117, 0.1);
+  /* Color de texto usando el azul de acento */
+  color: #0f4c75;
+  /* Borde usando el azul de acento */
+  border: 1px solid #0f4c75;
 }
 
-/* ===== Animaciones decorativas ===== */
+/* ===== Animaciones decorativas (Ajustando el color de las formas flotantes) ===== */
 body::before,
 body::after {
   content: "";
@@ -295,7 +310,8 @@ body::after {
 body::before {
   width: 30px;
   height: 30px;
-  background: #00bfff;
+  /* Color de acento */
+  background: #3792cb;
   border-radius: 50%;
   top: 20%;
   left: 30%;
@@ -307,7 +323,8 @@ body::after {
   height: 0;
   border-left: 12px solid transparent;
   border-right: 12px solid transparent;
-  border-bottom: 20px solid #00aaff;
+  /* Color de acento */
+  border-bottom: 20px solid #0f4c75;
   top: 70%;
   left: 15%;
 }
@@ -326,7 +343,7 @@ body::after {
   }
 }
 
-/* ===== Responsivo ===== */
+/* ===== Responsivo (Sin cambios de color) ===== */
 @media (max-width: 768px) {
   .card {
     width: 95%;

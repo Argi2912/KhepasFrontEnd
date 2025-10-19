@@ -33,7 +33,7 @@ const logout = () => {
   min-height: 100vh; /* Ocupar toda la altura de la ventana */
 }
 .navbar {
-  background-color: #2c3e50;
+  background-color: #5f9cda;
   padding: 1rem;
   color: white;
   display: flex;
