@@ -20,15 +20,6 @@
 
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-import { useAuthStore } from './stores/authStore'
-
-const authStore = useAuthStore()
-const isLoggedIn = authStore.isLoggedIn
-
-function logout() {
-  authStore.handleLogout()
-}
 </script>
 
 <style scoped>

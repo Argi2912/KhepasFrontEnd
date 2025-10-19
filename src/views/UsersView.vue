@@ -1,8 +1,18 @@
 <template>
   <div class="home">
     <h1>Usuarios</h1>
-    <button @click="showModal = true">Agregar</button>
-    
+    <div class="actions">
+      <button @click="showModal = true" class="btn-add">Agregar Usuario</button>
+      <button @click="authStore.handleLogout()" class="btn-logout" :disabled="authStore.loading">
+        <span
+          v-if="authStore.loading"
+          class="spinner-border spinner-border-sm"
+          role="status"
+          aria-hidden="true"
+        ></span>
+        {{ authStore.loading ? 'Saliendo...' : 'Cerrar Sesión' }}
+      </button>
+    </div>
 
     <div class="container">
       <table class="responsive table table-striped">
@@ -20,8 +30,8 @@
             <td>{{ user.name }}</td>
             <td>{{ user.email }}</td>
             <td>
-              <button @click="editUser(user.id)">Editar</button>
-              <button @click="deleteUser(user.id)">Eliminar</button>
+              <button @click="editUser(user.id)" class="btn-action edit">Editar</button>
+              <button @click="deleteUser(user.id)" class="btn-action delete">Eliminar</button>
             </td>
           </tr>
         </tbody>
@@ -44,35 +54,43 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useUserStore } from '../stores/userStore'
+import { useAuthStore } from '../stores/authStore' // 👈 Importar authStore
 import Swal from 'sweetalert2'
 import Modal from '../components/Modal.vue'
 
 const showModal = ref(false)
 const userStore = useUserStore()
+const authStore = useAuthStore() // 👈 Inicializar authStore
 
 const fetchData = () => {
   userStore.fetchUsers()
-  console.log(userStore.users)
 }
 
 const confirmAction = () => {
   showModal.value = false
 }
 
+// Puedes definir editUser y deleteUser para evitar errores de consola
+const editUser = (id) => {
+  console.log(`Editando usuario con ID: ${id}`)
+}
+
+const deleteUser = (id) => {
+  console.log(`Eliminando usuario con ID: ${id}`)
+}
+
 onMounted(() => {
   fetchData()
 })
 
-const showWelcomeAlert = () => {
-  Swal.fire('¡Bienvenido!', 'Has iniciado sesión exitosamente.', 'success')
-}
+// showWelcomeAlert ya no es necesario aquí, la usa LoginView.vue
 </script>
 
 <style>
 /* ===== Fondo que cubre toda la ventana ===== */
 .home {
-  min-height: 100vh;              /* Ocupa toda la altura visible */
-  width: 60vw;                   /* Ocupa todo el ancho visible */
+  min-height: 100vh; /* Ocupa toda la altura visible */
+  width: 60vw; /* Ocupa todo el ancho visible */
   background-size: cover;
   background-position: center;
   color: #fff;
@@ -80,7 +98,7 @@ const showWelcomeAlert = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;    /* Empieza desde arriba, pero puedes poner center si quieres centrar todo */
+  justify-content: flex-start; /* Empieza desde arriba, pero puedes poner center si quieres centrar todo */
   padding: 60px 40px;
   box-sizing: border-box;
   overflow-x: hidden;
@@ -110,7 +128,6 @@ const showWelcomeAlert = () => {
   box-shadow: 0 4px 10px rgba(0, 180, 255, 0.3);
   cursor: pointer;
   margin-bottom: 15px;
-  
 }
 
 .home > button:hover {
@@ -263,5 +280,4 @@ const showWelcomeAlert = () => {
     width: 90%;
   }
 }
-
 </style>

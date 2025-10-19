@@ -14,6 +14,6 @@ export default {
   },
 
   getMe: () => {
-    return api.post('/auth/me')
+    return api.get('/auth/me')
   },
 }

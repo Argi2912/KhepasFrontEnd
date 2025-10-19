@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import HomeView from '../views/HomeView.vue'
+import AuthenticatedLayout from '../views/AuthenticatedLayout.vue'
+import DashboardPage from '../views/DashboardView.vue'
+import UsersPage from '../views/UsersView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,11 +17,6 @@ const router = createRouter({
       path: '/about',
       name: 'about',
       component: () => import('../views/AboutView.vue'),
-    },
-    {
-      path: '/users',
-      name: 'users',
-      component: () => import('../views/UsersView.vue'),
     },
     {
       path: '/login',
@@ -37,12 +35,26 @@ const router = createRouter({
       },
     },
     {
-      path: '/users',
-      name: 'users',
-      component: () => import('../views/UsersView.vue'),
-      meta: {
-        requiresAuth: true,
-      },
+      path: '/',
+      component: AuthenticatedLayout, // Usamos el layout para rutas autenticadas
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: 'dashboard',
+          name: 'dashboard',
+          component: DashboardPage,
+        },
+        {
+          path: 'users',
+          name: 'users',
+          component: UsersPage,
+        },
+        // Redirigir a dashboard si se accede a '/' después de iniciar sesión
+        {
+          path: '',
+          redirect: '/dashboard',
+        },
+      ],
     },
 
     {
@@ -64,14 +76,7 @@ const router = createRouter({
         isGuest: true,
       },
     },
-    {
-      path: '/dashboard',
-      name: 'dashboard',
-      component: () => import('../views/DashboardView.vue'),
-      meta: {
-        requiresAuth: true,
-      },
-    },
+    
     {
       path: '/profile',
       name: 'profile',
