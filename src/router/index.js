@@ -1,23 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
-import HomeView from '../views/HomeView.vue'
-import AuthenticatedLayout from '../views/AuthenticatedLayout.vue'
-import DashboardPage from '../views/DashboardView.vue'
-import UsersPage from '../views/UsersView.vue'
-
+import Layout from '../layout/AppLayout.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    {
-      path: '/',
-      name: 'home',
-      component: HomeView,
-    },
-    {
-      path: '/about',
-      name: 'about',
-      component: () => import('../views/AboutView.vue'),
-    },
     {
       path: '/login',
       name: 'login',
@@ -35,37 +21,25 @@ const router = createRouter({
       },
     },
     {
-      path: '/',
-      component: AuthenticatedLayout, // Usamos el layout para rutas autenticadas
-      meta: { requiresAuth: true },
+      component: Layout,
       children: [
         {
-          path: 'dashboard',
+          path: '/dashboard',
           name: 'dashboard',
-          component: DashboardPage,
+          component: () => import('../views/DashboardView.vue'),
         },
         {
-          path: 'users',
+          path: '/users',
           name: 'users',
-          component: UsersPage,
+          component: () => import('../views/UsersView.vue'),
         },
-        // Redirigir a dashboard si se accede a '/' después de iniciar sesión
         {
-          path: '',
-          redirect: '/dashboard',
+          path: '/form',
+          name: 'form',
+          component: () => import('../views/FormularioView.vue'),
         },
       ],
     },
-
-    {
-      path: '/Formulario',
-      name: 'Formulario',
-      component: () => import('../views/FormularioView.vue'),
-      meta: {
-        requiresAuth: true,
-      },
-    },
-        
 
     /*
     {
