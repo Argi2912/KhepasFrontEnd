@@ -9,6 +9,7 @@
         <RouterLink to="/users">Users</RouterLink>
         <RouterLink to="/Register">Register</RouterLink>
         <RouterLink to="/Login">Login</RouterLink>
+        <RouterLink to="/Formulario">Solicitudes</RouterLink>
         <button v-if="isLoggedIn" @click="logout">Cerrar Sesión</button>
       </nav>
     </div>

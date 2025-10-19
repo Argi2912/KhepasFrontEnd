@@ -45,6 +45,16 @@ const router = createRouter({
       },
     },
 
+    {
+      path: '/Formulario',
+      name: 'Formulario',
+      component: () => import('../views/FormularioView.vue'),
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    
+
     /*
     {
       path: '/register',
