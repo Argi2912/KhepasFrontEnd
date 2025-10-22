@@ -1,12 +1,44 @@
 @import './base.css';
 
 
-body {
- height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(120deg, #1e3c72, #2a5298);
-  font-family: 'Poppins', sans-serif;
-  overflow: hidden;
+/* ============================================== */
+/* 1. ESTILOS GLOBALES (BODY/HTML) */
+/* Asegura el fondo que cubre toda la ventana y permite el scroll */
+/* ============================================== */
+body, html {
+    /* CLAVE 1: El fondo degradado debe aplicarse al body/html */
+    background: linear-gradient(120deg, #1e3c72, #2a5298);
+    background-attachment: fixed; /* Mantiene el fondo fijo al hacer scroll */
+    
+    /* CLAVE 2: Elimina overflow: hidden y usa auto para el scroll */
+  
+    
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', sans-serif;
+    min-height: 100vh; /* Asegura que el fondo cubra la altura de la ventana */
+}
+
+/* ============================================== */
+/* 2. ESTILOS DEL CONTENEDOR DE CONTENIDO (.main-content) */
+/* Define el ancho, centrado y padding de tu contenido */
+/* ============================================== */
+.main-content {
+    /* CLAVE: Define un ancho MÁXIMO (para evitar que se estire demasiado) 
+              y un ancho relativo (90%) */
+    width: 90%; 
+    max-width: 1200px; /* Tamaño máximo legible en pantallas grandes */
+
+    /* Centra el contenedor horizontalmente */
+    margin: 0 auto; 
+    
+    /* Padding interno para el contenido */
+    padding: 2rem; 
+    
+    /* Asegura que el padding no afecte el width total */
+    box-sizing: border-box;
+
+    /* No necesitas display: flex, align-items, ni justify-content aquí
+       a menos que quieras centrar *todo* el contenido en el centro absoluto
+       de la pantalla, lo cual no es ideal para un diseño desplazable. */
 }

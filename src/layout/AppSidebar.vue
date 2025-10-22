@@ -20,6 +20,12 @@
             <span>Solicitudes</span>
           </router-link>
         </li>
+        <li>
+          <router-link to="/Roles" class="sidebar-link">
+            <i class="icon">📝</i>
+            <span>Roles y Permisos</span>
+          </router-link>
+        </li>
       </ul>
     </nav>
   </div>

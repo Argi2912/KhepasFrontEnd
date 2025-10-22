@@ -44,6 +44,11 @@ const router = createRouter({
           name: 'form',
           component: () => import('../views/FormularioView.vue'),
         },
+        {
+          path: '/Roles',
+          name: 'roles',
+          component: () => import('../views/RolesView.vue'),
+        },
       ],
     },
   ],

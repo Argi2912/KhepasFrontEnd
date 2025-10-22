@@ -1,8 +1,10 @@
 <template>
+   
   <div class="row justify-content-center">
     <div class="col-md-6">
       <div class="card shadow-lg">
         <div class="card-header bg-primary text-white text-center">
+         
           <h4>Iniciar Sesión</h4>
         </div>
         <div class="card-body">
@@ -111,9 +113,13 @@ const submitLogin = async () => {
 </script>
 
 <style>
+
 /* ===== Fondo general (Manteniendo el color muy oscuro) ===== */
 body {
- height: 100vh;
+  width: 90%;
+  margin: 0 auto;
+  padding: 2rem;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -161,7 +167,7 @@ body {
 
 .card-header h4 {
   font-weight: 600;
-  font-size: 26px;
+  font-size: 2vw;
   color: #fff;
   /* Color de texto blanco */
   margin: -0px;
