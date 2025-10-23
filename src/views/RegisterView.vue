@@ -76,7 +76,6 @@ export default {
   data() {
     return {
       form: {
-        // CAMBIO: 'name' en lugar de 'nombreCompleto' y 'usuario'
         name: '',
         email: '',
         password: '',

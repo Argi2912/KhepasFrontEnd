@@ -1,5 +1,5 @@
 <template>
-   <div class="home">
+  <div class="home">
     <h1>Usuarios</h1>
     <div class="actions">
       <div>
@@ -7,31 +7,33 @@
 
         <div v-if="showModal" class="modal-backdrop" @click="cerrarSiFondo($event)">
           <div class="modal-contenido">
-
             <button class="modal-cerrar" @click="showModal = false">&times;</button>
 
             <h2>Registro de Nuevo Usuario</h2>
 
             <form @submit.prevent="registrarUsuario">
-              <label for="nombre">Nombre:</label>
-              <input type="text" id="nombre" v-model="nuevoUsuario.nombre" required>
+              <label for="name">Nombre:</label>
+              <input type="text" id="name" v-model="nuevoUsuario.name" required />
 
               <label for="email">Email:</label>
-              <input type="email" id="email" v-model="nuevoUsuario.email" required>
+              <input type="email" id="email" v-model="nuevoUsuario.email" required />
 
-              <label for="Contraseña">contraseña:</label>
-              <input type="password" id="contraseña" v-model="nuevoUsuario.contraseña" required>
+              <label for="password">contraseña:</label>
+              <input type="password" id="password" v-model="nuevoUsuario.password" required />
 
-              <label for="repetircontraseña">Repetir contraseña:</label>
-              <input type="password" id="repetircontraseña" v-model="nuevoUsuario.repetircontraseña" required>
+              <label for="repeatPassword">Repetir contraseña:</label>
+              <input
+                type="password"
+                id="repeatPassword"
+                v-model="nuevoUsuario.repeatPassword"
+                required
+              />
 
-              <p v-if="!passwordsMatch" class="error-msg">
-            ¡Las contraseñas no coinciden!
-          </p>
+              <p v-if="!passwordsMatch" class="error-msg">¡Las contraseñas no coinciden!</p>
 
-          <button type="submit" class="btn-submit" :disabled="!passwordsMatch">
-            Guardar Usuario
-          </button>
+              <button type="submit" class="btn-submit" :disabled="!passwordsMatch">
+                Guardar Usuario
+              </button>
             </form>
           </div>
         </div>
@@ -87,53 +89,38 @@ const userStore = useUserStore()
 const authStore = useAuthStore() // 👈 Inicializar authStore
 // 2. Estado para el formulario
 const nuevoUsuario = ref({
-  nombre: '',
+  name: '',
   email: '',
-  contraseña: '',
-  repetircontraseña: '',
-});
-// 3. Propiedad computada para verificar si las contraseñas coinciden
+  password: '',
+  repeatPassword: '',
+})
 const passwordsMatch = computed(() => {
-  // Solo verifica si ambas contraseñas tienen contenido
-  if (nuevoUsuario.value.contrasena && nuevoUsuario.value.repetirContrasena) {
-    return nuevoUsuario.value.contrasena === nuevoUsuario.value.repetirContrasena;
+  if (nuevoUsuario.value.password && nuevoUsuario.value.repeatPassword) {
+    return nuevoUsuario.value.password === nuevoUsuario.value.repeatPassword
   }
-  // Permite enviar si están vacías, la validación 'required' del HTML se encarga de eso.
-  // Sin embargo, si quieres que el botón esté deshabilitado hasta que haya algo:
-  return nuevoUsuario.value.contrasena === nuevoUsuario.value.repetirContrasena; 
-});
 
+  return nuevoUsuario.value.password === nuevoUsuario.value.repeatPassword
+})
 
-// 4. Función para registrar (Simulada)
 const registrarUsuario = () => {
   if (!passwordsMatch.value) {
-    alert("Error: Las contraseñas deben coincidir.");
-    return;
+    alert('Error: Las contraseñas deben coincidir.')
+    return
   }
 
-  // Aquí iría tu lógica real de API para enviar los datos al servidor.
-  console.log('Datos de usuario listos para enviar:', {
-    nombre: nuevoUsuario.value.nombre,
-    email: nuevoUsuario.value.email,
-    // ¡IMPORTANTE! NUNCA uses la contraseña del usuario en el console.log en producción.
-    // Enviarías solo 'contrasena' (que debe ser encriptada) y no 'repetirContrasena'.
-    contrasena: nuevoUsuario.value.contrasena, 
-  });
-  
-  alert(`Usuario ${nuevoUsuario.value.nombre} registrado (simulado).`);
+  console.log(nuevoUsuario.value)
 
-  // Resetear el formulario y cerrar el modal
-  Object.keys(nuevoUsuario.value).forEach(key => nuevoUsuario.value[key] = '');
-  showModal.value = false;
-};
+  userStore.addUser(nuevoUsuario.value)
+  showModal.value = false
+}
 
 // 5. Función para cerrar el modal si se hace clic en el fondo oscuro
 const cerrarSiFondo = (event) => {
   // Cierra solo si el clic fue en el fondo (.modal-backdrop)
   if (event.target.classList.contains('modal-backdrop')) {
-    showModal.value = false;
+    showModal.value = false
   }
-};
+}
 const fetchData = () => {
   userStore.fetchUsers()
 }
@@ -156,7 +143,6 @@ onMounted(() => {
 })
 
 // showWelcomeAlert ya no es necesario aquí, la usa LoginView.vue
-
 </script>
 
 <style>
@@ -256,13 +242,18 @@ onMounted(() => {
 
 /* === Animación === */
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* === Fondo principal === */
 .home {
-
   min-height: 100vh;
   width: 100%;
   background-size: cover;
@@ -312,7 +303,6 @@ onMounted(() => {
 }
 
 /* === Contenedor de tabla === */
-
 
 /* === Tabla === */
 .table {
@@ -394,7 +384,6 @@ onMounted(() => {
   color: #fff;
   animation: fadeInUp 0.4s ease;
 }
-
 
 .modal-content h2 {
   color: #00b4ff;
@@ -491,6 +480,4 @@ onMounted(() => {
     padding: 10px 20px;
   }
 }
-
-
 </style>

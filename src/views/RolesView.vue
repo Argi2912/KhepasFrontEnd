@@ -12,20 +12,18 @@
           <tr>
             <th>ID</th>
             <th>Nombre</th>
-            <th>Correo</th>
-            <th>Rol</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in usuarios" :key="user.id">
-            <td>{{ user.id }}</td>
-            <td>{{ user.name }}</td>
-            <td>{{ user.email }}</td>
-            <td>{{ user.role }}</td>
+          <tr v-for="role in rolesStore.roles" :key="role.id">
+            <td>{{ role.id }}</td>
+            <td>{{ role.name }}</td>
             <td>
               <button class="btn-accion editar" @click="abrirModal(user)">Editar</button>
-              <button class="btn-accion permisos" @click="abrirPermisos(user)">Permisos / Roles</button>
+              <button class="btn-accion permisos" @click="abrirPermisos(user)">
+                Permisos / Roles
+              </button>
             </td>
           </tr>
         </tbody>
@@ -33,7 +31,7 @@
     </div>
 
     <!-- MODAL principal -->
-    <div v-if="showModal" class="modal-overlay">
+    <!--  <div v-if="showModal" class="modal-overlay">
       <div class="modal-card">
         <h3>{{ usuarioSeleccionado ? 'Editar Usuario' : 'Agregar Usuario' }}</h3>
 
@@ -55,10 +53,10 @@
           <button class="btn-cancelar" @click="cerrarModal">Cancelar</button>
         </div>
       </div>
-    </div>
+    </div> -->
 
     <!-- SUBMODAL de permisos -->
-    <div v-if="showPermisos" class="modal-overlay">
+    <!-- <div v-if="showPermisos" class="modal-overlay">
       <div class="modal-card">
         <h3>Gestión de Permisos y Roles</h3>
 
@@ -82,89 +80,37 @@
           <button class="btn-cancelar" @click="cerrarPermisos">Cerrar</button>
         </div>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
-
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRolesStore } from '../stores/rolesStore'
 
-// Datos simulados
-const usuarios = ref([
-  { id: 1, name: 'Juan Pérez', email: 'juan@example.com', role: 'admin' },
-  { id: 2, name: 'María Gómez', email: 'maria@example.com', role: 'user' }
-])
+const rolesStore = useRolesStore()
 
-// Modales
-const showModal = ref(false)
-const showPermisos = ref(false)
-const usuarioSeleccionado = ref(null)
-
-// Formularios
-const form = ref({ nombre: '', email: '', role: 'user' })
-const permisos = ref({ ver: false, crear: false, editar: false, eliminar: false })
-const rolSeleccionado = ref('user')
-
-// Métodos
-function abrirModal(user = null) {
-  usuarioSeleccionado.value = user
-  if (user) {
-    form.value = { nombre: user.name, email: user.email, role: user.role }
-  } else {
-    form.value = { nombre: '', email: '', role: 'user' }
-  }
-  showModal.value = true
-}
-
-function cerrarModal() {
-  showModal.value = false
-}
-
-function guardarUsuario() {
-  if (usuarioSeleccionado.value) {
-    usuarioSeleccionado.value.name = form.value.nombre
-    usuarioSeleccionado.value.email = form.value.email
-    usuarioSeleccionado.value.role = form.value.role
-  } else {
-    usuarios.value.push({
-      id: usuarios.value.length + 1,
-      name: form.value.nombre,
-      email: form.value.email,
-      role: form.value.role
-    })
-  }
-  cerrarModal()
-}
-
-function abrirPermisos(user) {
-  usuarioSeleccionado.value = user
-  showPermisos.value = true
-}
-
-function cerrarPermisos() {
-  showPermisos.value = false
-}
-
-function guardarPermisos() {
-  alert(`Permisos actualizados para ${usuarioSeleccionado.value.name}`)
-  cerrarPermisos()
-}
-
+onMounted(() => {
+  rolesStore.fetchRoles()
+})
 </script>
 
 <style scoped>
 /* ======= Estilo LED Azul ======= */
 .neon-card {
   border: 1px solid #00aaff;
-  box-shadow: 0 0 20px rgba(0, 170, 255, 0.7), inset 0 0 15px rgba(0, 170, 255, 0.4);
+  box-shadow:
+    0 0 20px rgba(0, 170, 255, 0.7),
+    inset 0 0 15px rgba(0, 170, 255, 0.4);
   border-radius: 20px;
   transition: all 0.3s ease;
   background-color: #0a1120;
   color: #e0e0e0;
 }
 .neon-card:hover {
-  box-shadow: 0 0 40px rgba(0, 170, 255, 0.9), inset 0 0 25px rgba(0, 170, 255, 0.5);
+  box-shadow:
+    0 0 40px rgba(0, 170, 255, 0.9),
+    inset 0 0 25px rgba(0, 170, 255, 0.5);
 }
 
 .table-dark {

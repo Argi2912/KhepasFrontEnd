@@ -38,7 +38,6 @@ export const useUserStore = defineStore('user', {
       this.error = null
       try {
         const response = await userService.createUser(userData)
-        this.users.push(response.data)
         notyf.success('Usuario creado exitosamente')
       } catch (error) {
         this.error = error.message || 'Error al crear usuario.'
