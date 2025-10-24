@@ -7,7 +7,7 @@
 /* ============================================== */
 body, html {
     /* CLAVE 1: El fondo degradado debe aplicarse al body/html */
-    background: linear-gradient(120deg, #1e3c72, #2a5298);
+    background: linear-gradient(180deg, #1b263b, #4c98e9);
     background-attachment: fixed; /* Mantiene el fondo fijo al hacer scroll */
     
     /* CLAVE 2: Elimina overflow: hidden y usa auto para el scroll */

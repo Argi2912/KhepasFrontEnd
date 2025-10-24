@@ -12,6 +12,12 @@ export default {
   createRole(roleData) {
     return api.post(resourse + 'role', roleData)
   },
+
+  updateRole(id, roleData) {
+  return api.put(`/permissions/role/${id}`, roleData)
+},
+
+
   rolePermissions(data) {
     return api.post(resourse + 'role-permissions', data)
   },

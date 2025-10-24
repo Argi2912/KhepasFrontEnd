@@ -123,7 +123,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(120deg, #1e3c72, #2a5298);
+  background: linear-gradient(180deg, #1b263b, #4c98e9);
   font-family: 'Poppins', sans-serif;
   overflow: hidden;
 }

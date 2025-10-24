@@ -31,6 +31,7 @@ export const useRolesStore = defineStore('roles', {
       } finally {
         this.loading = false
       }
+      
     },
     async fetchRoles() {
       this.loading = true
@@ -67,24 +68,27 @@ export const useRolesStore = defineStore('roles', {
         this.loading = false
       }
     },
-    async updateRole(id, roleData) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await permissionsService.updateRole(id, roleData)
-        this.roles.push(response.data)
-        notyf.success('Rol actualizado exitosamente')
-      } catch (error) {
-        this.error = error.message || 'Error al actualizar rol.'
-        if (error.response) {
-          notyf.error(error.response.data.message)
-        } else {
-          notyf.error(error.message)
-        }
-      } finally {
-        this.loading = false
-      }
-    },
+   async updateRole(id, roleData) {
+  this.loading = true
+  this.error = null
+  try {
+    const response = await permissionsService.updateRole(id, roleData)
+    const updatedRole = response.data
+
+    const index = this.roles.findIndex(r => r.id === id)
+    if (index !== -1) {
+      this.roles[index] = updatedRole
+    }
+
+    notyf.success('Rol actualizado exitosamente')
+  } catch (error) {
+    this.error = error.message || 'Error al actualizar rol.'
+    notyf.error(error.response?.data?.message || error.message)
+  } finally {
+    this.loading = false
+  }
+},
+
     async deleteRole(id) {
       this.loading = true
       this.error = null
