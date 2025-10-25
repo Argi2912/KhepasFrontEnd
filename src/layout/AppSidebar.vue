@@ -26,6 +26,12 @@
             <span>Roles y Permisos</span>
           </router-link>
         </li>
+          <li>
+          <router-link to="/Request" class="sidebar-link">
+            <i class="icon">📨</i>
+            <span>Tipo de Solicitud</span>
+          </router-link>
+        </li>
       </ul>
     </nav>
   </div>

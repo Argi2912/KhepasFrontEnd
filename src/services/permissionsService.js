@@ -17,7 +17,6 @@ export default {
   return api.put(`/permissions/role/${id}`, roleData)
 },
 
-
   rolePermissions(data) {
     return api.post(resourse + 'role-permissions', data)
   },
