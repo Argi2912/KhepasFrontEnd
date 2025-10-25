@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 import RequestService from '../services/RequestService'
 
 export const useRequestStore = defineStore('requestStore', {
@@ -49,7 +48,11 @@ export const useRequestStore = defineStore('requestStore', {
       this.error = null
       try {
         const response = await RequestService.update(requestType)
-        this.requestsTypes.push(response.data)
+
+        const index = this.requestsTypes.findIndex((rt) => rt.id === requestType.id)
+        if (index !== -1) {
+          this.requestsTypes.splice(index, 1, response.data)
+        }
       } catch (error) {
         this.error = error.message || 'Error al actualizar tipo de solicitud.'
         if (error.response) {
@@ -61,12 +64,14 @@ export const useRequestStore = defineStore('requestStore', {
         this.loading = false
       }
     },
-    async delete(requestType) {
+
+    async delete(id) {
       this.loading = true
       this.error = null
       try {
-        const response = await RequestService.delete(requestType)
-        this.requestsTypes.push(response.data)
+        await RequestService.delete(id)
+
+        this.requestsTypes = this.requestsTypes.filter((rt) => rt.id !== id)
       } catch (error) {
         this.error = error.message || 'Error al eliminar tipo de solicitud.'
         if (error.response) {
