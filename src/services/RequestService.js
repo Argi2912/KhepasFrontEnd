@@ -4,23 +4,23 @@ import api from './api'
 const resource = '/request-types'
 
 export default {
-  list(params = {}) {
-    return api.get(resource, { params })
+  list() {
+    return api.get(resource)
   },
 
-   get(id) {
+  get(id) {
     return api.get(`${resource}/${id}`)
   },
 
-   create(data) {
+  create(data) {
     return api.post(resource, data)
   },
 
-   update(id, data) {
+  update(id, data) {
     return api.put(`${resource}/${id}`, data)
   },
 
-   delete(id) {
+  delete(id) {
     return api.delete(`${resource}/${id}`)
-  }
+  },
 }

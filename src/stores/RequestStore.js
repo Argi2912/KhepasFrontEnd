@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import RequestService from '../services/RequestService'
+import { Notyf } from 'notyf'
+
+let notyf = new Notyf()
 
 export const useRequestStore = defineStore('requestStore', {
   state: () => ({
@@ -8,13 +11,14 @@ export const useRequestStore = defineStore('requestStore', {
     error: null,
     meta: null,
   }),
+
   actions: {
     async fetchList() {
       this.loading = true
       this.error = null
       try {
-        const response = await RequestService.getAll()
-        this.requestsTypes = response.data
+        const response = await RequestService.list()
+        this.requestsTypes = response.data.data
       } catch (error) {
         this.error = error.message || 'Error al cargar tipos de solicitudes.'
         if (error.response) {
@@ -31,7 +35,11 @@ export const useRequestStore = defineStore('requestStore', {
       this.error = null
       try {
         const response = await RequestService.create(requestType)
-        this.requestsTypes.push(response.data)
+        const index = this.requestsTypes.findIndex((rt) => rt.id === requestType.id)
+        if (index !== -1) {
+          this.requestsTypes[index] = response.data.data
+        }
+        notyf.success('Tipo de solicitud creado exitosamente')
       } catch (error) {
         this.error = error.message || 'Error al crear tipo de solicitud.'
         if (error.response) {
@@ -47,18 +55,27 @@ export const useRequestStore = defineStore('requestStore', {
       this.loading = true
       this.error = null
       try {
-        const response = await RequestService.update(requestType)
-
+        const response = await RequestService.update(requestType.id, requestType)
         const index = this.requestsTypes.findIndex((rt) => rt.id === requestType.id)
         if (index !== -1) {
-          this.requestsTypes.splice(index, 1, response.data)
+          this.requestsTypes[index] = response.data.data
         }
+        notyf.success('Tipo de solicitud actualizado exitosamente')
       } catch (error) {
         this.error = error.message || 'Error al actualizar tipo de solicitud.'
-        if (error.response) {
-          notyf.error(error.response.data.message)
+        if (error.response && error.response.data && error.response.data.errors) {
+          // Si hay errores de validación
+          const errors = error.response.data.errors
+          if (errors.name) {
+            // Muestra el primer error del campo 'name'
+            notyf.error(errors.name[0])
+          } else {
+            // Muestra el mensaje principal si no es un error de 'name'
+            notyf.error(error.response.data.message || 'Error de validación')
+          }
         } else {
-          notyf.error(error.message)
+          // Error genérico si no es un error de validación
+          notyf.error('❌ Error al guardar la solicitud')
         }
       } finally {
         this.loading = false

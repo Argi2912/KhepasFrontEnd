@@ -11,7 +11,6 @@
         <thead>
           <tr>
             <th>ID</th>
-            <th>Nombre</th>
             <th>Tipo de Transacción</th>
             <th>Acciones</th>
           </tr>
@@ -20,7 +19,6 @@
           <tr v-for="req in requestStore.requestsTypes" :key="req.id">
             <td>{{ req.id }}</td>
             <td>{{ req.name }}</td>
-            <td>{{ req.transaction_type || 'En proceso' }}</td>
             <td>
               <button class="btn-accion editar" @click="abrirModal(req)">Editar</button>
               <button class="btn-accion eliminar" @click="eliminar(req.id)">Eliminar</button>
@@ -44,14 +42,7 @@
             type="text"
             class="input-field"
             placeholder="Ej: Solicitud de compra"
-          />
-
-          <label class="form-label">Tipo de Transacción:</label>
-          <input
-            v-model="form.transaction_type"
-            type="text"
-            class="input-field"
-            placeholder="Ej: Transferencia, Aprobación..."
+            @keyup.enter="guardar"
           />
         </div>
 
@@ -69,6 +60,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRequestStore } from '../stores/RequestStore'
+import { Notyf } from 'notyf'
+
+let notyf = new Notyf()
 
 const requestStore = useRequestStore()
 
@@ -78,7 +72,6 @@ const modoEdicion = ref(false)
 const form = ref({
   id: null,
   name: '',
-  transaction_type: '',
 })
 
 onMounted(() => {
@@ -87,59 +80,61 @@ onMounted(() => {
 
 function abrirModal(req = null) {
   modoEdicion.value = !!req
-  form.value = req
-    ? { id: req.id, name: req.name, transaction_type: req.transaction_type }
-    : { id: null, name: '', transaction_type: '' }
+  form.value = req ? { id: req.id, name: req.name } : { id: null, name: '' }
   mostrarModal.value = true
 }
 
 function cerrarModal() {
   mostrarModal.value = false
-  form.value = { id: null, name: '', transaction_type: '' }
+  form.value = { id: null, name: '' }
 }
 
 async function guardar() {
   if (!form.value.name) {
-    alert('⚠️ Debes ingresar un nombre.')
+    // CAMBIO: Usando notyf en lugar de alert
+    notyf.error('⚠️ Debes ingresar un nombre.')
     return
   }
 
   try {
     if (modoEdicion.value) {
-      // --- CORRECCIÓN 2 ---
-      // Antes: await requestStore.update(form.value.id, form.value)
-      // Ahora: El store espera solo un objeto 'requestType'.
+      // CORRECCIÓN: 'update' espera solo un objeto
       await requestStore.update(form.value)
-      alert('✅ Solicitud actualizada correctamente')
+      // CAMBIO: Usando notyf en lugar de alert
+      notyf.success('✅ Solicitud actualizada correctamente')
     } else {
       await requestStore.create(form.value)
-      alert('✅ Solicitud creada correctamente')
+      // CAMBIO: Usando notyf en lugar de alert
+      notyf.success('✅ Solicitud creada correctamente')
     }
     cerrarModal()
   } catch (err) {
     console.error(err)
-    alert('❌ Error al guardar la solicitud')
+    // CAMBIO: Usando notyf en lugar de alert
+    notyf.error('❌ Error al guardar la solicitud')
   }
 }
 
 async function eliminar(id) {
+  // 'confirm' se mantiene ya que notyf es para notificaciones, no para confirmaciones.
   if (confirm('¿Seguro que deseas eliminar esta solicitud?')) {
     try {
-      // --- CORRECCIÓN 3 ---
-      // Antes: await requestStore.remove(id)
-      // Ahora: La acción en el store se llama 'delete'.
+      // CORRECCIÓN: La acción se llama 'delete', no 'remove'
       await requestStore.delete(id)
-      alert('🗑️ Eliminada correctamente')
+      // CAMBIO: Usando notyf en lugar de alert
+      notyf.success('🗑️ Eliminada correctamente')
     } catch (err) {
       console.error(err)
-      alert('❌ Error al eliminar')
+      // CAMBIO: Usando notyf en lugar de alert
+      notyf.error('❌ Error al eliminar')
     }
   }
 }
 </script>
 
 <style scoped>
-/* Los estilos permanecen sin cambios */
+/* [Los estilos permanecen sin cambios] */
+
 /* ==== Contenedor principal ==== */
 .request-container {
   padding: 30px;
