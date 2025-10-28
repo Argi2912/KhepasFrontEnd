@@ -16,20 +16,32 @@
         </li>
         <li>
           <router-link to="/form" class="sidebar-link">
-            <i class="icon">📝</i>
+            <i class="icon">✒️</i>
             <span>Solicitudes</span>
           </router-link>
         </li>
         <li>
           <router-link to="/Roles" class="sidebar-link">
-            <i class="icon">📝</i>
+            <i class="icon">🔑</i>
             <span>Roles y Permisos</span>
           </router-link>
         </li>
           <li>
           <router-link to="/Request" class="sidebar-link">
-            <i class="icon">📨</i>
+            <i class="icon">🗃️</i>
             <span>Tipo de Solicitud</span>
+          </router-link>
+        </li>
+          <li>
+          <router-link to="/currencies" class="sidebar-link">
+            <i class="icon">💰</i>
+            <span>Tipo de moneda</span>
+          </router-link>
+        </li>
+           <li>
+          <router-link to="/exchange" class="sidebar-link">
+            <i class="icon">💱</i>
+            <span>Tasa De Cambio</span>
           </router-link>
         </li>
       </ul>
