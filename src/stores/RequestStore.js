@@ -30,23 +30,38 @@ export const useRequestStore = defineStore('requestStore', {
         this.loading = false
       }
     },
-    async create(requestType) {
+   async create(requestType) {
       this.loading = true
       this.error = null
       try {
         const response = await RequestService.create(requestType)
-        const index = this.requestsTypes.findIndex((rt) => rt.id === requestType.id)
-        if (index !== -1) {
-          this.requestsTypes[index] = response.data.data
-        }
+        
+        // 👇 CORRECCIÓN: Usamos unshift() para AÑADIR el nuevo
+        const createdRequestType = response.data.data || response.data
+        this.requestsTypes.unshift(createdRequestType)
+        
         notyf.success('Tipo de solicitud creado exitosamente')
+
+        // 👇 ¡LA LÍNEA QUE FALTA!
+        // Retornamos el objeto para que el formulario del wizard lo reciba
+        return createdRequestType
+
       } catch (error) {
         this.error = error.message || 'Error al crear tipo de solicitud.'
-        if (error.response) {
-          notyf.error(error.response.data.message)
+        if (error.response && error.response.data && error.response.data.errors) {
+          const errors = error.response.data.errors
+          if (errors.name) {
+            notyf.error(errors.name[0])
+          } else {
+            notyf.error(error.response.data.message || 'Error de validación')
+          }
         } else {
-          notyf.error(error.message)
+          notyf.error('❌ Error al guardar la solicitud')
         }
+        
+        // 👇 RECUERDA relanzar el error
+        throw error
+        
       } finally {
         this.loading = false
       }

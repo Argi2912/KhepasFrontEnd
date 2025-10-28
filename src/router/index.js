@@ -64,6 +64,11 @@ const router = createRouter({
           name: 'exchange',
           component: () => import('../views/exchangeView.vue'),
         },
+          {
+          path: '/Platform',
+          name: 'Platform',
+          component: () => import('../views/PlatformView.vue'),
+        },
       ],
     },
   ],
