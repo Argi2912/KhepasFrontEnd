@@ -1,6 +1,6 @@
 import api from './api'
 
-const resourse = '/users/'
+const resourse = '/users'
 
 export default {
   getAllUsers() {

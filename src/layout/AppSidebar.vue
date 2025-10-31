@@ -49,6 +49,10 @@
             <i class="icon">💳</i>
             <span>Plataformas de Cambio</span>
           </router-link>
+           <router-link to="/admin/DatabaseDashboard" class="sidebar-link">
+            <i class="icon">🛢️</i>
+            <span>Control De Registros</span>
+          </router-link>
         </li>
       </ul>
     </nav>
