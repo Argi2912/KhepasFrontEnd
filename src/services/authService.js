@@ -1,19 +1,13 @@
-import api from './api'
+// src/services/authService.js
 
-export default {
-  login: (email, password) => {
-    return api.post('/auth/login', { email, password })
-  },
+import apiClient from '@/utils/http.js' // Importamos el cliente con interceptores
 
-  logout: () => {
-    return api.post('/auth/logout')
-  },
-
-  refreshToken: () => {
-    return api.post('/auth/refresh')
-  },
-
-  getMe: () => {
-    return api.post('/auth/me')
-  },
+const authService = {
+  login: (email, password) => apiClient.post('/auth/login', { email, password }),
+  register: (credentials) => apiClient.post('/auth/register', credentials),
+  me: () => apiClient.get('/auth/me'),
+  logout: () => apiClient.post('/auth/logout'),
+  // Añadir refresh si se requiere manejo manual de refresh token
 }
+
+export default authService
