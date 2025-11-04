@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-dark-primary text-gray-100">
+  <div class="login-container">
     <LoginForm />
   </div>
 </template>
@@ -14,7 +14,13 @@ export default {
 </script>
 
 <style scoped>
-.bg-dark-primary {
-  background-color: #1c2127;
+/* ESTILOS DE CENTRADO Y FONDO */
+.login-container {
+  display: flex;
+  align-items: center; /* Centrado vertical */
+  justify-content: center; /* Centrado horizontal */
+  min-height: 100vh; /* Altura completa de la ventana */
+  width: 100%;
+  background-color: #1c2127; /* Fondo Negro Profundo */
 }
 </style>

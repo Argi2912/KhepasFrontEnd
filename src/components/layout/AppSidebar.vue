@@ -1,53 +1,53 @@
-// src/components/layout/AppSidebar.vue
-
 <template>
-  <aside class="bg-dark-secondary w-64 space-y-6 py-7 px-2 sticky top-0 h-screen shadow-2xl">
-    <div class="text-2xl font-extrabold text-accent-green text-center">Dashboard</div>
+  <aside class="app-sidebar" :class="{ collapsed: isCollapsed }">
+    <div class="sidebar-logo-section">
+      <span class="logo-icon">K</span>
+      <span class="logo-text">KHEPAS</span>
+    </div>
 
-    <nav>
-      <router-link
-        v-for="item in navItems"
-        :key="item.name"
-        :to="{ name: item.routeName }"
-        class="block py-2.5 px-4 rounded transition duration-200 text-gray-400 hover:bg-gray-700 hover:text-gray-100"
-        :class="{
-          'bg-accent-green text-dark-secondary font-semibold hover:!bg-opacity-80':
-            $route.name === item.routeName,
-        }"
-      >
-        {{ item.name }}
+    <nav class="nav-menu">
+      <router-link class="nav-link" :to="{ name: 'Dashboard' }">
+        <span class="icon">🏠</span>
+        <span class="text">Inicio (Balance)</span>
+      </router-link>
+      <router-link class="nav-link" :to="{ name: 'Transactions' }">
+        <span class="icon">🔄</span>
+        <span class="text">Transacciones</span>
+      </router-link>
+      <router-link class="nav-link" :to="{ name: 'Users' }">
+        <span class="icon">👥</span>
+        <span class="text">Base de Datos</span>
+      </router-link>
+      <router-link class="nav-link" :to="{ name: 'Cashes' }">
+        <span class="icon">💰</span>
+        <span class="text">Caja y Plataformas</span>
+      </router-link>
+      <router-link class="nav-link" :to="{ name: 'CurrencyList' }">
+        <span class="icon">🪙</span>
+        <span class="text">Divisas</span>
+      </router-link>
+      <router-link class="nav-link" :to="{ name: 'ExchangeRates' }">
+        <span class="icon">📈</span>
+        <span class="text">Tasas de Cambio</span>
+      </router-link>
+      <router-link class="nav-link" :to="{ name: 'Stats' }">
+        <span class="icon">📊</span>
+        <span class="text">Reportes</span>
       </router-link>
     </nav>
   </aside>
 </template>
 
-<script>
-import { reactive } from 'vue'
+<script setup>
+import { defineProps } from 'vue'
 
-export default {
-  name: 'AppSidebar',
-  setup() {
-    const navItems = reactive([
-      { name: 'Inicio (Balance)', routeName: 'Dashboard' },
-      { name: 'Transacciones / Solicitudes', routeName: 'Transactions' },
-      { name: 'Bases de Datos (Usuarios)', routeName: 'Users' },
-      { name: 'Caja y Plataformas', routeName: 'Cashes' },
-      { name: 'Tasas de Cambio', routeName: 'ExchangeRates' },
-      { name: 'Estadísticas / Reportes', routeName: 'Stats' },
-    ])
-    return { navItems }
-  },
-}
+defineProps({
+  isCollapsed: Boolean,
+})
 </script>
 
 <style scoped>
-.bg-dark-secondary {
-  background-color: #2b3139;
-}
-.text-accent-green {
-  color: #0ecb81;
-}
-.text-dark-secondary {
-  color: #2b3139;
-} /* Usado para el texto en el acento */
+/* Estilos aplicados desde layout.css.
+  Este <style scoped> se mantiene vacío por limpieza.
+*/
 </style>

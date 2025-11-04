@@ -1,21 +1,16 @@
 <template>
-  <footer class="bg-dark-secondary p-3 text-center text-gray-500 text-xs mt-auto">
+  <footer class="app-footer">
     &copy; {{ currentYear }} TUCONPAY MVP. Desarrollado con Vue 3 y Laravel.
   </footer>
 </template>
 
-<script>
-export default {
-  name: 'AppFooter',
-  setup() {
-    const currentYear = new Date().getFullYear()
-    return { currentYear }
-  },
-}
+<script setup>
+import { computed } from 'vue'
+const currentYear = computed(() => new Date().getFullYear())
 </script>
 
 <style scoped>
-.bg-dark-secondary {
-  background-color: #2b3139;
-}
+/* Estilos aplicados desde layout.css.
+  Este <style scoped> se mantiene vacío por limpieza.
+*/
 </style>

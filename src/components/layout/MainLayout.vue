@@ -1,12 +1,12 @@
 <template>
-  <div class="flex min-h-screen bg-dark-primary text-gray-100">
-    <AppSidebar />
+  <div class="app-layout-wrapper" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
+    <AppSidebar :is-collapsed="isSidebarCollapsed" />
 
-    <div class="flex flex-col flex-1">
-      <AppNavbar />
+    <div class="app-content-wrapper">
+      <AppNavbar @toggle-sidebar="toggleSidebar" />
 
-      <main class="flex-1 p-6 overflow-y-auto">
-        <slot></slot>
+      <main class="app-main-content">
+        <router-view />
       </main>
 
       <AppFooter />
@@ -14,23 +14,23 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
 import AppNavbar from './AppNavbar.vue'
 import AppSidebar from './AppSidebar.vue'
 import AppFooter from './AppFooter.vue'
 
-export default {
-  name: 'MainLayout',
-  components: {
-    AppNavbar,
-    AppSidebar,
-    AppFooter,
-  },
+// Estado para controlar el sidebar
+const isSidebarCollapsed = ref(false)
+
+const toggleSidebar = () => {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value
 }
 </script>
 
 <style scoped>
-.bg-dark-primary {
-  background-color: #1c2127;
-}
+/* No se necesitan estilos aquí. 
+  Todo se maneja en el layout.css global
+  para mantener este componente limpio.
+*/
 </style>

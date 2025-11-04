@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-dark-primary text-gray-100 py-10">
+  <div class="auth-container">
     <RegisterForm />
   </div>
 </template>
@@ -14,7 +14,8 @@ export default {
 </script>
 
 <style scoped>
-.bg-dark-primary {
-  background-color: #1c2127;
-}
+/* ¡No se necesitan estilos aquí! 
+  Todo el estilo de centrado y fondo 
+  es manejado por .auth-container en auth.css
+*/
 </style>

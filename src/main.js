@@ -1,5 +1,3 @@
-// src/main.js
-
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
@@ -8,6 +6,9 @@ import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 import apiClient from '@/utils/http.js' // Importado para inicializar interceptores
 import { useAuthStore } from '@/stores/authStore'
+
+import '@/assets/css/auth.css'
+import '@/assets/css/layout.css' // Estilos para el Dashboard/Layout
 
 const app = createApp(App)
 const pinia = createPinia()

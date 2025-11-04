@@ -1,11 +1,10 @@
 <template>
-  <form
-    @submit.prevent="handleSubmit"
-    class="bg-dark-secondary p-8 rounded-xl shadow-2xl w-full max-w-lg"
-  >
-    <h2 class="text-3xl font-bold text-accent-green mb-6 text-center">Registro de Empresa</h2>
+  <form @submit.prevent="handleSubmit" class="auth-card register-card">
+    <div class="logo-section">
+      <h2 class="title">Registro de Empresa</h2>
+    </div>
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="form-grid">
       <CustomInput id="first_name" label="Nombre" v-model="credentials.first_name" required />
       <CustomInput id="last_name" label="Apellido" v-model="credentials.last_name" required />
     </div>
@@ -24,7 +23,7 @@
       placeholder="(Opcional)"
     />
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="form-grid">
       <CustomInput
         id="password"
         label="Contraseña"
@@ -50,24 +49,21 @@
       required
     />
 
-    <button
-      type="submit"
-      :disabled="authStore.loading"
-      class="w-full bg-accent-green text-dark-primary py-2 mt-6 rounded-lg font-semibold hover:bg-opacity-90 transition-opacity disabled:opacity-50"
-    >
-      {{ authStore.loading ? 'Registrando...' : 'Registrarse y Acceder' }}
-    </button>
+    <div class="action-section">
+      <button type="submit" :disabled="authStore.loading" class="btn-primary">
+        {{ authStore.loading ? 'Registrando...' : 'Registrarse y Acceder' }}
+      </button>
+    </div>
 
-    <p class="text-center text-gray-400 mt-4">
+    <p class="auth-link">
       ¿Ya tienes cuenta?
-      <router-link :to="{ name: 'Login' }" class="text-accent-yellow hover:underline"
-        >Inicia sesión</router-link
-      >
+      <router-link :to="{ name: 'Login' }">Inicia sesión</router-link>
     </p>
   </form>
 </template>
 
 <script>
+// El script que subiste es correcto y se mantiene.
 import { reactive } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import CustomInput from '@/components/common/CustomInput.vue'
@@ -98,7 +94,7 @@ export default {
       try {
         await authStore.handleRegister(credentials)
       } catch (error) {
-        console.error('Registro fallido:', error)
+        // Notificación manejada por el interceptor
       }
     }
 
@@ -112,14 +108,7 @@ export default {
 </script>
 
 <style scoped>
-/* Colores de la Paleta */
-.bg-dark-secondary {
-  background-color: #2b3139;
-}
-.text-accent-green {
-  color: #0ecb81;
-}
-.text-accent-yellow {
-  color: #f0b90b;
-}
+/* ¡No se necesitan estilos aquí! 
+  Todo es manejado por auth.css
+*/
 </style>

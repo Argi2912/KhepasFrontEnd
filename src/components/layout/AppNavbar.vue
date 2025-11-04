@@ -1,41 +1,41 @@
 <template>
-  <header
-    class="bg-dark-secondary shadow-lg p-4 flex justify-between items-center z-10 sticky top-0"
-  >
-    <div class="text-xl font-bold text-accent-yellow">TUCONPAY</div>
+  <nav class="app-navbar">
+    <button class="sidebar-toggle-btn" @click="emit('toggle-sidebar')">☰</button>
 
-    <div class="flex items-center space-x-4">
-      <span class="text-gray-400 text-sm">Rol: {{ authStore.primaryRole }}</span>
-      <span class="text-gray-200 font-medium">Bienvenido, {{ authStore.fullName }}</span>
-      <button
-        @click="authStore.handleLogout()"
-        class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
-      >
-        Salir
+    <div class="user-menu">
+      <button class="user-menu-trigger" @click="isUserMenuOpen = !isUserMenuOpen">
+        <img src="https://via.placeholder.com/32" alt="Avatar" />
+        <div class="user-info">
+          <span class="name">{{ authStore.fullName }}</span>
+          <span class="role">{{ authStore.primaryRole }}</span>
+        </div>
       </button>
+
+      <div v-if="isUserMenuOpen" class="user-menu-dropdown" @mouseleave="isUserMenuOpen = false">
+        <router-link to="/profile">Editar Perfil</router-link>
+        <button @click="logoutAndCloseMenu">Cerrar Sesión</button>
+      </div>
     </div>
-  </header>
+  </nav>
 </template>
 
-<script>
+<script setup>
+import { ref, defineEmits } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 
-export default {
-  name: 'AppNavbar',
-  setup() {
-    const authStore = useAuthStore()
-    return {
-      authStore,
-    }
-  },
+const emit = defineEmits(['toggle-sidebar'])
+const authStore = useAuthStore()
+
+const isUserMenuOpen = ref(false)
+
+const logoutAndCloseMenu = () => {
+  isUserMenuOpen.value = false
+  authStore.handleLogout()
 }
 </script>
 
 <style scoped>
-.bg-dark-secondary {
-  background-color: #2b3139;
-}
-.text-accent-yellow {
-  color: #f0b90b;
-}
+/* Estilos aplicados desde layout.css.
+  Este <style scoped> se mantiene vacío por limpieza.
+*/
 </style>
