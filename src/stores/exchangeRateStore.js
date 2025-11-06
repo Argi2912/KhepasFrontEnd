@@ -73,9 +73,12 @@ export const useExchangeRateStore = defineStore('exchangeRates', {
     },
 
     // --- INICIO DE LA CORRECCIÓN ---
-    async fetchLatestRate(fromCurrencyId, toCurrencyId) {
-      if (!fromCurrencyId || !toCurrencyId) {
+    async fetchLatestRate(fromCurrencyId, toCurrencyId, date) {
+      // <-- 1. ACEPTAR FECHA
+      if (!fromCurrencyId || !toCurrencyId || !date) {
+        // <-- 2. VALIDAR FECHA
         this.latestRate = null
+        this.error = null // Limpiar error si faltan datos
         return
       }
 
@@ -84,16 +87,15 @@ export const useExchangeRateStore = defineStore('exchangeRates', {
       this.error = null
 
       try {
-        // CORRECCIÓN: Llamar al servicio 'exchangeRateService'
-        // y a su método 'getLatestRate' (que definimos en el paso 1).
-        const response = await exchangeRateService.getLatestRate(fromCurrencyId, toCurrencyId)
+        // 3. PASAR FECHA AL SERVICIO
+        const response = await exchangeRateService.getLatestRate(fromCurrencyId, toCurrencyId, date)
 
         this.latestRate = response.data
         return response.data
       } catch (error) {
         this.error = 'No se pudo cargar la tasa de cambio.'
-        console.error(this.error, error.response?.data) // Mantenemos el log
-        this.latestRate = null // Aseguramos que sea nulo si falla
+        console.error(this.error, error.response?.data)
+        this.latestRate = null
         return null
       } finally {
         this.loading = false

@@ -29,11 +29,12 @@ const exchangeRateService = {
    * @param {Number} fromCurrencyId
    * @param {Number} toCurrencyId
    */
-  getLatestRate: (fromCurrencyId, toCurrencyId) => {
+  getLatestRate: (fromCurrencyId, toCurrencyId, date) => {
     return apiClient.get('/exchange-rates/latest', {
       params: {
         from_currency_id: fromCurrencyId,
         to_currency_id: toCurrencyId,
+        date: date,
       },
     })
   },

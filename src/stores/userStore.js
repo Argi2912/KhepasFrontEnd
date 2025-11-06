@@ -1,38 +1,60 @@
+// src/stores/userStore.js
 import { defineStore } from 'pinia'
 import userService from '@/services/userService'
 import { useToast } from 'vue-toastification'
+import { useAuthStore } from './authStore' // Importar authStore
 
 export const useUserStore = defineStore('users', {
   state: () => ({
-    users: [],
+    users: [], // Lista para el CRUD (paginado)
+    allUsers: [], // Lista para dropdowns (cache)
     loading: false,
     error: null,
     paginationData: null,
+
+    // Getter para obtener el usuario logueado desde authStore
+    get user() {
+      const auth = useAuthStore()
+      return auth.user
+    },
   }),
 
   actions: {
     /**
-     * Buscar y paginar usuarios.
-     * @param {Object} params - { page: Number, search: String }
+     * CORREGIDO: Acepta un objeto de parámetros genérico
+     * @param {Object} params - { page: Number, search: String, role: String, per_page: Number }
      */
-    async fetchUsers({ page = 1, search = '' }) {
+    async fetchUsers(params = {}) {
       this.loading = true
       this.error = null
-      this.users = []
 
       try {
-        const response = await userService.index(page, search)
+        // Pasamos todos los params al servicio
+        const response = await userService.index(params)
 
+        // Si la respuesta es paginada (viene del CRUD de usuarios)
         if (response.data && Array.isArray(response.data.data)) {
           this.users = response.data.data
-          // Guardar meta y links para la paginación
           const { data, ...pagination } = response.data
           this.paginationData = pagination
+          return this.users // Devuelve los datos paginados
+        }
+
+        // Si la respuesta NO es paginada (ej. per_page: 999 para dropdowns)
+        else if (response.data && Array.isArray(response.data)) {
+          // Guardamos en un caché diferente para no afectar la tabla paginada
+          this.allUsers = response.data
+          return this.allUsers // Devuelve todos los datos
         } else {
-          this.users = response.data // Fallback
+          // Fallback por si la respuesta es inesperada
+          console.warn('Respuesta inesperada de fetchUsers:', response.data)
+          this.users = []
+          this.allUsers = []
+          return []
         }
       } catch (error) {
         this.error = 'No se pudieron cargar los usuarios.'
+        throw error
       } finally {
         this.loading = false
       }

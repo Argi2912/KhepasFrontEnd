@@ -1,5 +1,3 @@
-// src/services/transactionService.js
-
 import apiClient from '@/utils/http'
 
 const transactionService = {
@@ -26,6 +24,16 @@ const transactionService = {
 
   // 4. Intercambio de Divisas
   executeExchange: (data) => apiClient.post('/transactions/execute-exchange', data),
+
+  getLatestRate: (from_currency_id, to_currency_id, date) => {
+    return apiClient.get('/exchange-rates/latest', {
+      params: {
+        from_currency_id,
+        to_currency_id,
+        date,
+      },
+    })
+  },
 }
 
 export default transactionService
