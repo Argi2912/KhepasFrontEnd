@@ -1,38 +1,36 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
-import router from './router'
+import router from './router' // Importamos el router (aún no creado)
+
+// --- Estilos y Plugins ---
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
-import apiClient from '@/utils/http.js' // Importado para inicializar interceptores
-import { useAuthStore } from '@/stores/authStore'
+import 'vue-select/dist/vue-select.css'
+import '@/assets/css/global.css'
 
-import '@/assets/css/auth.css'
-import '@/assets/css/layout.css' // Estilos para el Dashboard/Layout
+// --- Font Awesome ---
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { fas } from '@fortawesome/free-solid-svg-icons'
+
+library.add(fas)
 
 const app = createApp(App)
-const pinia = createPinia()
 
-app.use(pinia)
+// Registros
+app.component('FontAwesomeIcon', FontAwesomeIcon)
+app.use(createPinia())
 app.use(router)
-
-// Configuración de Vue-Toastification
 app.use(Toast, {
-  position: 'top-right',
-  timeout: 3000,
-  closeOnClick: true,
-  pauseOnFocusLoss: true,
-  pauseOnHover: true,
-  draggable: true,
-  hideProgressBar: true,
-  icon: true,
+  transition: 'Vue-Toastification__bounce',
+  maxToasts: 5,
+  newestOnTop: true,
 })
 
-// Inicialización del Estado de Autenticación
-// Esto asegura que si el token existe, el usuario sea cargado antes de que el router evalúe las rutas protegidas.
-router.isReady().then(() => {
-  const authStore = useAuthStore()
-  authStore.fetchUser()
+app.mount('#app')
 
-  app.mount('#app')
-})
+// Inicializar autenticación después de montar Pinia
+import { useAuthStore } from './stores/auth'
+const authStore = useAuthStore()
+authStore.checkAuth()

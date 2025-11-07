@@ -1,0 +1,47 @@
+/* src/assets/css/global.css */
+
+/* --- Variables de Color (Paleta Binance Minimalista) --- */
+:root {
+  --color-primary: #f0b90b; /* Dorado/Amarillo (Acento Binance) */
+  --color-secondary: #212121; /* Gris Oscuro (Fondo de Sidebar, Cartas) */
+  --color-background: #1e2023; /* Fondo Principal (Negro/Gris Profundo) */
+  --color-text-light: #ffffff; /* Texto Principal */
+  --color-text-dark: #333333; /* Texto en fondos claros */
+  --color-success: #0ecb81; /* Verde (Ganancia, OK) */
+  --color-danger: #f6465d; /* Rojo (Pérdida, Error) */
+  --color-border: #444444; /* Líneas divisorias */
+  --color-hover: #3c3c3c; /* Hover/Selección de menú */
+
+  /* Fuentes */
+  --font-family-sans: 'Roboto', 'Arial', sans-serif;
+}
+
+/* --- Estilos Base y Reset --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--color-background);
+  color: var(--color-text-light);
+  line-height: 1.6;
+  scroll-behavior: smooth;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--color-text-light);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+/* Enlaza este archivo en src/main.js */
