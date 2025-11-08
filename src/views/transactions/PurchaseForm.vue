@@ -17,10 +17,9 @@ const authStore = useAuthStore()
 const transactionStore = useTransactionStore()
 const { errors, handleAxiosError, getError, clearError } = useFormValidation()
 
-// --- ESTADO DEL WIZARD ---
 const currentStep = ref(0)
 const isSubmitting = ref(false)
-const localCurrencyCode = 'VES' // Moneda local que recibimos
+const localCurrencyCode = 'VES'
 
 // --- ESTADO DEL FORMULARIO ---
 const form = reactive({
@@ -28,79 +27,106 @@ const form = reactive({
   broker_id: null,
   provider_id: null,
   admin_user_id: authStore.authUser?.id,
-  from_account_id: null, // 🚨 NUEVO: Cuenta en VES para recibir pago
-  to_account_id: null, // 🚨 NUEVO: Cuenta en divisa para entregar
-  amount_to_deliver: 0.0, // 🚨 NUEVO: Monto que el cliente quiere comprar
+
+  from_account_id: null, // 🚨 Cuenta que RECIBE (VES)
+  platform_account_id: null, // 🚨 Cuenta que PAGA (USD/Divisa)
+
+  amount_to_deliver: 0.0, // Campo Manual (USD)
+
   buy_rate: 0.0,
   received_rate: 0.0,
+
   commission_charged_pct: 0.0,
   commission_provider_pct: 0.0,
+
+  deliver_currency_code: '',
 })
 
 // --- LÓGICA DE DATOS ---
 const selectedBroker = computed(() =>
   transactionStore.getBrokers.find((b) => b.id == form.broker_id),
 )
-const toAccount = computed(() => transactionStore.accounts.find((a) => a.id == form.to_account_id))
+// 🚨 'fromAccount' es la cuenta que RECIBE (VES)
+const fromAccount = computed(() =>
+  transactionStore.accounts.find((a) => a.id == form.from_account_id),
+)
+const platformAccount = computed(() =>
+  transactionStore.accounts.find((a) => a.id == form.platform_account_id),
+)
 
-// Cuentas en VES (Origen)
 const fromAccountOptions = computed(() =>
   transactionStore.getAccounts.filter((a) => a.currency_code === localCurrencyCode),
 )
-// Cuentas en Divisas (Destino)
-const toAccountOptions = computed(() =>
+const platformAccountOptions = computed(() =>
   transactionStore.getAccounts.filter((a) => a.currency_code !== localCurrencyCode),
 )
 
-// --- CÁLCULOS AUTOMÁTICOS ---
-const deliverCurrency = computed(() => toAccount.value?.currency_code || null)
-const marketRate = computed(() =>
-  transactionStore.findRate(deliverCurrency.value, localCurrencyCode),
-)
+const deliverCurrency = computed(() => platformAccount.value?.currency_code || null)
+const ratePair = computed(() => {
+  if (!deliverCurrency.value) {
+    return { buy_rate: null, received_rate: null }
+  }
+  return transactionStore.getRatePair(localCurrencyCode, deliverCurrency.value)
+})
 
-// 🚨 Monto a pagar en moneda local (VES)
-const amountToPayInLocal = computed(() => {
-  if (form.amount_to_deliver <= 0 || form.received_rate <= 0) return 0
+// --- CÁLCULOS AUTOMÁTICOS ---
+const baseAmountInVes = computed(() => {
+  // Total Base VES (A Recibir)
+  if (form.amount_to_deliver <= 0 || !form.received_rate) return 0
   return form.amount_to_deliver * form.received_rate
 })
-
-const commissionChargedAmount = computed(
+const commissionCharged_USD = computed(
   () => (form.amount_to_deliver * form.commission_charged_pct) / 100,
 )
-const commissionProviderAmount = computed(
+const commissionProvider_USD = computed(
   () => (form.amount_to_deliver * form.commission_provider_pct) / 100,
 )
-const totalDebitedFromPlatform = computed(
-  () => form.amount_to_deliver + commissionProviderAmount.value,
-)
+const commissionCharged_VES = computed(() => commissionCharged_USD.value * form.received_rate)
+const commissionProvider_VES = computed(() => commissionProvider_USD.value * form.received_rate)
 
-// --- VALIDACIÓN DE SALDO ---
-const amountError = computed(() => {
-  if (toAccount.value && totalDebitedFromPlatform.value > toAccount.value.balance) {
-    return `El monto total a debitar (${formatCurrency(totalDebitedFromPlatform.value, deliverCurrency.value)}) supera el saldo.`
-  }
-  return null
+// Total VES a Acreditar en la cuenta 'from_account_id'
+const totalVesCredit = computed(() => {
+  return baseAmountInVes.value + commissionCharged_VES.value + commissionProvider_VES.value
 })
+// Total USD a Debitar de la cuenta 'platform_account_id'
+const totalUsdDebit_Platform = computed(() => {
+  return parseFloat(form.amount_to_deliver || 0) + commissionProvider_USD.value
+})
+
+// 🚨🚨🚨 INICIO DE LA CORRECCIÓN 🚨🚨🚨
+// --- VALIDACIÓN DE SALDO (Solo la cuenta que PAGA) ---
+
+// 1. Error para la CUENTA DE ORIGEN (VES)
+// ELIMINADO. Esta cuenta recibe dinero, no se valida.
+// const fromAccountError = computed(() => { ... })
+
+// 2. Error para la CUENTA DE PLATAFORMA (USD) (La que PAGA)
+const platformAccountError = computed(() => {
+  if (
+    platformAccount.value &&
+    totalUsdDebit_Platform.value > 0 &&
+    totalUsdDebit_Platform.value > platformAccount.value.balance
+  ) {
+    return `El débito total (${formatCurrency(totalUsdDebit_Platform.value, deliverCurrency.value)}) supera el saldo de esta cuenta.`
+  }
+  return null // Pasa la validación
+})
+
+// 3. Error general (Solo depende de la cuenta de plataforma)
+const generalAmountError = computed(() => platformAccountError.value)
+// 🚨🚨🚨 FIN DE LA CORRECCIÓN 🚨🚨🚨
 
 // --- WATCHERS ---
 watch(selectedBroker, (broker) => {
   if (broker) form.commission_charged_pct = broker.commission
 })
-
-watch(marketRate, (rate) => {
-  if (rate && rate > 0 && form.buy_rate === 0) {
-    form.buy_rate = parseFloat((rate * 0.99).toFixed(4))
-    form.received_rate = parseFloat((rate * 1.01).toFixed(4))
-  }
+watch(ratePair, (rates) => {
+  form.buy_rate = rates.buy_rate || 0
+  form.received_rate = rates.received_rate || 0
 })
-
-watch(
-  () => form.to_account_id,
-  () => {
-    form.buy_rate = 0
-    form.received_rate = 0
-  },
-)
+watch(platformAccount, (account) => {
+  form.deliver_currency_code = account ? account.currency_code : ''
+})
 
 // --- NAVEGACIÓN Y ENVÍO ---
 const validateStep = (step) => {
@@ -109,25 +135,29 @@ const validateStep = (step) => {
     notify.error('Debe seleccionar un cliente.')
     return false
   }
+
   if (step === 1) {
-    if (!form.from_account_id || !form.to_account_id) {
+    if (!form.from_account_id || !form.platform_account_id) {
       notify.error('Debe seleccionar ambas cuentas.')
       return false
     }
-    if (form.amount_to_deliver <= 0) {
-      notify.error('El monto a comprar debe ser mayor a cero.')
-      return false
-    }
-    if (form.buy_rate <= 0 || form.received_rate <= 0) {
-      notify.error('Las tasas deben ser mayores a cero.')
+    if (!form.buy_rate || !form.received_rate) {
+      notify.error('No se encontraron las tasas (compra/venta) para este par de divisas.')
       return false
     }
     if (form.buy_rate >= form.received_rate) {
-      notify.error('La tasa de compra no puede ser mayor o igual a la de venta.')
+      notify.error(
+        'Error de configuración: La tasa de compra (costo) no puede ser mayor o igual a la de venta (cliente).',
+      )
       return false
     }
-    if (amountError.value) {
-      notify.error(amountError.value)
+    if (form.amount_to_deliver <= 0) {
+      notify.error('El monto a comprar (Divisa) debe ser mayor a cero.')
+      return false
+    }
+
+    if (generalAmountError.value) {
+      notify.error(generalAmountError.value)
       return false
     }
   }
@@ -139,19 +169,18 @@ const goToNextStep = () => {
 }
 
 const handleSubmit = async () => {
-  if (!validateStep(1) || isSubmitting.value || amountError.value) {
+  if (!validateStep(1) || isSubmitting.value || generalAmountError.value) {
     notify.error('Revise los campos, hay errores.')
     return
   }
   isSubmitting.value = true
 
-  // Adaptar el payload al backend (DollarPurchaseController)
+  // El backend espera 'amount_received' (el monto BASE en VES)
   const payload = {
     ...form,
-    platform_account_id: form.to_account_id, // La cuenta de origen de la divisa
-    amount_received: amountToPayInLocal.value, // El monto en VES
-    deliver_currency_code: deliverCurrency.value,
+    amount_received: baseAmountInVes.value,
   }
+  delete payload.amount_to_deliver
 
   try {
     await api.post('/transactions/dollar-purchase', payload)
@@ -166,12 +195,15 @@ const handleSubmit = async () => {
 
 onMounted(() => transactionStore.fetchAllSupportData())
 
-// Helper de formato
+// Función de ayuda
 const formatCurrency = (value, currency) => {
   if (value == null || !currency) return '...'
   const code = currency === 'USDT' ? 'USD' : currency
   try {
-    return new Intl.NumberFormat('es-VE', { style: 'currency', currency: code }).format(value)
+    return new Intl.NumberFormat('es-VE', {
+      style: 'currency',
+      currency: code,
+    }).format(value)
   } catch (e) {
     return `${currency} ${value}`
   }
@@ -180,7 +212,7 @@ const formatCurrency = (value, currency) => {
 
 <template>
   <div class="transaction-form-view">
-    <FormWizard :title="'Registro de Compra de Divisa (Ej: VES a USD)'" v-model="currentStep">
+    <FormWizard title="Registro de Compra de Divisa (VES a USD)" v-model="currentStep">
       <template #step-0>
         <h2 class="step-title">1. Partes Involucradas</h2>
         <div class="form-grid">
@@ -207,19 +239,20 @@ const formatCurrency = (value, currency) => {
 
       <template #step-1>
         <h2 class="step-title">2. Operación y Resumen</h2>
-        <div class="form-grid-col2">
+
+        <div class="form-grid-col2 section-title">
           <BaseSelect
             v-model="form.from_account_id"
-            :label="`Cuenta Origen (Cliente Paga en ${localCurrencyCode})`"
+            :label="`Cuenta Destino (Plataforma Recibe ${localCurrencyCode})`"
             :options="fromAccountOptions"
             required
           />
           <BaseSelect
-            v-model="form.to_account_id"
-            label="Cuenta Destino (Plataforma Entrega)"
-            :options="toAccountOptions"
+            v-model="form.platform_account_id"
+            label="Cuenta Origen (Plataforma Paga Divisa)"
+            :options="platformAccountOptions"
             required
-            :error="amountError"
+            :error="platformAccountError"
           />
         </div>
 
@@ -232,20 +265,18 @@ const formatCurrency = (value, currency) => {
             step="0.01"
             required
           />
-          <BaseInput
-            v-model.number="form.buy_rate"
-            :label="`Tasa de Compra (Costo)`"
-            type="number"
-            step="0.0001"
-            required
-          />
-          <BaseInput
-            v-model.number="form.received_rate"
-            :label="`Tasa de Venta (Cliente)`"
-            type="number"
-            step="0.0001"
-            required
-          />
+          <div class="info-box rate-box">
+            <p>Tasa de Compra (Costo)</p>
+            <h3 :class="{ 'rate-found': form.buy_rate }">
+              {{ form.buy_rate ? form.buy_rate.toFixed(4) : '...' }}
+            </h3>
+          </div>
+          <div class="info-box rate-box">
+            <p>Tasa de Venta (Cliente)</p>
+            <h3 :class="{ 'rate-found': form.received_rate }">
+              {{ form.received_rate ? form.received_rate.toFixed(4) : '...' }}
+            </h3>
+          </div>
         </div>
 
         <h2 class="step-title section-title">Comisiones (Sobre Monto a Comprar)</h2>
@@ -265,27 +296,47 @@ const formatCurrency = (value, currency) => {
         </div>
 
         <div class="summary-box">
-          <h2 class="step-title section-title">Resumen Final</h2>
+          <h2 class="step-title section-title">Resumen Final (Calculado)</h2>
           <div class="summary-grid">
             <div class="summary-card">
-              <h4><FontAwesomeIcon icon="fa-solid fa-arrow-up" /> Cliente Paga</h4>
-              <div class="summary-total debit">
-                <span>Total a Pagar ({{ localCurrencyCode }}):</span>
-                <strong>{{ formatCurrency(amountToPayInLocal, localCurrencyCode) }}</strong>
+              <h4><FontAwesomeIcon icon="fa-solid fa-arrow-up" /> Plataforma Recibe (VES)</h4>
+              <div class="summary-line">
+                <span>Monto Base (VES):</span>
+                <strong>{{ formatCurrency(baseAmountInVes, localCurrencyCode) }}</strong>
+              </div>
+              <div class="summary-line com-line">
+                <span>Com. Empresa (VES):</span>
+                <span>{{ formatCurrency(commissionCharged_VES, localCurrencyCode) }}</span>
+              </div>
+              <div class="summary-line com-line">
+                <span>Com. Proveedor (VES):</span>
+                <span>{{ formatCurrency(commissionProvider_VES, localCurrencyCode) }}</span>
+              </div>
+              <div class="summary-total credit">
+                <span>Total a Recibir (VES):</span>
+                <strong>{{ formatCurrency(totalVesCredit, localCurrencyCode) }}</strong>
               </div>
             </div>
             <div class="summary-card">
-              <h4><FontAwesomeIcon icon="fa-solid fa-arrow-down" /> Cliente Recibe</h4>
-              <div class="summary-total credit">
-                <span>Neto a Recibir ({{ deliverCurrency }}):</span>
-                <strong>{{
-                  formatCurrency(amountToDeliver - commissionChargedAmount, deliverCurrency)
-                }}</strong>
+              <h4><FontAwesomeIcon icon="fa-solid fa-arrow-down" /> Plataforma Paga (Divisa)</h4>
+              <div class="summary-line">
+                <span>Monto Cliente:</span>
+                <strong>{{ formatCurrency(form.amount_to_deliver, deliverCurrency) }}</strong>
+              </div>
+              <div class="summary-line com-line">
+                <span>Com. Proveedor:</span>
+                <span>{{ formatCurrency(commissionProvider_USD, deliverCurrency) }}</span>
+              </div>
+              <div class="summary-total debit">
+                <span>Total a Pagar ({{ deliverCurrency }}):</span>
+                <strong>{{ formatCurrency(totalUsdDebit_Platform, deliverCurrency) }}</strong>
               </div>
             </div>
           </div>
-          <div v-if="amountError" class="error-box">
-            <FontAwesomeIcon icon="fa-solid fa-exclamation-triangle" /> {{ amountError }}
+
+          <div v-if="generalAmountError" class="error-box">
+            <FontAwesomeIcon icon="fa-solid fa-exclamation-triangle" />
+            {{ generalAmountError }}
           </div>
         </div>
       </template>
@@ -307,7 +358,7 @@ const formatCurrency = (value, currency) => {
             type="button"
             @click="handleSubmit"
             v-if="currentStep === 1"
-            :disabled="isSubmitting || amountError"
+            :disabled="isSubmitting || generalAmountError"
             class="btn-finish"
           >
             {{ isSubmitting ? 'Procesando...' : 'Finalizar Compra' }}
@@ -319,14 +370,10 @@ const formatCurrency = (value, currency) => {
 </template>
 
 <style scoped>
-/* Estilos del Wizard (Comunes para ambos formularios) */
+/* Estilos (No cambian) */
 .step-title {
   font-size: 1.3rem;
   color: var(--color-text-light);
-}
-.step-subtitle {
-  opacity: 0.8;
-  margin-bottom: 30px;
 }
 .section-title {
   margin-top: 30px;
@@ -373,6 +420,10 @@ const formatCurrency = (value, currency) => {
   margin-bottom: 8px;
   opacity: 0.8;
 }
+.summary-line.com-line {
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
 .summary-total {
   display: flex;
   justify-content: space-between;
@@ -397,6 +448,41 @@ const formatCurrency = (value, currency) => {
   text-align: center;
   font-weight: 500;
 }
+.info-box {
+  background-color: var(--color-background);
+  padding: 15px;
+  border-radius: 8px;
+}
+.info-box p {
+  margin: 0 0 5px 0;
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+.info-box h3 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--color-danger);
+}
+.info-box h3.rate-found {
+  color: var(--color-success);
+}
+.rate-box {
+  margin-top: 30px;
+}
+.form-grid-col3 .info-box {
+  margin-top: 0;
+}
+.form-grid-col3 .rate-box {
+  margin-top: 0;
+}
+.form-grid-col3 > *:not(h2) {
+  height: 100%;
+}
+.form-grid-col3 .info-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 .wizard-nav {
   display: flex;
   justify-content: flex-end;
@@ -409,7 +495,6 @@ const formatCurrency = (value, currency) => {
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 .btn-prev {
   background-color: var(--color-hover);

@@ -17,22 +17,22 @@ const authStore = useAuthStore()
 const transactionStore = useTransactionStore()
 const { errors, handleAxiosError, getError, clearError } = useFormValidation()
 
-// --- ESTADO DEL WIZARD ---
 const currentStep = ref(0)
 const isSubmitting = ref(false)
 
-// --- ESTADO DEL FORMULARIO ---
 const form = reactive({
+  // 'number' SE ELIMINA, el backend lo genera
+
   client_id: null,
   broker_id: null,
   provider_id: null,
   admin_user_id: authStore.authUser?.id,
   from_account_id: null,
   to_account_id: null,
-  amount_received: 0.0,
-  commission_charged_pct: 0.0, // Comisión Empresa
+  amount_received: 0.0, // Monto que envía el cliente (Origen)
+  commission_charged_pct: 0.0,
   commission_provider_pct: 0.0,
-  commission_admin_pct: 0.0, // Comisión Plataforma
+  commission_admin_pct: 0.0,
 })
 
 // --- LÓGICA DE DATOS ---
@@ -62,23 +62,26 @@ const commissionProviderAmount = computed(
 const commissionAdminAmount = computed(
   () => (form.amount_received * form.commission_admin_pct) / 100,
 )
-const totalDebitedFromOrigin = computed(
-  () =>
+
+// Total a debitar de la cuenta de origen (Monto + comisiones)
+const totalDebitedFromOrigin = computed(() => {
+  return (
     parseFloat(form.amount_received || 0) +
     commissionChargedAmount.value +
     commissionProviderAmount.value +
-    commissionAdminAmount.value,
-)
+    commissionAdminAmount.value
+  )
+})
 
 // --- VALIDACIÓN DE SALDO ---
 const amountError = computed(() => {
   if (fromAccount.value && totalDebitedFromOrigin.value > fromAccount.value.balance) {
-    return `El monto total a debitar (${formatCurrency(totalDebitedFromOrigin.value, fromAccount.value.currency_code)}) supera el saldo.`
+    // Usamos el formatCurrency local
+    return `El monto total a debitar (${formatCurrency(totalDebitedFromOrigin.value, fromAccount.value.currency_code)}) supera el saldo disponible.`
   }
   return null
 })
 
-// --- WATCHERS ---
 watch(selectedBroker, (broker) => {
   if (broker) form.commission_charged_pct = broker.commission
 })
@@ -90,7 +93,10 @@ const validateStep = (step) => {
     notify.error('Debe seleccionar un cliente.')
     return false
   }
+
   if (step === 1) {
+    // 'number' SE ELIMINA de la validación
+
     if (!form.from_account_id || !form.to_account_id) {
       notify.error('Debe seleccionar ambas cuentas.')
       return false
@@ -112,15 +118,6 @@ const validateStep = (step) => {
       return false
     }
   }
-  if (
-    step === 2 &&
-    (form.commission_charged_pct < 0 ||
-      form.commission_provider_pct < 0 ||
-      form.commission_admin_pct < 0)
-  ) {
-    notify.error('Las comisiones no pueden ser negativas.')
-    return false
-  }
   return true
 }
 
@@ -129,7 +126,13 @@ const goToNextStep = () => {
 }
 
 const handleSubmit = async () => {
-  if (!validateStep(3) || isSubmitting.value || amountError.value) {
+  if (
+    !validateStep(0) ||
+    !validateStep(1) ||
+    !validateStep(2) ||
+    isSubmitting.value ||
+    amountError.value
+  ) {
     notify.error('Revise los campos, hay errores.')
     return
   }
@@ -147,11 +150,15 @@ const handleSubmit = async () => {
 
 onMounted(() => transactionStore.fetchAllSupportData())
 
+// 🚨 FUNCIÓN DE AYUDA (que faltó en turnos anteriores)
 const formatCurrency = (value, currency) => {
   if (value == null || !currency) return '...'
   const code = currency === 'USDT' ? 'USD' : currency
   try {
-    return new Intl.NumberFormat('es-VE', { style: 'currency', currency: code }).format(value)
+    return new Intl.NumberFormat('es-VE', {
+      style: 'currency',
+      currency: code,
+    }).format(value)
   } catch (e) {
     return `${currency} ${value}`
   }
@@ -188,7 +195,8 @@ const formatCurrency = (value, currency) => {
 
       <template #step-1>
         <h2 class="step-title">2. Detalles de la Operación</h2>
-        <div class="form-grid-col2">
+
+        <div class="form-grid-col2 section-title">
           <div class="account-selection">
             <BaseSelect
               v-model="form.from_account_id"
@@ -214,7 +222,7 @@ const formatCurrency = (value, currency) => {
               :error="amountError"
             />
             <div class="info-box rate-box">
-              <p>Tasa de Cambio Aplicada</p>
+              <p>Tasa de Cambio Aplicada (Automática)</p>
               <h3 :class="{ 'rate-found': exchangeRate }">
                 {{ exchangeRate ? exchangeRate.toFixed(4) : 'NO DISPONIBLE' }}
               </h3>
@@ -311,13 +319,7 @@ const formatCurrency = (value, currency) => {
           >
             Anterior
           </button>
-          <button
-            type-button
-            @click="goToNextStep"
-            v-if="currentStep < 3"
-            class="btn-next"
-            :disabled="amountError || !exchangeRate"
-          >
+          <button type="button" @click="goToNextStep" v-if="currentStep < 3" class="btn-next">
             Siguiente
           </button>
           <button
@@ -336,7 +338,10 @@ const formatCurrency = (value, currency) => {
 </template>
 
 <style scoped>
-/* Estilos del Wizard (Comunes para ambos formularios) */
+/* Estilos del Wizard */
+.section-title {
+  margin-top: 30px;
+} /* 🚨 Añadido para el espaciado */
 .step-title {
   font-size: 1.3rem;
   color: var(--color-text-light);
@@ -360,17 +365,6 @@ const formatCurrency = (value, currency) => {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 20px;
 }
-
-.account-balance {
-  font-size: 0.9rem;
-  opacity: 0.7;
-  margin: -10px 0 15px 5px;
-}
-.account-balance span {
-  font-weight: 600;
-  color: var(--color-success);
-}
-
 .info-box {
   background-color: var(--color-background);
   padding: 15px;
@@ -392,7 +386,6 @@ const formatCurrency = (value, currency) => {
 .rate-box {
   margin-top: 30px;
 }
-
 .summary-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -434,7 +427,6 @@ const formatCurrency = (value, currency) => {
 .summary-total.credit strong {
   color: var(--color-success);
 }
-
 .error-box {
   margin-top: 20px;
   padding: 15px;
@@ -445,7 +437,6 @@ const formatCurrency = (value, currency) => {
   text-align: center;
   font-weight: 500;
 }
-
 .wizard-nav {
   display: flex;
   justify-content: flex-end;
@@ -458,7 +449,6 @@ const formatCurrency = (value, currency) => {
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 .btn-prev {
   background-color: var(--color-hover);

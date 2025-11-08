@@ -3,15 +3,30 @@ import { ref, computed } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 
+/**
+ * Helper de formato (fuera del store para que getAccounts lo use)
+ */
+const formatCurrency = (value, currency) => {
+  if (value == null || !currency) return '...'
+  const code = currency === 'USDT' ? 'USD' : currency
+  try {
+    return new Intl.NumberFormat('es-VE', {
+      style: 'currency',
+      currency: code,
+    }).format(value)
+  } catch (e) {
+    return `${currency} ${value}`
+  }
+}
+
 export const useTransactionStore = defineStore('transaction', () => {
   // --- STATE ---
   const clients = ref([])
   const providers = ref([])
   const brokers = ref([])
   const accounts = ref([])
-  const activeRates = ref([])
-  const currencies = ref([]) // Para la lista de divisas
-
+  const allRates = ref([]) // 🚨 Contendrá TODAS las tasas
+  const currencies = ref([]) // (Opcional, si lo necesitas)
   const isLoadingData = ref(false)
 
   // --- GETTERS ---
@@ -19,36 +34,37 @@ export const useTransactionStore = defineStore('transaction', () => {
   const getProviders = computed(() => providers.value)
   const getBrokers = computed(() => brokers.value)
 
-  // Mapear cuentas para mostrar su saldo en el nombre (UX mejorada)
+  /**
+   * Mapea las cuentas para mostrar el saldo en el nombre (UX).
+   * Crucial para la validación de saldos.
+   */
   const getAccounts = computed(() =>
     accounts.value.map((a) => ({
       ...a, // Mantiene todos los datos originales como 'balance'
-      name: `${a.name} (${a.currency_code})`, // El texto que se muestra en el select
+      name: `${a.name} (${a.currency_code}) - Saldo: ${formatCurrency(a.balance, a.currency_code)}`,
     })),
   )
 
-  const getActiveRates = computed(() => activeRates.value)
-  const getCurrencies = computed(() => currencies.value)
+  const getAllRates = computed(() => allRates.value)
 
-  // Lógica de búsqueda de tasa mejorada para incluir tasas inversas
+  /**
+   * Lógica de búsqueda de tasa.
+   * Busca la tasa más reciente (directa o inversa)
+   */
   const findRate = computed(() => (from, to) => {
     if (!from || !to) return null
-    if (from === to) return 1 // La tasa a sí misma es 1
+    if (from === to) return 1
 
     // 1. Buscar tasa directa (ej: USD -> VES)
-    const directRate = activeRates.value.find(
-      (r) => r.from_currency === from && r.to_currency === to,
-    )
+    // .find() obtiene la primera (la más reciente, ya que el backend ordena por latest())
+    const directRate = allRates.value.find((r) => r.from_currency === from && r.to_currency === to)
     if (directRate) return parseFloat(directRate.rate)
 
     // 2. Si no, buscar tasa inversa (ej: VES -> USD)
-    const inverseRate = activeRates.value.find(
-      (r) => r.from_currency === to && r.to_currency === from,
-    )
-    // Si se encuentra, devolver el inverso (1 / tasa)
+    const inverseRate = allRates.value.find((r) => r.from_currency === to && r.to_currency === from)
     if (inverseRate) return 1 / parseFloat(inverseRate.rate)
 
-    return null // No se encontró ninguna tasa
+    return null
   })
 
   // --- ACTIONS ---
@@ -57,20 +73,24 @@ export const useTransactionStore = defineStore('transaction', () => {
     isLoadingData.value = true
 
     try {
-      const [clientsRes, providersRes, brokersRes, accountsRes, ratesRes, currenciesRes] =
-        await Promise.all([
-          api.get('/clients?per_page=999'),
-          api.get('/providers?per_page=999'),
-          api.get('/brokers?per_page=999'),
-          api.get('/accounts?per_page=999'),
-          api.get('/rates', { params: { is_active: 1 } }), // 🚨 Ahora esto funcionará
-          api.get('/currencies?per_page=999'),
-        ])
+      const [
+        clientsRes,
+        providersRes,
+        brokersRes,
+        accountsRes,
+        ratesRes, // 🚨 LLAMADA A LA NUEVA RUTA
+        currenciesRes,
+      ] = await Promise.all([
+        api.get('/clients?per_page=999'),
+        api.get('/providers?per_page=999'),
+        api.get('/brokers?per_page=999'),
+        api.get('/accounts?per_page=999'),
+        api.get('/rates/all'), // <-- 🚨 ¡AQUÍ ESTÁ EL CAMBIO!
+        api.get('/currencies?per_page=999'),
+      ])
 
       clients.value = clientsRes.data.data
       providers.value = providersRes.data.data
-
-      // Mapear brokers para incluir su comisión por defecto
       brokers.value = brokersRes.data.data.map((b) => ({
         id: b.id,
         name: `${b.user.name} (${b.default_commission_rate}%)`,
@@ -78,7 +98,7 @@ export const useTransactionStore = defineStore('transaction', () => {
       }))
 
       accounts.value = accountsRes.data.data
-      activeRates.value = ratesRes.data.data // Ahora sí contendrá solo las activas
+      allRates.value = ratesRes.data // 🚨 La data de /all no está paginada
       currencies.value = currenciesRes.data.data
     } catch (error) {
       console.error('Error al cargar datos de apoyo:', error)
@@ -89,14 +109,19 @@ export const useTransactionStore = defineStore('transaction', () => {
   }
 
   return {
+    // State
     isLoadingData,
+    accounts, // Exponer 'accounts' crudas para encontrar balances
+    // Getters
     getClients,
     getProviders,
     getBrokers,
-    getAccounts, // Devuelve cuentas con saldo
-    getCurrencies,
-    findRate, // Devuelve tasa directa o inversa
+    getAccounts,
+    getAllRates,
+    findRate,
+    // Actions
     fetchAllSupportData,
-    accounts, // Exponer cuentas 'crudas' para acceder al balance
+    // Helpers
+    formatCurrency, // Exponer el helper para usarlo en los componentes
   }
 })

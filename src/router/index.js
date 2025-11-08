@@ -132,6 +132,19 @@ const router = createRouter({
           meta: { requiresAuth: true, label: 'Cambio de Divisas', hidden: true },
         },
         {
+          path: 'exchange/list',
+          name: 'transaction_exchange_list',
+          component: () => import('@/views/transactions/CurrencyExchangeListView.vue'),
+          meta: { requiresAuth: true, label: 'Listado de Cambios', hidden: true },
+        },
+        // 🚨 NUEVA RUTA: VISTA DE DETALLE (SHOW)
+        {
+          path: 'exchange/:id', // Utiliza un parámetro dinámico llamado 'id'
+          name: 'transaction_exchange_show', // Nombre de ruta que la lista estaba buscando
+          component: () => import('@/views/transactions/CurrencyExchangeDetailView.vue'),
+          meta: { requiresAuth: true, label: 'Detalle de Transacción', hidden: true },
+        },
+        {
           path: 'purchase',
           name: 'transaction_purchase_create',
           component: () => import('@/views/transactions/PurchaseForm.vue'),

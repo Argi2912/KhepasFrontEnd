@@ -1,3 +1,5 @@
+// src/views/transactions/TransactionHomeView.vue
+
 <script setup>
 import { computed } from 'vue' // 🛑 Importar computed
 import { useRoute } from 'vue-router' // 🛑 Importar useRoute
@@ -15,20 +17,28 @@ const isHomeView = computed(() => route.name === 'transactions_home')
 <template>
   <div class="transaction-home">
     <div v-if="isHomeView">
-      <h1>Crear Nueva Solicitud</h1>
-      <p class="subtitle">Selecciona el tipo de transacción que deseas registrar.</p>
+      <h1>Gestión de Solicitudes</h1>
+      <p class="subtitle">Selecciona una acción: crear una nueva transacción o ver el historial.</p>
 
       <div class="selection-grid">
         <router-link :to="{ name: 'transaction_exchange_create' }" class="selection-card exchange">
           <FontAwesomeIcon icon="fa-solid fa-retweet" class="card-icon" />
-          <h2>Cambio de Divisas</h2>
+          <h2>Crear Cambio de Divisas</h2>
           <p>Registro de operaciones de intercambio de una moneda a otra (Ej: USD a VES).</p>
         </router-link>
 
-        <router-link :to="{ name: 'transaction_purchase_create' }" class="selection-card purchase">
+        <!-- <router-link :to="{ name: 'transaction_purchase_create' }" class="selection-card purchase">
           <FontAwesomeIcon icon="fa-solid fa-dollar-sign" class="card-icon" />
-          <h2>Compra de Dólares</h2>
+          <h2>Crear Compra de Dólares</h2>
           <p>Registro de operaciones donde se compra USD/USDT con moneda local (Ej: VES a USD).</p>
+        </router-link> -->
+
+        <router-link :to="{ name: 'transaction_exchange_list' }" class="selection-card list">
+          <FontAwesomeIcon icon="fa-solid fa-list-ul" class="card-icon" />
+          <h2>Ver Historial de Cambios</h2>
+          <p>
+            Revisar, filtrar y gestionar todas las solicitudes de cambio de divisas registradas.
+          </p>
         </router-link>
       </div>
     </div>
@@ -38,6 +48,7 @@ const isHomeView = computed(() => route.name === 'transactions_home')
 </template>
 
 <style scoped>
+/* Estilos existentes */
 h1 {
   font-size: 1.8rem;
   margin-bottom: 5px;
@@ -94,5 +105,9 @@ h1 {
 }
 .purchase {
   border-left: 5px solid var(--color-success);
+}
+/* 🚨 NUEVO ESTILO PARA EL LISTADO */
+.list {
+  border-left: 5px solid #f39c12; /* Color anaranjado/amarillo para Listas/Historial */
 }
 </style>
