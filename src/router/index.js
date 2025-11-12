@@ -112,6 +112,17 @@ const router = createRouter({
         label: 'Tasas de Cambio',
       },
     },
+    {
+      path: '/admi-platforms', 
+      name: 'platforms_list',
+      component: () => import('@/views/admi/PlatformList.vue'), 
+      meta: {
+        requiresAuth: true,
+        permission: 'manage_rates', 
+        icon: 'fa-solid fa-server', 
+        label: 'Plataformas', 
+      },
+    },
 
     // MÓDULO DE TRANSACCIONES
     {
