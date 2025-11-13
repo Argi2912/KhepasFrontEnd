@@ -29,7 +29,7 @@ const isLoading = ref(false)
 // Encabezados de tabla (idénticos a Cliente)
 const tableHeaders = [
   { key: 'name', label: 'Nombre' },
-  { key: 'email', label: 'Email' },
+  { key: 'email', label: 'Identificacion' },
   { key: 'phone', label: 'Teléfono' },
   { key: 'created_at', label: 'Registro' },
 ]
@@ -106,7 +106,7 @@ onMounted(() => {
 <template>
   <div class="platform-list">
     <div class="header-actions">
-      <h1>Plataformas Registradas</h1>
+      <h1>Plataformas y administradores</h1>
       <button vButton-if="authStore.can(permissionKey)" @click="openCreateModal" class="btn-primary">
         <FontAwesomeIcon icon="fa-solid fa-plus" /> Agregar Plataforma
       </button>
