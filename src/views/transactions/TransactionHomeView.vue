@@ -1,44 +1,47 @@
-// src/views/transactions/TransactionHomeView.vue
-
 <script setup>
-import { computed } from 'vue' // 🛑 Importar computed
-import { useRoute } from 'vue-router' // 🛑 Importar useRoute
-
-import BaseCard from '@/components/shared/BaseCard.vue'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const route = useRoute()
-
-// Determina si estamos en la ruta principal del módulo de transacciones
-// Si route.name es 'transactions_home', mostramos los botones de selección.
+// Si estamos en la raíz de transacciones, mostrar menú. Si no, mostrar el hijo (router-view).
 const isHomeView = computed(() => route.name === 'transactions_home')
 </script>
 
 <template>
-  <div class="transaction-home">
-    <div v-if="isHomeView">
-      <h1>Gestión de Solicitudes</h1>
-      <p class="subtitle">Selecciona una acción: crear una nueva transacción o ver el historial.</p>
+  <div class="home-container">
+    <div v-if="isHomeView" class="menu-wrapper">
+      <h1>Centro de Operaciones</h1>
+      <p>Selecciona el tipo de transacción a realizar:</p>
 
-      <div class="selection-grid">
-        <router-link :to="{ name: 'transaction_exchange_create' }" class="selection-card exchange">
-          <FontAwesomeIcon icon="fa-solid fa-retweet" class="card-icon" />
-          <h2>Crear Cambio de Divisas</h2>
-          <p>Registro de operaciones de intercambio de una moneda a otra (Ej: USD a VES).</p>
+      <div class="cards-grid">
+        <router-link :to="{ name: 'transaction_exchange_create' }" class="menu-card primary">
+          <div class="icon"><FontAwesomeIcon icon="fa-solid fa-money-bill-transfer" /></div>
+          <h3>Operaciones de Divisas</h3>
+          <p>Compra, Venta y Cambio. Incluye gestión de comisiones y tasas.</p>
         </router-link>
 
-        <!-- <router-link :to="{ name: 'transaction_purchase_create' }" class="selection-card purchase">
-          <FontAwesomeIcon icon="fa-solid fa-dollar-sign" class="card-icon" />
-          <h2>Crear Compra de Dólares</h2>
-          <p>Registro de operaciones donde se compra USD/USDT con moneda local (Ej: VES a USD).</p>
-        </router-link> -->
+        <router-link :to="{ name: 'transaction_exchange_list' }" class="menu-card primary-light">
+          <div class="icon"><FontAwesomeIcon icon="fa-solid fa-file-invoice" /></div>
+          <h3>Ver Historial de Divisas</h3>
+          <p>Revisa y gestiona el listado completo de todas las operaciones.</p>
+        </router-link>
 
-        <router-link :to="{ name: 'transaction_exchange_list' }" class="selection-card list">
-          <FontAwesomeIcon icon="fa-solid fa-list-ul" class="card-icon" />
-          <h2>Ver Historial de Cambios</h2>
-          <p>
-            Revisar, filtrar y gestionar todas las solicitudes de cambio de divisas registradas.
-          </p>
+        <router-link :to="{ name: 'transaction_internal_create' }" class="menu-card secondary">
+          <div class="icon"><FontAwesomeIcon icon="fa-solid fa-cash-register" /></div>
+          <h3>Caja y Gastos</h3>
+          <p>Registro de gastos operativos, nómina e ingresos de capital.</p>
+        </router-link>
+
+        <router-link :to="{ name: 'transaction_internal_list' }" class="menu-card secondary-light">
+          <div class="icon"><FontAwesomeIcon icon="fa-solid fa-list-ul" /></div>
+          <h3>Ver Historial de Caja</h3>
+          <p>Auditoría de todos los ingresos y egresos internos.</p>
+        </router-link>
+        <router-link :to="{ name: 'transaction_ledger' }" class="menu-card danger-light">
+          <div class="icon"><FontAwesomeIcon icon="fa-solid fa-file-invoice-dollar" /></div>
+          <h3>Cuentas por Pagar</h3>
+          <p>Gestión de deudas a Brokers, Proveedores y Cobros pendientes.</p>
         </router-link>
       </div>
     </div>
@@ -48,66 +51,72 @@ const isHomeView = computed(() => route.name === 'transactions_home')
 </template>
 
 <style scoped>
-/* Estilos existentes */
+.home-container {
+  padding: 20px;
+}
+.menu-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
 h1 {
   font-size: 1.8rem;
   margin-bottom: 5px;
 }
-.subtitle {
-  opacity: 0.7;
-  margin-bottom: 40px;
+p {
+  margin-bottom: 30px;
+  opacity: 0.8;
 }
-.selection-grid {
+.cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 30px;
 }
 
-.selection-card {
-  background-color: var(--color-secondary);
-  padding: 30px;
-  border-radius: 10px;
+.menu-card {
+  background: var(--color-secondary);
+  padding: 40px 20px;
+  border-radius: 12px;
   text-decoration: none;
   color: var(--color-text-light);
+  border: 1px solid var(--color-border);
   transition:
     transform 0.2s,
-    box-shadow 0.2s;
-  border: 1px solid var(--color-border);
-  position: relative;
-  overflow: hidden;
+    box-shadow 0.2s,
+    border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.selection-card:hover {
+.menu-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
   border-color: var(--color-primary);
 }
 
-.card-icon {
+.icon {
   font-size: 3rem;
-  color: var(--color-primary);
   margin-bottom: 15px;
-  opacity: 0.8;
+  color: var(--color-primary);
+}
+.menu-card.primary .icon {
+  color: var(--color-primary);
+}
+.menu-card.primary-light .icon {
+  color: #5dade2;
+}
+.menu-card.secondary .icon {
+  color: #ffbf00;
 }
 
-.selection-card h2 {
-  font-size: 1.5rem;
+.menu-card h3 {
+  font-size: 1.2rem;
   margin-bottom: 10px;
 }
-.selection-card p {
+.menu-card p {
+  margin: 0;
   font-size: 0.9rem;
-  opacity: 0.7;
-}
-
-/* Colores visuales */
-.exchange {
-  border-left: 5px solid #3498db;
-}
-.purchase {
-  border-left: 5px solid var(--color-success);
-}
-/* 🚨 NUEVO ESTILO PARA EL LISTADO */
-.list {
-  border-left: 5px solid #f39c12; /* Color anaranjado/amarillo para Listas/Historial */
+  opacity: 0.6;
 }
 </style>

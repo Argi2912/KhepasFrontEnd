@@ -1,19 +1,20 @@
-// src/router/index.js (CÓDIGO FINAL CON CARGA DINÁMICA ESTRICTA)
+// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
 
-// 🚨 ELIMINAR TODAS LAS IMPORTACIONES EXPLÍCITAS DE VISTAS DE LA CABECERA.
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // --- 1. Rutas Públicas ---
     {
       path: '/login',
       name: 'login',
       component: () => import('@/views/Login.vue'),
       meta: { layout: 'AuthLayout', requiresAuth: false },
     },
+
+    // --- 2. Dashboard (Raíz) ---
     {
       path: '/',
       redirect: { name: 'dashboard' },
@@ -30,29 +31,28 @@ const router = createRouter({
         permission: 'view_dashboard',
       },
     },
+
+    // --- 3. Gestión de Usuarios y Seguridad ---
     {
       path: '/users',
       name: 'users_list',
-      component: () => import('@/views/users/TenantUserListView.vue'), // 🚨 NUEVA RUTA
+      component: () => import('@/views/users/TenantUserListView.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_users', // Permiso específico para este módulo
+        permission: 'manage_users', // ✅ Coincide con Seeder
         icon: 'fa-solid fa-user-gear',
         label: 'Gestión de Usuarios',
       },
-      children: [
-        // ...
-      ],
     },
 
-    // MÓDULOS DEL TENANT (Carga Dinámica Estricta)
+    // --- 4. Catálogos del Sistema (Configuración) ---
     {
       path: '/clients',
       name: 'clients_list',
       component: () => import('@/views/clients/ClientList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_requests',
+        permission: 'manage_clients', // ✅ Coincide con Seeder
         icon: 'fa-solid fa-users',
         label: 'Clientes',
       },
@@ -63,20 +63,9 @@ const router = createRouter({
       component: () => import('@/views/providers/ProviderList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_requests',
+        permission: 'manage_clients', // Usamos el mismo permiso de cartera
         icon: 'fa-solid fa-truck-moving',
         label: 'Proveedores',
-      },
-    },
-    {
-      path: '/accounts',
-      name: 'accounts_list',
-      component: () => import('@/views/accounts/AccountList.vue'),
-      meta: {
-        requiresAuth: true,
-        permission: 'manage_requests',
-        icon: 'fa-solid fa-wallet',
-        label: 'Cuentas y Caja',
       },
     },
     {
@@ -85,20 +74,46 @@ const router = createRouter({
       component: () => import('@/views/brokers/BrokerList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_requests',
+        permission: 'manage_users', // Los brokers son usuarios
         icon: 'fa-solid fa-user-tie',
         label: 'Corredores',
       },
     },
     {
-      path: '/currencies',
-      name: 'currencies_list',
-      component: () => import('@/views/currencies/CurrencyListView.vue'), // Carga dinámica
+      path: '/admi-platforms',
+      name: 'platforms_list',
+      component: () => import('@/views/admi/PlatformList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_rates',
-        icon: 'fa-solid fa-money-bill-transfer',
-        label: 'Gestión de Divisas',
+        permission: 'manage_platforms', // ✅ Coincide con Seeder
+        icon: 'fa-solid fa-server',
+        label: 'Plataformas',
+      },
+    },
+
+    // --- 5. Configuración Financiera (Tasas y Cuentas) ---
+    {
+      path: '/accounts',
+      name: 'accounts_list',
+      component: () => import('@/views/accounts/AccountList.vue'),
+      meta: {
+        requiresAuth: true,
+        // Permitimos 'manage_exchanges' para que el cajero pueda ver las cuentas,
+        // aunque idealmente solo 'admin_tenant' (manage_platforms) debería editarlas.
+        permission: 'manage_exchanges',
+        icon: 'fa-solid fa-wallet',
+        label: 'Cuentas Bancarias',
+      },
+    },
+    {
+      path: '/currencies',
+      name: 'currencies_list',
+      component: () => import('@/views/currencies/CurrencyListView.vue'),
+      meta: {
+        requiresAuth: true,
+        permission: 'manage_exchanges', // Reemplaza a 'manage_rates' (eliminado)
+        icon: 'fa-solid fa-coins',
+        label: 'Divisas',
       },
     },
     {
@@ -107,81 +122,121 @@ const router = createRouter({
       component: () => import('@/views/rates/ExchangeRateListView.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_rates',
-        icon: 'fa-solid fa-exchange-alt',
+        permission: 'manage_exchanges', // Reemplaza a 'manage_rates' (eliminado)
+        icon: 'fa-solid fa-money-bill-trend-up',
         label: 'Tasas de Cambio',
       },
     },
-    {
-      path: '/admi-platforms', 
-      name: 'platforms_list',
-      component: () => import('@/views/admi/PlatformList.vue'), 
-      meta: {
-        requiresAuth: true,
-        permission: 'manage_rates', 
-        icon: 'fa-solid fa-server', 
-        label: 'Plataformas', 
-      },
-    },
 
-    // MÓDULO DE TRANSACCIONES
+    // --- 6. Módulo Operativo (Transacciones) ---
     {
       path: '/transactions',
       name: 'transactions_home',
       component: () => import('@/views/transactions/TransactionHomeView.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_requests',
-        icon: 'fa-solid fa-file-invoice-dollar',
-        label: 'Solicitudes',
+        icon: 'fa-solid fa-money-bill-transfer',
+        label: 'Transacciones',
+        permission: 'view_dashboard', // Acceso base para ver el menú
       },
       children: [
+        // A. Operaciones de Divisas
         {
-          path: 'exchange',
+          path: 'exchange/create',
           name: 'transaction_exchange_create',
           component: () => import('@/views/transactions/CurrencyExchangeForm.vue'),
-          meta: { requiresAuth: true, label: 'Cambio de Divisas', hidden: true },
+          meta: {
+            requiresAuth: true,
+            label: 'Nueva Operación',
+            hidden: true,
+            permission: 'manage_exchanges', // ✅ Coincide con Seeder
+          },
         },
+        // B. Movimientos de Caja
+        {
+          path: 'internal/create',
+          name: 'transaction_internal_create',
+          component: () => import('@/views/transactions/InternalTransactionForm.vue'),
+          meta: {
+            requiresAuth: true,
+            label: 'Movimiento de Caja',
+            hidden: true,
+            permission: 'manage_internal_transactions', // ✅ Coincide con Seeder
+          },
+        },
+        {
+          path: 'internal/list',
+          name: 'transaction_internal_list',
+          component: () => import('@/views/transactions/InternalTransactionListView.vue'),
+          meta: { requiresAuth: true, label: 'Historial de Caja', hidden: true },
+        },
+        // C. Historial y Detalles
         {
           path: 'exchange/list',
           name: 'transaction_exchange_list',
           component: () => import('@/views/transactions/CurrencyExchangeListView.vue'),
-          meta: { requiresAuth: true, label: 'Listado de Cambios', hidden: true },
+          meta: {
+            requiresAuth: true,
+            label: 'Historial de Operaciones',
+            hidden: true,
+            permission: 'manage_exchanges',
+          },
         },
-        // 🚨 NUEVA RUTA: VISTA DE DETALLE (SHOW)
         {
-          path: 'exchange/:id', // Utiliza un parámetro dinámico llamado 'id'
-          name: 'transaction_exchange_show', // Nombre de ruta que la lista estaba buscando
+          path: 'exchange/:id',
+          name: 'transaction_exchange_show',
           component: () => import('@/views/transactions/CurrencyExchangeDetailView.vue'),
-          meta: { requiresAuth: true, label: 'Detalle de Transacción', hidden: true },
-        },
-        {
-          path: 'purchase',
-          name: 'transaction_purchase_create',
-          component: () => import('@/views/transactions/PurchaseForm.vue'),
-          meta: { requiresAuth: true, label: 'Compra de Dólares', hidden: true },
+          meta: {
+            requiresAuth: true,
+            label: 'Detalle de Transacción',
+            hidden: true,
+            permission: 'manage_exchanges',
+          },
         },
       ],
+    },
+    {
+      path: '/ledger',
+      name: 'transaction_ledger',
+      component: () => import('@/views/finance/LedgerDashboard.vue'),
+      meta: { requiresAuth: true, label: 'Cuentas por Pagar/Cobrar', hidden: true },
     },
   ],
 })
 
-// --- GUARDIA DE NAVEGACIÓN (Se mantiene la lógica estable) ---
+// --- GUARDIA DE NAVEGACIÓN ---
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+
+  // 1. Recuperar usuario si hay token pero no datos (F5 Refresh)
   if (authStore.token && !authStore.user) {
     try {
       await authStore.fetchUser()
     } catch (e) {
-      /* ... */
+      console.error('Sesión no válida')
     }
   }
+
+  // 2. Si ya está logueado e intenta ir al login -> Dashboard
   if (to.name === 'login' && authStore.isLoggedIn) {
     return next({ name: 'dashboard' })
   }
+
+  // 3. Rutas protegidas requieren login
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     return next({ name: 'login' })
   }
+
+  // 4. 🚨 VERIFICACIÓN DE PERMISOS (RBAC)
+  // Esta parte faltaba en tu snippet y es vital para que funcionen los permisos
+  if (to.meta.permission) {
+    if (!authStore.can(to.meta.permission)) {
+      notify.error(`Acceso Denegado. Requieres: ${to.meta.permission}`)
+      // Si falla, redirigimos al dashboard (que es seguro)
+      return next({ name: 'dashboard' })
+    }
+  }
+
   next()
 })
 

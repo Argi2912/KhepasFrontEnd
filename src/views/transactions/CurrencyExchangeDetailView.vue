@@ -1,449 +1,465 @@
-// src/views/transactions/CurrencyExchangeListView.vue
-
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useTransactionStore } from '@/stores/transaction'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
-import notify from '@/services/notify'
-
-// 🚨 Componentes de UI Compartidos y de Diseño
-import BaseCard from '@/components/shared/BaseCard.vue'
-import BaseButton from '@/components/shared/BaseButton.vue'
-import BaseModal from '@/components/shared/BaseModal.vue'
-import BaseTable from '@/components/ui/BaseTable.vue'
-import FilterBar from '@/components/ui/FilterBar.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
-import Pagination from '@/components/ui/Pagination.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
+const route = useRoute()
 const router = useRouter()
-const transactionStore = useTransactionStore()
+const tx = ref(null)
+const loading = ref(true)
+const showDebug = ref(false) // Para ver el JSON real si es necesario
 
-// --- ESTADO DEL MODAL DE DETALLE ---
-const showModal = ref(false)
-const selectedTransaction = ref(null)
-const fetchingDetail = ref(false)
+// --- COMPUTEDS INTELIGENTES (Detectan CamelCase o snake_case) ---
 
-// --- ESTADO DE LA LISTA ---
-const exchanges = ref([])
-const loading = ref(false)
-const pagination = ref({
-  current_page: 1,
-  last_page: 1,
-  total: 0,
-  from: 0,
-  to: 0,
-})
+const getRel = (obj, camelKey) => {
+  if (!obj) return null
+  // 1. Intenta CamelCase (ej: fromAccount)
+  if (obj[camelKey]) return obj[camelKey]
 
-// --- ESTADO DE LOS FILTROS ---
-const combinedFilters = ref({
-  client_id: null,
-  broker_id: null,
-  // search, start_date, end_date serán actualizados por FilterBar
-})
+  // 2. Intenta snake_case (ej: from_account)
+  const snakeKey = camelKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+  if (obj[snakeKey]) return obj[snakeKey]
 
-// --- CONFIGURACIÓN DE LA TABLA (Para BaseTable.vue) ---
-const tableHeaders = [
-  { key: 'number', label: '#' },
-  { key: 'created_at', label: 'Fecha' },
-  { key: 'client', label: 'Cliente' },
-  { key: 'broker', label: 'Corredor' },
-  { key: 'sent_amount', label: 'Envía' },
-  { key: 'received_amount', label: 'Recibe' },
-  { key: 'exchange_rate', label: 'Tasa' },
-  { key: 'status', label: 'Estado' },
-]
-
-// --- GETTERS Y HELPERS ---
-const clientsOptions = computed(() =>
-  transactionStore.getClients.map((c) => ({ id: c.id, name: c.name })),
-)
-
-const brokersOptions = computed(() =>
-  transactionStore.getBrokers.map((b) => ({
-    id: b.id,
-    name: b.name.split('(')[0].trim(),
-  })),
-)
-
-/**
- * Helper para formatear montos en el modal de detalle, extrayendo la divisa del nombre de la cuenta.
- */
-const formatDetailAmount = (amount, account) => {
-  if (amount == null || !account) return 'N/A'
-  // Extraer divisa: 'Mercantil (VES)' -> 'VES'
-  const currencyMatch = account.name?.match(/\((.*?)\)/)
-  const currency = currencyMatch ? currencyMatch[1] : 'USD'
-  return transactionStore.formatCurrency(amount, currency)
+  return null
 }
 
-// --- ACCIONES DE LISTA ---
+const fromAccount = computed(() => getRel(tx.value, 'fromAccount') || {})
+const toAccount = computed(() => getRel(tx.value, 'toAccount') || {})
+const client = computed(() => getRel(tx.value, 'client') || {})
+const adminUser = computed(() => getRel(tx.value, 'adminUser') || {})
+const provider = computed(() => getRel(tx.value, 'provider') || {})
+const broker = computed(() => getRel(tx.value, 'broker') || {})
+// Acceso seguro al usuario del broker (puede venir anidado como broker.user o plano)
+const brokerUser = computed(() => broker.value.user || {})
 
-/**
- * Carga las transacciones y mapea los datos para la tabla.
- */
-const fetchCurrencyExchanges = async (page = 1) => {
-  loading.value = true
+// --- LÓGICA DE VISUALIZACIÓN ---
 
-  const params = {
-    page: page,
-    ...combinedFilters.value,
+const operationType = computed(() => {
+  if (tx.value?.operation_type) return tx.value.operation_type
+  // Inferencia: Si exchange_rate es igual a buy_rate (o buy_rate no existe), es Intercambio.
+  // Si buy_rate existe y es diferente, es Compra.
+  if (tx.value?.buy_rate && parseFloat(tx.value.buy_rate) !== parseFloat(tx.value.exchange_rate)) {
+    return 'purchase'
+  }
+  return 'exchange'
+})
+
+const commissionCurrency = computed(() => {
+  if (operationType.value === 'purchase') {
+    return toAccount.value.currency_code || 'USD'
+  }
+  return fromAccount.value.currency_code || 'USD'
+})
+
+const exchangeRateDetails = computed(() => {
+  if (!tx.value) return {}
+
+  // Si detectamos que fue una compra con tasas diferenciadas
+  if (operationType.value === 'purchase') {
+    return {
+      title: 'Tasas de Compra',
+      rate1: { label: 'Compra (Base)', value: tx.value.buy_rate || tx.value.exchange_rate },
+      rate2: { label: 'Entrada (Cliente)', value: tx.value.received_rate || '---' },
+      usedRate: tx.value.buy_rate || tx.value.exchange_rate,
+    }
   }
 
+  return {
+    title: 'Tasa de Operación',
+    rate1: { label: 'Tasa Aplicada', value: tx.value.exchange_rate },
+    rate2: null,
+    usedRate: tx.value.exchange_rate,
+  }
+})
+
+const netProfit = computed(() => {
+  if (!tx.value) return 0
+  const charged = parseFloat(
+    tx.value.commission_total_amount || tx.value.commission_charged_amount || 0,
+  )
+  const providerCost = parseFloat(tx.value.commission_provider_amount || 0)
+  const adminCost = parseFloat(tx.value.commission_admin_amount || 0)
+
+  return (charged - providerCost - adminCost).toFixed(2)
+})
+
+// --- API ---
+onMounted(async () => {
   try {
-    // URL CORREGIDA: /transactions/currency-exchange
-    const response = await api.get('/transactions/currency-exchange', { params })
-
-    exchanges.value = response.data.data.map((ex) => {
-      // Lógica de inferencia de divisas y valores seguros
-      const fromCurrencyMatch = ex.from_account?.name?.match(/\((.*?)\)/)
-      const toCurrencyMatch = ex.to_account?.name?.match(/\((.*?)\)/)
-
-      const from_currency = fromCurrencyMatch ? fromCurrencyMatch[1] : (ex.from_currency ?? 'USD')
-      const to_currency = toCurrencyMatch ? toCurrencyMatch[1] : (ex.to_currency ?? 'USD')
-
-      // El campo 'amount_sent' no está en el JSON de la API, lo ponemos a null/0.
-      const amount_sent = ex.amount_sent ?? 0
-
-      return {
-        ...ex,
-        // Datos formateados para la tabla
-        sent_amount: transactionStore.formatCurrency(amount_sent, from_currency),
-        received_amount: transactionStore.formatCurrency(ex.amount_received, to_currency),
-
-        // Acceso seguro a relaciones anidadas
-        client: ex.client?.name ?? `ID ${ex.client_id ?? 'N/A'}`,
-        broker: ex.broker?.user?.name ?? `ID ${ex.broker_id ?? 'N/A'}`,
-
-        created_at: ex.created_at ? new Date(ex.created_at).toLocaleDateString() : 'N/A',
-        exchange_rate: ex.exchange_rate ? parseFloat(ex.exchange_rate).toFixed(4) : 'N/A',
-        status: ex.status ?? 'pending', // Default para 'status'
-      }
-    })
-
-    const { data, ...paginationData } = response.data
-    pagination.value = paginationData
-  } catch (error) {
-    notify.error('Error al cargar el historial de cambios.')
-    console.error('API Error:', error)
+    const { data } = await api.get(`/transactions/exchanges/${route.params.id}`)
+    tx.value = data
+    console.log('Transaction Data:', data) // Ver en consola del navegador (F12)
+  } catch (e) {
+    console.error(e)
+    router.push({ name: 'transaction_exchange_list' })
   } finally {
     loading.value = false
   }
-}
-
-/**
- * Maneja los filtros provenientes del FilterBar.vue
- */
-const handleFilterBarUpdate = (newBarFilters) => {
-  // Fusión de los filtros: selects (existentes) + inputs (nuevos)
-  combinedFilters.value = {
-    ...combinedFilters.value,
-    ...newBarFilters,
-  }
-  // Recargar siempre desde la página 1
-  fetchCurrencyExchanges(1)
-}
-
-/**
- * Maneja el cambio de página desde el componente Pagination.vue
- */
-const handlePageChange = (page) => {
-  fetchCurrencyExchanges(page)
-}
-
-// --- ACCIONES DE MODAL ---
-
-/**
- * Carga los detalles de una transacción específica (el endpoint 'show') y muestra el modal.
- */
-const openDetailModal = async (id) => {
-  fetchingDetail.value = true
-  selectedTransaction.value = null
-
-  try {
-    // Llama al endpoint SHOW para obtener todas las relaciones
-    const response = await api.get(`/transactions/currency-exchange/${id}`)
-    selectedTransaction.value = response.data
-    showModal.value = true
-  } catch (error) {
-    notify.error('Error al cargar el detalle de la transacción.')
-    console.error('Detail API Error:', error)
-  } finally {
-    fetchingDetail.value = false
-  }
-}
-
-const closeDetailModal = () => {
-  showModal.value = false
-  selectedTransaction.value = null
-}
-
-// --- CICLO DE VIDA Y WATCHERS ---
-
-onMounted(async () => {
-  // Carga inicial de datos de apoyo (clientes, brokers)
-  await transactionStore.fetchAllSupportData()
-  // Carga inicial de la lista
-  fetchCurrencyExchanges()
-})
-
-// Observa cambios en los selects (client_id, broker_id) para recargar la lista
-watch([() => combinedFilters.value.client_id, () => combinedFilters.value.broker_id], () => {
-  fetchCurrencyExchanges(1)
 })
 </script>
 
 <template>
-  <div class="currency-exchange-list-view">
-    <h1>Historial de Solicitudes de Cambio de Divisas</h1>
+  <div class="detail-wrapper">
+    <div v-if="loading" class="text-center">
+      <FontAwesomeIcon icon="fa-solid fa-spinner" spin size="2x" />
+      <p>Cargando...</p>
+    </div>
 
-    <FilterBar @update:filters="handleFilterBarUpdate" />
-
-    <BaseCard class="mb-4">
-      <h3>Filtros Adicionales</h3>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <BaseSelect
-            v-model="combinedFilters.client_id"
-            label="Cliente"
-            name="client_id"
-            :options="clientsOptions"
-            label-by="name"
-            track-by="id"
-            placeholder="Filtrar por Cliente"
-          />
+    <div v-else-if="tx" class="invoice-card">
+      <div class="invoice-header">
+        <div>
+          <h2>Transacción #{{ tx.number }}</h2>
+          <span class="date-label">{{ new Date(tx.created_at).toLocaleString('es-VE') }}</span>
         </div>
-        <div class="col-md-6">
-          <BaseSelect
-            v-model="combinedFilters.broker_id"
-            label="Corredor"
-            name="broker_id"
-            :options="brokersOptions"
-            label-by="name"
-            track-by="id"
-            placeholder="Filtrar por Corredor"
-          />
+        <div class="header-badges">
+          <span class="badge type-badge">
+            {{ operationType === 'purchase' ? 'COMPRA' : 'INTERCAMBIO' }}
+          </span>
+          <span :class="['badge', `bg-${tx.status === 'completed' ? 'success' : 'warning'}`]">
+            {{ tx.status ? tx.status.toUpperCase() : 'COMPLETADO' }}
+          </span>
         </div>
       </div>
-    </BaseCard>
 
-    <BaseCard>
-      <div class="d-flex justify-content-end align-items-center mb-3">
-        <BaseButton @click="router.push({ name: 'transaction_exchange_create' })" variant="primary">
-          <FontAwesomeIcon icon="fa-solid fa-plus" /> Nueva Transacción
-        </BaseButton>
+      <div class="meta-info-grid">
+        <div class="info-group">
+          <label>Cliente</label>
+          <p>{{ client.name || '---' }}</p>
+        </div>
+        <div class="info-group">
+          <label>Corredor</label>
+          <p>{{ brokerUser.name || 'Directo' }}</p>
+        </div>
+        <div class="info-group">
+          <label>Registrado Por</label>
+          <p>{{ adminUser.name || 'Sistema' }}</p>
+        </div>
       </div>
 
-      <BaseTable :headers="tableHeaders" :data="exchanges" :is-loading="loading">
-        <tr v-for="ex in exchanges" :key="ex.id">
-          <td>{{ ex.number }}</td>
-          <td>{{ ex.created_at }}</td>
-          <td>{{ ex.client }}</td>
-          <td>{{ ex.broker }}</td>
-          <td>{{ ex.sent_amount }}</td>
-          <td>{{ ex.received_amount }}</td>
-          <td>{{ ex.exchange_rate }}</td>
-          <td>
-            <span :class="['badge', `bg-${ex.status === 'completed' ? 'success' : 'warning'}`]">
-              {{ ex.status }}
-            </span>
-          </td>
-          <td>
-            <button @click="openDetailModal(ex.id)" class="action-btn view-btn">
-              <FontAwesomeIcon icon="fa-solid fa-eye" />
-            </button>
-          </td>
-        </tr>
-      </BaseTable>
+      <div class="divider"></div>
 
-      <Pagination :pagination="pagination" @change-page="handlePageChange" />
-    </BaseCard>
+      <div class="flow-chart-container">
+        <div class="flow-box left">
+          <span>SALE DE ({{ fromAccount.name || 'Origen' }})</span>
+          <strong class="text-danger amount-text">
+            - {{ parseFloat(tx.amount_sent).toFixed(2) }}
+            <small>{{ fromAccount.currency_code }}</small>
+          </strong>
+        </div>
 
-    <BaseModal
-      :show="showModal"
-      @close="closeDetailModal"
-      :title="`Detalle de Transacción ${selectedTransaction?.number ?? ''}`"
-    >
-      <div v-if="fetchingDetail" class="text-center p-4">
-        <FontAwesomeIcon icon="fa-solid fa-spinner" spin size="2x" />
-        <p class="mt-2">Cargando detalles...</p>
+        <div class="flow-arrow">
+          <div class="line"></div>
+          <FontAwesomeIcon icon="fa-solid fa-circle-right" />
+          <span class="rate-pill">Tasa: {{ exchangeRateDetails.usedRate }}</span>
+        </div>
+
+        <div class="flow-box right">
+          <span>ENTRA EN ({{ toAccount.name || 'Destino' }})</span>
+          <strong class="text-success amount-text">
+            + {{ parseFloat(tx.amount_received).toFixed(2) }}
+            <small>{{ toAccount.currency_code }}</small>
+          </strong>
+        </div>
       </div>
 
-      <div v-else-if="selectedTransaction" class="transaction-detail-content">
+      <div class="sections-grid">
         <div class="detail-section">
-          <h4 class="section-title">Información Principal</h4>
-          <div class="detail-grid">
-            <div class="detail-item">
-              <strong>Número:</strong> <span>{{ selectedTransaction.number }}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Fecha:</strong>
-              <span>{{ new Date(selectedTransaction.created_at).toLocaleDateString() }}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Estado:</strong>
-              <span
-                :class="[
-                  'badge',
-                  `bg-${selectedTransaction.status === 'completed' ? 'success' : 'warning'}`,
-                ]"
-              >
-                {{ selectedTransaction.status ?? 'pending' }}
-              </span>
-            </div>
+          <h4><FontAwesomeIcon icon="fa-solid fa-percent" /> {{ exchangeRateDetails.title }}</h4>
+          <div class="detail-row">
+            <span>{{ exchangeRateDetails.rate1.label }}:</span>
+            <strong>{{ exchangeRateDetails.rate1.value }}</strong>
+          </div>
+          <div v-if="exchangeRateDetails.rate2" class="detail-row">
+            <span>{{ exchangeRateDetails.rate2.label }}:</span>
+            <strong>{{ exchangeRateDetails.rate2.value }}</strong>
           </div>
         </div>
 
         <div class="detail-section">
-          <h4 class="section-title">Partes Involucradas</h4>
-          <div class="detail-grid">
-            <div class="detail-item">
-              <strong>Cliente:</strong> <span>{{ selectedTransaction.client?.name }}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Corredor:</strong>
-              <span>{{ selectedTransaction.broker?.user?.name ?? 'N/A' }}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Administrador:</strong>
-              <span>{{ selectedTransaction.admin_user?.name ?? 'N/A' }}</span>
-            </div>
+          <h4>
+            <FontAwesomeIcon icon="fa-solid fa-calculator" /> Rentabilidad ({{
+              commissionCurrency
+            }})
+          </h4>
+
+          <div class="detail-row income">
+            <span>Comisión Cobrada:</span>
+            <strong>+ {{ parseFloat(tx.commission_total_amount || 0).toFixed(2) }}</strong>
           </div>
-        </div>
+          <div class="detail-row expense">
+            <span>Pago a Proveedor ({{ provider.name || 'N/A' }}):</span>
+            <strong>- {{ parseFloat(tx.commission_provider_amount || 0).toFixed(2) }}</strong>
+          </div>
+          <div v-if="parseFloat(tx.commission_admin_amount) > 0" class="detail-row expense">
+            <span>Costo Plataforma:</span>
+            <strong>- {{ parseFloat(tx.commission_admin_amount).toFixed(2) }}</strong>
+          </div>
 
-        <div class="detail-section">
-          <h4 class="section-title">Movimiento y Comisiones</h4>
-          <div class="detail-grid">
-            <div class="detail-item">
-              <strong>Cuenta Origen:</strong>
-              <span>{{ selectedTransaction.from_account?.name }}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Monto Enviado:</strong>
-              <span>{{
-                formatDetailAmount(
-                  selectedTransaction.amount_sent,
-                  selectedTransaction.from_account,
-                )
-              }}</span>
-            </div>
-
-            <div class="detail-item">
-              <strong>Cuenta Destino:</strong>
-              <span>{{ selectedTransaction.to_account?.name }}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Monto Recibido:</strong>
-              <span>{{
-                formatDetailAmount(
-                  selectedTransaction.amount_received,
-                  selectedTransaction.to_account,
-                )
-              }}</span>
-            </div>
-
-            <div class="detail-item">
-              <strong>Comisión Cobrada:</strong>
-              <span>{{ selectedTransaction.commission_charged_pct }}%</span>
-            </div>
-            <div class="detail-item">
-              <strong>Comisión Admin:</strong>
-              <span>{{ selectedTransaction.commission_admin_pct }}%</span>
-            </div>
+          <div class="detail-row total">
+            <span>Utilidad Neta:</span>
+            <strong :class="netProfit >= 0 ? 'text-success' : 'text-danger'">
+              {{ netProfit }}
+            </strong>
           </div>
         </div>
       </div>
 
-      <div v-else-if="!fetchingDetail" class="p-4">
-        No se encontraron los detalles de la transacción.
+      <div class="debug-toggle">
+        <button @click="showDebug = !showDebug" class="btn-link">
+          {{ showDebug ? 'Ocultar Datos Crudos' : 'Ver Datos Crudos (Debug)' }}
+        </button>
+        <pre v-if="showDebug" class="debug-box">{{ tx }}</pre>
       </div>
 
-      <template #footer>
-        <BaseButton @click="closeDetailModal" variant="secondary" :disabled="fetchingDetail">
-          Cerrar
-        </BaseButton>
-      </template>
-    </BaseModal>
+      <div class="footer-actions">
+        <button @click="router.back()" class="btn-secondary">
+          <FontAwesomeIcon icon="fa-solid fa-arrow-left" /> Volver
+        </button>
+      </div>
+    </div>
+
+    <div v-else class="text-center error-state">
+      <p>No se encontró la transacción.</p>
+      <button @click="router.back()" class="btn-secondary">Volver</button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Estilos se mantienen */
-.mb-4 {
-  margin-bottom: 1.5rem;
+.detail-wrapper {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 0 20px;
+  color: var(--color-text-light);
+}
+
+.invoice-card {
+  background-color: var(--color-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Header */
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 25px;
+}
+.invoice-header h2 {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 1.8rem;
+}
+.date-label {
+  color: #888;
+  font-size: 0.9rem;
+}
+.header-badges {
+  display: flex;
+  gap: 10px;
 }
 .badge {
-  padding: 0.4em 0.6em;
-  border-radius: 0.375rem;
-  font-size: 0.75em;
-  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+.type-badge {
+  background: #444;
+  color: #fff;
+  border: 1px solid #666;
 }
 .bg-success {
-  background-color: #2ecc71;
-  color: #fff;
+  background-color: rgba(14, 203, 129, 0.2);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
 }
 .bg-warning {
-  background-color: #f39c12;
-  color: #fff;
+  background-color: rgba(243, 156, 18, 0.2);
+  color: #f39c12;
+  border: 1px solid #f39c12;
 }
 
-.action-btn {
+/* Meta Info Grid */
+.meta-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  background: var(--color-background);
+  padding: 15px;
+  border-radius: 8px;
+}
+.info-group label {
+  display: block;
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.info-group p {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: #eee;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 25px 0;
+}
+
+/* Flow Chart */
+.flow-chart-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 0 10px;
+}
+.flow-box {
+  display: flex;
+  flex-direction: column;
+}
+.flow-box.right {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.flow-box span {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 5px;
+}
+.amount-text {
+  font-size: 1.6rem;
+  font-weight: bold;
+}
+.amount-text small {
+  font-size: 1rem;
+  font-weight: normal;
+  color: #888;
+  margin-left: 5px;
+}
+
+.flow-arrow {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 0 20px;
+  color: var(--color-border);
+}
+.flow-arrow svg {
+  font-size: 1.5rem;
+  z-index: 2;
+  background: var(--color-secondary);
+}
+.rate-pill {
+  margin-top: 8px;
+  background: #333;
+  padding: 4px 10px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+}
+
+/* Sections */
+.sections-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+.detail-section {
+  background: var(--color-background);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+.detail-section h4 {
+  color: var(--color-text-light);
+  font-size: 1rem;
+  border-bottom: 1px dashed #444;
+  padding-bottom: 10px;
+  margin: 0 0 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-section h4 svg {
+  color: var(--color-primary);
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+.detail-row.total {
+  border-top: 1px solid #444;
+  padding-top: 12px;
+  margin-top: 15px;
+  font-size: 1.1rem;
+}
+
+/* Utils */
+.text-danger {
+  color: var(--color-danger) !important;
+}
+.text-success {
+  color: var(--color-success) !important;
+}
+.btn-secondary {
+  background: transparent;
+  border: 1px solid #666;
+  color: #ccc;
+  padding: 8px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-secondary:hover {
+  background: #333;
+}
+
+/* Debug */
+.debug-toggle {
+  margin-top: 30px;
+  text-align: center;
+}
+.btn-link {
   background: none;
   border: none;
+  color: #555;
+  text-decoration: underline;
   cursor: pointer;
-  font-size: 1rem;
-  padding: 5px;
-  transition: color 0.2s;
+  font-size: 0.8rem;
 }
-.view-btn {
-  color: var(--color-primary);
-}
-.view-btn:hover {
-  color: #3498db;
-}
-
-/* Estilos específicos del modal de detalle */
-.transaction-detail-content {
-  padding: 20px;
+.debug-box {
+  text-align: left;
+  background: #000;
+  color: #0f0;
+  padding: 15px;
+  border-radius: 5px;
+  overflow: auto;
+  max-height: 300px;
+  margin-top: 10px;
+  font-size: 0.75rem;
 }
 
-.detail-section {
-  margin-bottom: 25px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.detail-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.section-title {
-  color: var(--color-primary);
-  font-size: 1.1rem;
-  margin-bottom: 15px;
-  font-weight: 600;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px 20px;
-}
-
-.detail-item strong {
-  display: block;
-  font-weight: 500;
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin-bottom: 3px;
-}
-
-.detail-item span {
-  display: block;
-  font-size: 1rem;
-  color: var(--color-text-light);
+.footer-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
 }
 </style>
