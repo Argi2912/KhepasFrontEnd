@@ -14,7 +14,7 @@ import BaseCard from '@/components/shared/BaseCard.vue'
 import ProviderFormModal from '@/components/shared/ProviderFormModal.vue' // 🚨 IMPORTANTE
 
 const authStore = useAuthStore()
-const permissionKey = 'manage_requests' // Usamos el permiso de transacciones
+const permissionKey = 'manage_exchanges' // Usamos el permiso de transacciones
 
 // Estado del Modal
 const showProviderModal = ref(false)

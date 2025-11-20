@@ -14,7 +14,7 @@ import BaseCard from '@/components/shared/BaseCard.vue'
 import AccountFormModal from '@/components/shared/AccountFormModal.vue'
 
 const authStore = useAuthStore()
-const permissionKey = 'manage_requests'
+const permissionKey = 'manage_exchanges'
 
 // Estado del Modal
 const showAccountModal = ref(false)

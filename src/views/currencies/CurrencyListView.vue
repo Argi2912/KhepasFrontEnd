@@ -14,7 +14,7 @@ import BaseCard from '@/components/shared/BaseCard.vue'
 import CurrencyFormModal from '@/views/currencies/CurrencyFormModal.vue'
 
 const authStore = useAuthStore()
-const permissionKey = 'manage_rates' // Permiso para manejar divisas y tasas
+const permissionKey = 'manage_exchanges' // Permiso para manejar divisas y tasas
 
 // Estado del Modal
 const showCurrencyModal = ref(false)

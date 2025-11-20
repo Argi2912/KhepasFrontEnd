@@ -14,7 +14,7 @@ import BaseCard from '@/components/shared/BaseCard.vue'
 import BrokerFormModal from '@/components/shared/BrokerFormModal.vue' // 🚨 Importar Modal
 
 const authStore = useAuthStore()
-const permissionKey = 'manage_requests' // Permiso para gestionar brokers
+const permissionKey = 'manage_exchanges' // Permiso para gestionar brokers
 
 // Estado del Modal
 const showBrokerModal = ref(false)
