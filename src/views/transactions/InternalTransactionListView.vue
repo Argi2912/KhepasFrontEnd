@@ -16,13 +16,15 @@ const showDetailModal = ref(false)
 const selectedTx = ref(null)
 const isLoadingDetail = ref(false)
 
+// --- DEFINICIÓN DE COLUMNAS ---
 const headers = [
   { key: 'date', label: 'Fecha' },
   { key: 'type', label: 'Tipo' },
+  { key: 'person_name', label: 'Persona / Tercero' }, // NUEVO
   { key: 'category', label: 'Categoría' },
   { key: 'account', label: 'Cuenta' },
+  { key: 'dueño', label: 'Dueño Cta.' },              // CORREGIDO (key minúscula)
   { key: 'amount', label: 'Monto' },
-  { key: 'user', label: 'Responsable' },
   { key: 'actions', label: '' },
 ]
 
@@ -47,6 +49,10 @@ const normalizeInternalTx = (data) => {
     is_income: isIncome,
     category: data.category || 'General',
     description: data.description || 'Sin notas adicionales',
+
+    // --- NUEVOS CAMPOS ---
+    dueño: data.dueño || 'N/A',             // Mapeo directo de la API
+    person_name: data.person_name || 'N/A', // Mapeo directo de la API
 
     // Relaciones seguras
     account_name: account.name || 'Cuenta Eliminada',
@@ -95,7 +101,7 @@ const openModal = async (id) => {
   selectedTx.value = null
 
   try {
-    const { data } = await api.get(`/transactions/internal/${id}`) // Usa el nuevo show()
+    const { data } = await api.get(`/transactions/internal/${id}`)
     selectedTx.value = normalizeInternalTx(data)
   } catch (e) {
     console.error(e)
@@ -121,6 +127,7 @@ onMounted(() => fetchTransactions())
       <BaseTable :headers="headers" :data="transactions" :is-loading="isLoading">
         <tr v-for="row in transactions" :key="row.id">
           <td>{{ row.date_fmt }}</td>
+          
           <td>
             <span :class="['badge-type', row.is_income ? 'b-green' : 'b-red']">
               <FontAwesomeIcon
@@ -129,12 +136,19 @@ onMounted(() => fetchTransactions())
               {{ row.type_label }}
             </span>
           </td>
+
+          <td class="font-bold text-dark">{{ row.person_name }}</td>
+
           <td>{{ row.category }}</td>
+          
           <td>{{ row.account_name }}</td>
+
+          <td class="text-sm text-gray">{{ row.dueño }}</td>
+
           <td :class="['font-mono', row.is_income ? 'text-success' : 'text-danger']">
             {{ row.is_income ? '+' : '-' }} {{ row.amount_fmt }}
           </td>
-          <td class="text-sm text-gray">{{ row.user_name }}</td>
+
           <td>
             <button @click="openModal(row.id)" class="btn-icon view-btn" title="Ver Detalle">
               <FontAwesomeIcon icon="fa-solid fa-eye" />
@@ -172,6 +186,15 @@ onMounted(() => fetchTransactions())
 
         <div class="info-grid">
           <div class="info-item">
+            <label>Persona / Tercero</label>
+            <p class="font-bold">{{ selectedTx.person_name }}</p>
+          </div>
+           <div class="info-item"> 
+            <label>Dueño de la Cuenta</label>
+            <p>{{ selectedTx.dueño }}</p>
+          </div>
+
+          <div class="info-item">
             <label>Cuenta Afectada</label>
             <p>{{ selectedTx.account_name }}</p>
           </div>
@@ -187,6 +210,7 @@ onMounted(() => fetchTransactions())
             <label>Fecha de Registro</label>
             <p>{{ selectedTx.created_at }}</p>
           </div>
+
           <div class="info-item full-width">
             <label>Descripción / Notas</label>
             <div class="desc-box">

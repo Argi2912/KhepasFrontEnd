@@ -14,15 +14,17 @@ const { errors, handleAxiosError } = useFormValidation()
 
 const isSubmitting = ref(false)
 
-// Formulario simple
+// Formulario actualizado
 const form = reactive({
   account_id: '',
   user_id: authStore.authUser?.id,
   type: 'expense', // expense | income
   category: '',
+  dueño: '',       // Dueño de la cuenta bancaria/caja
+  person_name: '', // NUEVO: Nombre de la persona (quien recibe o entrega)
   amount: '',
   description: '',
-  transaction_date: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
+  transaction_date: new Date().toISOString().split('T')[0],
 })
 
 onMounted(() => transactionStore.fetchAllSupportData())
@@ -73,6 +75,22 @@ const handleSubmit = async () => {
             required
             :error="errors.amount"
           />
+          
+          <BaseInput
+            label="Dueño de la Cuenta"
+            placeholder="Titular de la cuenta"
+            v-model="form.dueño"
+            required
+            :error="errors.dueño"
+          />
+
+          <BaseInput
+            label="Nombre de la Persona"
+            placeholder="Quien entrega o recibe el dinero"
+            v-model="form.person_name"
+            required
+            :error="errors.person_name"
+          />
         </div>
 
         <BaseInput
@@ -80,9 +98,14 @@ const handleSubmit = async () => {
           v-model="form.category"
           required
           :error="errors.category"
+          class="mt-4"
         />
 
-        <BaseInput label="Descripción / Notas" v-model="form.description" />
+        <BaseInput 
+            label="Descripción / Notas" 
+            v-model="form.description" 
+            class="mt-4"
+        />
 
         <div class="actions">
           <button type="button" @click="router.back()" class="btn-cancel">Cancelar</button>
