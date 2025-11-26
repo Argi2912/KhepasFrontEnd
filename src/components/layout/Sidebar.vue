@@ -94,7 +94,7 @@ const menuItems = computed(() => {
 
     <div class="user-footer" v-if="isOpen">
       <span class="tenant-name"
-        >Tenant: {{ authStore.authUser?.tenant?.name || 'Cargando...' }}</span
+        >Tenant: {{ authStore.authUser?.tenant?.name || 'SuperAdmin' }}</span
       >
     </div>
   </aside>

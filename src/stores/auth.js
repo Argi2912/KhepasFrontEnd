@@ -19,9 +19,9 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const can = (permissionName) => {
     // 1. Si el usuario es Superadmin (sin tenant_id), tiene acceso total
-    if (user.value && user.value.tenant_id === null) {
+    /*  if (user.value && user.value.tenant_id === null) {
       return true
-    }
+    } */
     // 2. Busca en la lista plana de permisos
     return permissions.value.includes(permissionName)
   }
@@ -43,12 +43,19 @@ export const useAuthStore = defineStore('auth', () => {
 
     setToken(newToken)
 
-    // Esperamos que fetchUser() termine y cargue los permisos
+    // Esperamos que fetchUser() termine y cargue los permisos y el objeto user
     await fetchUser()
 
-    // Solo después de tener los permisos, redirigimos.
-    // Esto evita el error 403 al recargar.
-    router.push({ name: 'dashboard' })
+    // --- CORRECCIÓN AQUÍ ---
+    // Determinamos si es Superadmin basándonos en tenant_id (igual que en tu router)
+    const isSuperAdmin = user.value?.tenant_id === null
+
+    // Redirigimos según el rol
+    if (isSuperAdmin) {
+      router.push({ name: 'superadmin_dashboard' })
+    } else {
+      router.push({ name: 'dashboard' })
+    }
   }
 
   /**
