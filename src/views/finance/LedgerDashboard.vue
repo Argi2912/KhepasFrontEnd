@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useTransactionStore } from '@/stores/transaction' // Para sacar las cuentas disponibles
+import { useTransactionStore } from '@/stores/transaction'
 import api from '@/services/api'
 import notify from '@/services/notify'
+import Swal from 'sweetalert2' // Importamos SweetAlert
 
 // Componentes UI
 import BaseTable from '@/components/ui/BaseTable.vue'
@@ -25,7 +26,7 @@ const paymentForm = ref({ account_id: '' })
 const isProcessingPayment = ref(false)
 
 // --- COMPUTADAS ---
-const accountsOptions = computed(() => transactionStore.getAccounts) // Usamos el getter del store que ya formatea el saldo
+const accountsOptions = computed(() => transactionStore.getAccounts)
 
 const headers = [
   { key: 'date', label: 'Fecha' },
@@ -44,7 +45,7 @@ const fetchDashboard = async () => {
     const resSummary = await api.get('/ledger/summary')
     summary.value = resSummary.data
 
-    // 2. Cargar Lista según el tab activo (solo pendientes)
+    // 2. Cargar Lista según el tab activo
     const resEntries = await api.get(`/ledger?status=pending&type=${activeTab.value}`)
 
     entries.value = resEntries.data.data.map((item) => ({
@@ -54,10 +55,13 @@ const fetchDashboard = async () => {
       amount: parseFloat(item.amount),
       // Lógica para mostrar nombre de Broker/Provider/Client de forma segura
       entity_name: item.entity ? item.entity.name || item.entity.user?.name || '---' : '---',
-      entity_type: item.entity_type ? item.entity_type.split('\\').pop() : '', // "Broker", "Provider"
+      entity_type: item.entity_type ? item.entity_type.split('\\').pop() : 'Cliente',
       // Referencia a la transacción original
       tx_number: item.transaction ? item.transaction.number : '---',
       currency: item.currency_code || 'USD',
+
+      // 🚨 Bandera para identificar si es Compra de Divisa Pendiente
+      is_exchange_op: item.is_exchange_op || false,
     }))
   } catch (e) {
     console.error(e)
@@ -87,21 +91,49 @@ const confirmPayment = async () => {
 
   isProcessingPayment.value = true
   try {
-    // Llamada al endpoint que creamos en el backend
     await api.post(`/ledger/${selectedDebt.value.id}/pay`, {
       account_id: paymentForm.value.account_id,
     })
 
     notify.success('Pago registrado exitosamente')
     showPayModal.value = false
-    fetchDashboard() // Recargar datos para ver que desaparece de la lista
+    fetchDashboard() // Recargar datos
     transactionStore.fetchAllSupportData() // Recargar saldos globales
   } catch (error) {
-    // El backend puede responder "Saldo insuficiente"
     const msg = error.response?.data?.message || 'Error al procesar el pago'
     notify.error(msg)
   } finally {
     isProcessingPayment.value = false
+  }
+}
+
+// 🚨 NUEVA ACCIÓN: Entregar Divisas
+const handleDeliver = async (row) => {
+  const result = await Swal.fire({
+    title: '¿Confirmar Entrega?',
+    text: `Vas a marcar la compra #${row.tx_number} como COMPLETADA. Asegúrate de haber entregado el efectivo.`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, Entregar',
+    cancelButtonColor: '#d33',
+    confirmButtonColor: '#0ecb81',
+  })
+
+  if (result.isConfirmed) {
+    loading.value = true
+    try {
+      // Endpoint especial para marcar entregado (lo creamos en pasos anteriores)
+      await api.patch(`/transactions/exchanges/${row.id}/deliver`)
+      // Nota: El endpoint en el controlador debe llamarse 'markDelivered' y ruta patch '/transactions/exchanges/{exchange}/deliver'
+      // Si usaste otro nombre de ruta, ajusta aquí.
+
+      notify.success('Entrega confirmada')
+      fetchDashboard()
+    } catch (e) {
+      notify.error(e.response?.data?.message || 'Error al actualizar')
+    } finally {
+      loading.value = false
+    }
   }
 }
 
@@ -112,7 +144,7 @@ const formatMoney = (amount, currency = 'USD') => {
 
 onMounted(() => {
   fetchDashboard()
-  transactionStore.fetchAllSupportData() // Asegurar que tenemos cuentas
+  transactionStore.fetchAllSupportData()
 })
 </script>
 
@@ -153,7 +185,10 @@ onMounted(() => {
 
     <div class="list-section">
       <div class="list-header">
-        <h2>Detalle: {{ activeTab === 'payable' ? 'Deudas Pendientes' : 'Cobros Pendientes' }}</h2>
+        <h2>
+          Detalle:
+          {{ activeTab === 'payable' ? 'Deudas Pendientes' : 'Cobros / Entregas Pendientes' }}
+        </h2>
         <button class="btn-refresh" @click="fetchDashboard">
           <FontAwesomeIcon icon="fa-solid fa-rotate" /> Actualizar
         </button>
@@ -174,16 +209,24 @@ onMounted(() => {
             {{ formatMoney(row.amount, row.currency) }}
           </td>
           <td>
-            <button v-if="activeTab === 'payable'" @click="openPayModal(row)" class="btn-pay">
-              Pagar
-            </button>
-            <button
-              v-if="activeTab === 'receivable'"
-              @click="openPayModal(row)"
-              class="btn-collect"
-            >
-              Ingresar
-            </button>
+            <template v-if="!row.is_exchange_op">
+              <button v-if="activeTab === 'payable'" @click="openPayModal(row)" class="btn-pay">
+                Pagar
+              </button>
+              <button
+                v-if="activeTab === 'receivable'"
+                @click="openPayModal(row)"
+                class="btn-collect"
+              >
+                Ingresar
+              </button>
+            </template>
+
+            <template v-else>
+              <button @click="handleDeliver(row)" class="btn-deliver">
+                <FontAwesomeIcon icon="fa-solid fa-check" /> Entregar
+              </button>
+            </template>
           </td>
         </tr>
       </BaseTable>
@@ -374,6 +417,23 @@ onMounted(() => {
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
+}
+
+/* NUEVO BOTÓN: ENTREGAR */
+.btn-deliver {
+  background: #f39c12; /* Naranja */
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-deliver:hover {
+  background: #d35400;
 }
 
 /* Modal */

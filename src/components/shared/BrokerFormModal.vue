@@ -1,222 +1,207 @@
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
-
+import { ref, reactive, computed, watch } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
-import { useFormValidation } from '@/utils/useFormValidation'
 
+// Componentes UI reutilizables
+import BaseModal from '@/components/shared/BaseModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
 
+// Props y Emits
 const props = defineProps({
-  show: Boolean,
-  brokerId: [Number, String, null], // ID del corredor a editar
+  show: { type: Boolean, required: true },
+  brokerId: { type: [Number, String], default: null }, // Si viene ID, es Edición
 })
 
 const emit = defineEmits(['close', 'saved'])
 
-const { errors, handleAxiosError, getError, clearError } = useFormValidation()
-
-const initialForm = {
-  user_id: null,
-  default_commission_rate: 0.0,
-}
-const form = reactive({ ...initialForm })
-
-const usersOptions = ref([]) // Opciones para BaseSelect
-const isLoading = ref(false)
+// --- ESTADO ---
 const isSubmitting = ref(false)
+const isLoadingData = ref(false)
 
+const form = reactive({
+  name: '',
+  email: '',
+  document_id: '',
+  default_commission_rate: '',
+})
+
+// Computada para saber el modo
 const isEditing = computed(() => !!props.brokerId)
 const modalTitle = computed(() =>
-  isEditing.value ? 'Editar Tasa del Corredor' : 'Registrar Nuevo Corredor',
+  isEditing.value ? 'Editar Corredor' : 'Registrar Nuevo Corredor',
 )
-const commissionKey = 'default_commission_rate'
+
+// --- LÓGICA DE CARGA (EDICIÓN) ---
+watch(
+  () => props.show,
+  async (newVal) => {
+    if (newVal) {
+      if (isEditing.value) {
+        // Modo Edición: Cargar datos
+        await fetchBrokerData()
+      } else {
+        // Modo Crear: Limpiar formulario
+        resetForm()
+      }
+    }
+  },
+)
+
+const fetchBrokerData = async () => {
+  isLoadingData.value = true
+  try {
+    const { data } = await api.get(`/brokers/${props.brokerId}`)
+    // Llenamos el formulario con los datos recibidos
+    form.name = data.name
+    form.email = data.email || ''
+    form.document_id = data.document_id || ''
+    form.default_commission_rate = data.default_commission_rate || 0
+  } catch (error) {
+    notify.error('Error al cargar datos del corredor.')
+    emit('close') // Cerrar si falla la carga
+  } finally {
+    isLoadingData.value = false
+  }
+}
 
 const resetForm = () => {
-  Object.assign(form, initialForm)
-  errors.value = {}
+  form.name = ''
+  form.email = ''
+  form.document_id = ''
+  form.default_commission_rate = ''
 }
 
-/**
- * Carga usuarios que aún NO son corredores (solo en modo creación).
- */
-const fetchUsersOptions = async () => {
-  try {
-    // Asumimos que el endpoint /users acepta un filtro para traer solo los que no son corredores.
-    // Si no, cargamos todos y el backend debe manejar la validación/asignación de rol.
-    const response = await api.get('/users', { params: { filter_by_role: 'non_broker' } })
-
-    usersOptions.value = response.data.data.map((u) => ({
-      id: u.id,
-      name: `${u.name} (${u.email})`,
-    }))
-  } catch (error) {
-    notify.error('Error al cargar la lista de usuarios para asignar.')
-  }
-}
-
-/**
- * Carga los datos del corredor si estamos editando.
- */
-const fetchBroker = async (id) => {
-  if (!id) return
-
-  isLoading.value = true
-  try {
-    const response = await api.get(`/brokers/${id}`)
-
-    // Solo actualizamos la tasa en edición
-    form.default_commission_rate = response.data[commissionKey]
-  } catch (error) {
-    notify.error('No se pudo cargar el corredor para edición.')
-    emit('close')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-/**
- * Envía el formulario (Crear o Actualizar).
- */
+// --- GUARDAR (SUBMIT) ---
 const handleSubmit = async () => {
   isSubmitting.value = true
-
   try {
     if (isEditing.value) {
-      // 🚨 En edición, solo se actualiza la tasa
-      await api.put(`/brokers/${props.brokerId}`, { [commissionKey]: form[commissionKey] })
-      notify.success(`Tasa de comisión actualizada.`)
+      // ACTUALIZAR
+      await api.put(`/brokers/${props.brokerId}`, form)
+      notify.success('Corredor actualizado correctamente.')
     } else {
-      // 🚨 En creación, se requiere user_id y la tasa
+      // CREAR
       await api.post('/brokers', form)
-      notify.success(`Corredor registrado exitosamente.`)
+      notify.success('Corredor creado exitosamente.')
     }
 
-    emit('saved')
-    emit('close')
+    emit('saved') // Avisar al padre para recargar la lista
+    emit('close') // Cerrar modal
   } catch (error) {
-    handleAxiosError(error)
+    // Manejo básico de errores de validación del backend
+    if (error.response?.status === 422) {
+      notify.warning('Verifica los datos ingresados.')
+    } else {
+      notify.error('Error al guardar el corredor.')
+    }
+    console.error(error)
   } finally {
     isSubmitting.value = false
   }
 }
-
-watch(
-  () => props.brokerId,
-  (newId) => {
-    resetForm()
-    if (newId) {
-      fetchBroker(newId)
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  () => props.show,
-  (newVal) => {
-    if (newVal) {
-      fetchUsersOptions() // Cargar usuarios cada vez que se abre en modo CREATE
-    } else {
-      resetForm()
-    }
-  },
-)
-
-onMounted(() => {
-  fetchUsersOptions()
-})
 </script>
 
 <template>
   <BaseModal :show="show" :title="modalTitle" @close="emit('close')">
-    <form class="modal-form">
-      <BaseSelect
-        v-if="!isEditing"
-        v-model="form.user_id"
-        label="Usuario del Tenant a Asignar"
-        name="user_id"
-        :options="usersOptions"
-        track-by="id"
-        label-by="name"
-        :error="getError('user_id')"
-        placeholder="Seleccione un usuario disponible"
-        required
-        @change="clearError('user_id')"
-      />
+    <div v-if="isLoadingData" class="loading-state">
+      <p>Cargando información...</p>
+    </div>
 
+    <form v-else @submit.prevent="handleSubmit" class="broker-form">
       <BaseInput
-        v-model.number="form.default_commission_rate"
-        label="Tasa de Comisión por Defecto (%)"
-        name="default_commission_rate"
-        type="number"
-        step="0.01"
-        :error="getError('default_commission_rate')"
-        icon="fa-solid fa-percent"
-        placeholder="1.50"
+        label="Nombre del Corredor / Empresa *"
+        v-model="form.name"
+        placeholder="Ej: Juan Pérez o Inversiones XYZ"
         required
-        @input="clearError('default_commission_rate')"
       />
 
-      <p v-if="isEditing" class="note-editing">
-        Solo se puede actualizar la tasa de comisión. El usuario asignado es permanente.
-      </p>
-    </form>
+      <div class="grid-2">
+        <BaseInput
+          label="Documento ID (Opcional)"
+          v-model="form.document_id"
+          placeholder="V-12345678"
+        />
 
-    <template #footer>
-      <button @click="emit('close')" type="button" class="btn-cancel-modal">Cancelar</button>
-      <button
-        @click="handleSubmit"
-        type="button"
-        class="btn-submit-modal"
-        :disabled="isSubmitting || isLoading"
-      >
-        <span v-if="isSubmitting">Guardando...</span>
-        <span v-else>{{ isEditing ? 'Actualizar Tasa' : 'Registrar Corredor' }}</span>
-      </button>
-    </template>
+        <BaseInput
+          label="Correo Electrónico"
+          type="email"
+          v-model="form.email"
+          placeholder="contacto@ejemplo.com"
+        />
+      </div>
+
+      <div class="commission-section">
+        <BaseInput
+          label="Tasa de Comisión Base (%)"
+          type="number"
+          step="0.01"
+          v-model="form.default_commission_rate"
+          placeholder="0.00"
+          hint="Esta comisión se sugerirá automáticamente en las operaciones."
+        />
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" @click="emit('close')">Cancelar</button>
+        <button type="submit" class="btn-save" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Guardando...' : 'Guardar Datos' }}
+        </button>
+      </div>
+    </form>
   </BaseModal>
 </template>
 
 <style scoped>
-/* Estilos para el formulario dentro del modal */
-.modal-form {
-  /* No hay necesidad de max-width aquí ya que el modal lo limita */
+.broker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
-.note-editing {
-  background-color: var(--color-hover);
-  padding: 10px;
-  border-left: 3px solid var(--color-primary);
-  font-size: 0.9rem;
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 30px;
+  color: #888;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.btn-cancel {
+  background: transparent;
+  border: 1px solid #555;
   color: #ccc;
-  margin-top: -10px;
-  margin-bottom: 20px;
-}
-/* Estilos para los botones del footer */
-.btn-cancel-modal {
-  background: none;
-  border: none;
-  color: #aaa;
-  padding: 10px 15px;
-  cursor: pointer;
-  margin-right: 10px;
-}
-.btn-submit-modal {
   padding: 10px 20px;
-  background-color: var(--color-success);
-  color: var(--color-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.btn-cancel:hover {
+  background: #333;
+}
+
+.btn-save {
+  background: var(--color-primary);
+  color: #000; /* Texto oscuro para contraste con amarillo */
   border: none;
+  padding: 10px 25px;
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
-.btn-submit-modal:hover:not(:disabled) {
-  background-color: #0dcf92;
-}
-.btn-submit-modal:disabled {
+.btn-save:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

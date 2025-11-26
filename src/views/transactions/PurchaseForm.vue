@@ -21,17 +21,19 @@ const currentStep = ref(0)
 const isSubmitting = ref(false)
 const localCurrencyCode = 'VES'
 
-// --- ESTADO DEL FORMULARIO ---
+// NUEVO: Entrega física de la divisa
+const isDivisaDelivered = ref(true)
+
 const form = reactive({
   client_id: null,
   broker_id: null,
   provider_id: null,
   admin_user_id: authStore.authUser?.id,
 
-  from_account_id: null, // 🚨 Cuenta que RECIBE (VES)
-  platform_account_id: null, // 🚨 Cuenta que PAGA (USD/Divisa)
+  from_account_id: null,
+  platform_account_id: null,
 
-  amount_to_deliver: 0.0, // Campo Manual (USD)
+  amount_to_deliver: 0.0,
 
   buy_rate: 0.0,
   received_rate: 0.0,
@@ -42,11 +44,10 @@ const form = reactive({
   deliver_currency_code: '',
 })
 
-// --- LÓGICA DE DATOS ---
 const selectedBroker = computed(() =>
   transactionStore.getBrokers.find((b) => b.id == form.broker_id),
 )
-// 🚨 'fromAccount' es la cuenta que RECIBE (VES)
+
 const fromAccount = computed(() =>
   transactionStore.accounts.find((a) => a.id == form.from_account_id),
 )
@@ -62,6 +63,7 @@ const platformAccountOptions = computed(() =>
 )
 
 const deliverCurrency = computed(() => platformAccount.value?.currency_code || null)
+
 const ratePair = computed(() => {
   if (!deliverCurrency.value) {
     return { buy_rate: null, received_rate: null }
@@ -69,38 +71,29 @@ const ratePair = computed(() => {
   return transactionStore.getRatePair(localCurrencyCode, deliverCurrency.value)
 })
 
-// --- CÁLCULOS AUTOMÁTICOS ---
 const baseAmountInVes = computed(() => {
-  // Total Base VES (A Recibir)
   if (form.amount_to_deliver <= 0 || !form.received_rate) return 0
   return form.amount_to_deliver * form.received_rate
 })
+
 const commissionCharged_USD = computed(
   () => (form.amount_to_deliver * form.commission_charged_pct) / 100,
 )
 const commissionProvider_USD = computed(
   () => (form.amount_to_deliver * form.commission_provider_pct) / 100,
 )
+
 const commissionCharged_VES = computed(() => commissionCharged_USD.value * form.received_rate)
 const commissionProvider_VES = computed(() => commissionProvider_USD.value * form.received_rate)
 
-// Total VES a Acreditar en la cuenta 'from_account_id'
 const totalVesCredit = computed(() => {
   return baseAmountInVes.value + commissionCharged_VES.value + commissionProvider_VES.value
 })
-// Total USD a Debitar de la cuenta 'platform_account_id'
+
 const totalUsdDebit_Platform = computed(() => {
   return parseFloat(form.amount_to_deliver || 0) + commissionProvider_USD.value
 })
 
-// 🚨🚨🚨 INICIO DE LA CORRECCIÓN 🚨🚨🚨
-// --- VALIDACIÓN DE SALDO (Solo la cuenta que PAGA) ---
-
-// 1. Error para la CUENTA DE ORIGEN (VES)
-// ELIMINADO. Esta cuenta recibe dinero, no se valida.
-// const fromAccountError = computed(() => { ... })
-
-// 2. Error para la CUENTA DE PLATAFORMA (USD) (La que PAGA)
 const platformAccountError = computed(() => {
   if (
     platformAccount.value &&
@@ -109,26 +102,24 @@ const platformAccountError = computed(() => {
   ) {
     return `El débito total (${formatCurrency(totalUsdDebit_Platform.value, deliverCurrency.value)}) supera el saldo de esta cuenta.`
   }
-  return null // Pasa la validación
+  return null
 })
 
-// 3. Error general (Solo depende de la cuenta de plataforma)
 const generalAmountError = computed(() => platformAccountError.value)
-// 🚨🚨🚨 FIN DE LA CORRECCIÓN 🚨🚨🚨
 
-// --- WATCHERS ---
 watch(selectedBroker, (broker) => {
-  if (broker) form.commission_charged_pct = broker.commission
+  if (broker) form.commission_charged_pct = broker.commission || 0
 })
+
 watch(ratePair, (rates) => {
   form.buy_rate = rates.buy_rate || 0
   form.received_rate = rates.received_rate || 0
 })
+
 watch(platformAccount, (account) => {
   form.deliver_currency_code = account ? account.currency_code : ''
 })
 
-// --- NAVEGACIÓN Y ENVÍO ---
 const validateStep = (step) => {
   clearError()
   if (step === 0 && !form.client_id) {
@@ -142,20 +133,17 @@ const validateStep = (step) => {
       return false
     }
     if (!form.buy_rate || !form.received_rate) {
-      notify.error('No se encontraron las tasas (compra/venta) para este par de divisas.')
+      notify.error('No se encontraron las tasas para este par de divisas.')
       return false
     }
     if (form.buy_rate >= form.received_rate) {
-      notify.error(
-        'Error de configuración: La tasa de compra (costo) no puede ser mayor o igual a la de venta (cliente).',
-      )
+      notify.error('La tasa de compra no puede ser mayor o igual a la de venta.')
       return false
     }
     if (form.amount_to_deliver <= 0) {
-      notify.error('El monto a comprar (Divisa) debe ser mayor a cero.')
+      notify.error('El monto a comprar debe ser mayor a cero.')
       return false
     }
-
     if (generalAmountError.value) {
       notify.error(generalAmountError.value)
       return false
@@ -175,10 +163,10 @@ const handleSubmit = async () => {
   }
   isSubmitting.value = true
 
-  // El backend espera 'amount_received' (el monto BASE en VES)
   const payload = {
     ...form,
     amount_received: baseAmountInVes.value,
+    delivered: isDivisaDelivered.value, // ← ESTE ES EL NUEVO CAMPO
   }
   delete payload.amount_to_deliver
 
@@ -195,7 +183,6 @@ const handleSubmit = async () => {
 
 onMounted(() => transactionStore.fetchAllSupportData())
 
-// Función de ayuda
 const formatCurrency = (value, currency) => {
   if (value == null || !currency) return '...'
   const code = currency === 'USDT' ? 'USD' : currency
@@ -268,13 +255,13 @@ const formatCurrency = (value, currency) => {
           <div class="info-box rate-box">
             <p>Tasa de Compra (Costo)</p>
             <h3 :class="{ 'rate-found': form.buy_rate }">
-              {{ form.buy_rate ? form.buy_rate.toFixed(4) : '...' }}
+              {{ form.buy_rate ? form.buy_rate.toFixed(6) : '...' }}
             </h3>
           </div>
           <div class="info-box rate-box">
             <p>Tasa de Venta (Cliente)</p>
             <h3 :class="{ 'rate-found': form.received_rate }">
-              {{ form.received_rate ? form.received_rate.toFixed(4) : '...' }}
+              {{ form.received_rate ? form.received_rate.toFixed(6) : '...' }}
             </h3>
           </div>
         </div>
@@ -293,6 +280,19 @@ const formatCurrency = (value, currency) => {
             type="number"
             step="0.01"
           />
+        </div>
+
+        <!-- NUEVO CHECKBOX -->
+        <div class="delivery-checkbox-section">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="isDivisaDelivered" />
+            <span class="checkmark"></span>
+            <strong>La divisa fue entregada físicamente al cliente</strong>
+          </label>
+          <div v-if="!isDivisaDelivered" class="warning-text">
+            <FontAwesomeIcon icon="fa-solid fa-exclamation-triangle" />
+            La transacción quedará en estado <strong>PENDIENTE DE ENTREGA</strong>
+          </div>
         </div>
 
         <div class="summary-box">
@@ -370,7 +370,39 @@ const formatCurrency = (value, currency) => {
 </template>
 
 <style scoped>
-/* Estilos (No cambian) */
+/* Tus estilos originales + el del checkbox */
+.delivery-checkbox-section {
+  margin: 40px 0 30px;
+  padding: 25px;
+  background: rgba(255, 193, 7, 0.15);
+  border: 2px dashed #ffc107;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.checkbox-label input[type='checkbox'] {
+  width: 28px;
+  height: 28px;
+}
+
+.warning-text {
+  margin-top: 12px;
+  color: #ffc107;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+/* Resto de tus estilos originales sin cambio */
 .step-title {
   font-size: 1.3rem;
   color: var(--color-text-light);

@@ -5,6 +5,12 @@ import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { useAuthStore } from '@/stores/auth'
+import { useTransactionStore } from '@/stores/transaction'
+import Swal from 'sweetalert2'
+
+const authStore = useAuthStore()
+const transactionStore = useTransactionStore()
 
 // --- ESTADO ---
 const exchanges = ref([])
@@ -27,30 +33,71 @@ const headers = [
   { key: 'actions', label: '' },
 ]
 
+const canApprove = computed(() => {
+  const user = authStore.user
+
+  // 1. Si no hay usuario o roles, denegar
+  if (!user || !user.roles) return false
+
+  // 2. Definir los roles permitidos (Incluyendo 'admin_tenant')
+  const allowedRoles = ['admin', 'cajero', 'superadmin', 'admin_tenant']
+
+  // 3. Verificar si el usuario tiene alguno de los roles permitidos
+  return user.roles.some((r) => allowedRoles.includes(r.name))
+})
+
+const handleDeliver = async (row) => {
+  const result = await Swal.fire({
+    title: '¿Confirmar Entrega?',
+    text: `Se marcará la operación #${row.number} como COMPLETADA. Asegúrate de haber entregado el dinero.`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, Confirmar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#0ecb81',
+    cancelButtonColor: '#d33',
+  })
+
+  if (result.isConfirmed) {
+    isLoading.value = true
+    try {
+      // Nota: asumimos que transactionStore.markAsDelivered(row.id) existe
+      await transactionStore.markAsDelivered(row.id)
+      await fetchExchanges(pagination.value.current_page) // Recargar tabla
+    } catch (e) {
+      // El notify ya se maneja en el store
+    } finally {
+      isLoading.value = false
+    }
+  }
+}
 // --- HELPERS ---
 const formatMoney = (amount, currency = '') => {
   if (amount === null || amount === undefined) return '0.00'
   return parseFloat(amount).toFixed(2) + (currency ? ` ${currency}` : '')
 }
 
+const parseLaravelDate = (dateString) => {
+  if (!dateString) return null
+  // Reemplazar el espacio con 'T' para forzar el formato ISO 8601, más fiable.
+  const isoString = dateString.replace(' ', 'T')
+  return new Date(isoString)
+}
+
 // 🚨 FUNCIÓN MAESTRA: Normaliza los datos del backend para que la vista no falle
 const normalizeTransactionData = (data) => {
   // 1. Extracción segura de objetos (maneja nulls del backend)
-  // El backend envía snake_case (from_account), pero a veces Laravel inyecta CamelCase si viene de toArray().
-  // Buscamos ambas opciones.
   const client = data.client || {}
   const broker = data.broker || {}
-  const brokerUser = broker.user || {} // Relación anidada
   const provider = data.provider || {}
   const admin = data.admin_user || data.adminUser || {}
   const fromAcc = data.from_account || data.fromAccount || {}
   const toAcc = data.to_account || data.toAccount || {}
 
   // 2. Detección de Tipo de Operación
-  // Si buy_rate es null o igual a exchange_rate, es un Intercambio simple.
-  // Si buy_rate existe y es diferente, es una Compra/Venta con spread.
   const buyRate = parseFloat(data.buy_rate || 0)
   const exRate = parseFloat(data.exchange_rate || 0)
+  // Usamos el buy_rate ya que el exchange_rate se copia al received_rate en compras
   const isPurchase = buyRate > 0 && buyRate !== exRate
 
   // 3. Cálculos Financieros
@@ -59,11 +106,18 @@ const normalizeTransactionData = (data) => {
   const adminShare = parseFloat(data.commission_admin_amount || 0)
   const netProfit = charged - cost - adminShare
 
+  // 🚨 FIX DE FECHA: Procesar la fecha una sola vez
+  const rawDate = parseLaravelDate(data.created_at)
+
   return {
     id: data.id,
     number: data.number,
-    created_at: new Date(data.created_at).toLocaleString('es-VE'),
     status: data.status,
+
+    // 🚨 CORRECCIÓN 1: Fecha para el detalle del modal (fecha y hora)
+    created_at: rawDate?.toLocaleString('es-VE') || 'N/A',
+    // 🚨 NUEVO CAMPO: Fecha formateada solo para la tabla
+    date_fmt: rawDate?.toLocaleDateString() || 'N/A',
 
     // Etiquetas
     type_label: isPurchase ? 'COMPRA' : 'INTERCAMBIO',
@@ -71,7 +125,8 @@ const normalizeTransactionData = (data) => {
 
     // Nombres de Actores (Con Fallback)
     client_name: client.name || 'Cliente Eliminado',
-    broker_name: brokerUser.name || 'Directo / Sin Broker',
+    // 🚨 Ya no buscamos broker.user
+    broker_name: broker.name || 'Directo / Sin Broker',
     provider_name: provider.name || 'N/A',
     admin_name: admin.name || 'Sistema',
 
@@ -129,12 +184,10 @@ const openModal = async (id) => {
 
   try {
     const { data } = await api.get(`/transactions/exchanges/${id}`)
-    // Normalizamos también el detalle individual
     selectedTx.value = normalizeTransactionData(data)
   } catch (e) {
     console.error(e)
     showDetailModal.value = false
-    // Aquí podrías poner un notify.error('Error al cargar')
   } finally {
     isLoadingDetail.value = false
   }
@@ -158,7 +211,7 @@ onMounted(() => fetchExchanges())
           <td>
             <span class="ref-text">{{ row.number }}</span>
           </td>
-          <td>{{ new Date(row.created_at).toLocaleDateString() }}</td>
+          <td>{{ row.date_fmt }}</td>
           <td>{{ row.client_name }}</td>
           <td>
             <span :class="['badge-type', row.is_purchase ? 'b-blue' : 'b-purple']">
@@ -175,6 +228,15 @@ onMounted(() => fetchExchanges())
           <td>
             <button @click="openModal(row.id)" class="btn-icon view-btn" title="Ver Detalle">
               <FontAwesomeIcon icon="fa-solid fa-eye" />
+            </button>
+
+            <button
+              v-if="row.status === 'pending' && canApprove"
+              @click="handleDeliver(row)"
+              class="btn-icon check-btn"
+              title="Confirmar Entrega / Completar"
+            >
+              <FontAwesomeIcon icon="fa-solid fa-check-double" />
             </button>
           </td>
         </tr>
@@ -327,6 +389,12 @@ onMounted(() => fetchExchanges())
 }
 .view-btn:hover {
   color: var(--color-primary);
+}
+.check-btn {
+  color: var(--color-success);
+}
+.check-btn:hover {
+  color: #0ecb81;
 }
 
 /* Tabla */

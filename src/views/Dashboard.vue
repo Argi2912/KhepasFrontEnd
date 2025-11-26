@@ -3,8 +3,8 @@ import { ref, onMounted } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import DashboardCard from '@/components/shared/DashboardCard.vue' // Necesitas crear este componente Card
-import { useAuthStore } from '@/stores/auth' // Asegurarse de que esté importado
+// import DashboardCard from '@/components/shared/DashboardCard.vue' // (Opcional si usas componentes separados)
+import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 const summary = ref(null)
@@ -72,8 +72,22 @@ onMounted(() => {
         </div>
 
         <div class="kpi-card por-cobrar">
-          <p class="kpi-title">Por Cobrar Pendiente</p>
+          <p class="kpi-title">Por Cobrar (Total)</p>
           <h3 class="kpi-value">{{ formatCurrency(summary.total_por_cobrar, 'USD') }}</h3>
+
+          <div class="kpi-breakdown" v-if="summary.desglose_por_cobrar">
+            <div class="break-row">
+              <span>Deudas (Ledger):</span>
+              <strong>{{ formatCurrency(summary.desglose_por_cobrar.ledger, 'USD') }}</strong>
+            </div>
+            <div class="break-row highlight">
+              <span>Compras Pend.:</span>
+              <strong>{{
+                formatCurrency(summary.desglose_por_cobrar.compras_pendientes, 'USD')
+              }}</strong>
+            </div>
+          </div>
+
           <FontAwesomeIcon icon="fa-solid fa-arrow-up" class="kpi-icon" />
         </div>
 
@@ -109,7 +123,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Estilos se mantienen */
+/* Estilos Generales */
 .page-header {
   border-left: 5px solid var(--color-primary);
   padding-left: 15px;
@@ -123,6 +137,7 @@ onMounted(() => {
   opacity: 0.6;
   font-size: 0.95rem;
 }
+
 /* --- Grid de KPIs --- */
 .kpi-grid {
   display: grid;
@@ -147,17 +162,23 @@ onMounted(() => {
   opacity: 0.08;
   color: var(--color-text-light);
   transform: rotate(-10deg);
+  z-index: 0; /* Al fondo */
 }
 .kpi-title {
   font-size: 1rem;
   opacity: 0.7;
   margin-bottom: 10px;
+  position: relative;
+  z-index: 1;
 }
 .kpi-value {
   font-size: 2.2rem;
   font-weight: 700;
   margin-top: 5px;
+  position: relative;
+  z-index: 1;
 }
+
 /* Colores de Borde Dinámicos */
 .balance-neto {
   border-color: var(--color-primary);
@@ -177,6 +198,32 @@ onMounted(() => {
 .por-pagar .kpi-value {
   color: var(--color-danger);
 }
+
+/* --- Desglose (Breakdown) --- */
+.kpi-breakdown {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.break-row {
+  display: flex;
+  justify-content: space-between;
+  opacity: 0.8;
+}
+
+.break-row.highlight {
+  color: var(--color-warning, #f39c12); /* Color naranja para resaltar */
+  font-weight: bold;
+  opacity: 1;
+}
+
 /* --- Detalle de Caja General --- */
 .box-detail-wrapper h2 {
   font-size: 1.5rem;
@@ -194,7 +241,7 @@ onMounted(() => {
   border-radius: 8px;
   min-width: 220px;
   flex-grow: 1;
-  border-left: 3px solid #3498db; /* Un color secundario para diferenciación */
+  border-left: 3px solid #3498db;
 }
 .cash-title {
   font-size: 0.85rem;
@@ -210,6 +257,7 @@ onMounted(() => {
   font-size: 0.8rem;
   opacity: 0.5;
 }
+
 /* --- ESTADOS DE CARGA --- */
 .loading-state {
   text-align: center;
