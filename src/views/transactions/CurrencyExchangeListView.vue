@@ -35,14 +35,8 @@ const headers = [
 
 const canApprove = computed(() => {
   const user = authStore.user
-
-  // 1. Si no hay usuario o roles, denegar
   if (!user || !user.roles) return false
-
-  // 2. Definir los roles permitidos (Incluyendo 'admin_tenant')
   const allowedRoles = ['admin', 'cajero', 'superadmin', 'admin_tenant']
-
-  // 3. Verificar si el usuario tiene alguno de los roles permitidos
   return user.roles.some((r) => allowedRoles.includes(r.name))
 })
 
@@ -61,17 +55,16 @@ const handleDeliver = async (row) => {
   if (result.isConfirmed) {
     isLoading.value = true
     try {
-      // Nota: asumimos que transactionStore.markAsDelivered(row.id) existe
       await transactionStore.markAsDelivered(row.id)
-      await fetchExchanges(pagination.value.current_page) // Recargar tabla
+      await fetchExchanges(pagination.value.current_page)
     } catch (e) {
-      // El notify ya se maneja en el store
+      // Error handled in store
     } finally {
       isLoading.value = false
     }
   }
 }
-// --- HELPERS ---
+
 const formatMoney = (amount, currency = '') => {
   if (amount === null || amount === undefined) return '0.00'
   return parseFloat(amount).toFixed(2) + (currency ? ` ${currency}` : '')
@@ -79,14 +72,12 @@ const formatMoney = (amount, currency = '') => {
 
 const parseLaravelDate = (dateString) => {
   if (!dateString) return null
-  // Reemplazar el espacio con 'T' para forzar el formato ISO 8601, más fiable.
   const isoString = dateString.replace(' ', 'T')
   return new Date(isoString)
 }
 
-// 🚨 FUNCIÓN MAESTRA: Normaliza los datos del backend para que la vista no falle
+// 🚨 FUNCIÓN MAESTRA NORMALIZADORA 🚨
 const normalizeTransactionData = (data) => {
-  // 1. Extracción segura de objetos (maneja nulls del backend)
   const client = data.client || {}
   const broker = data.broker || {}
   const provider = data.provider || {}
@@ -94,79 +85,82 @@ const normalizeTransactionData = (data) => {
   const fromAcc = data.from_account || data.fromAccount || {}
   const toAcc = data.to_account || data.toAccount || {}
 
-  // 2. Detección de Tipo de Operación
   const buyRate = parseFloat(data.buy_rate || 0)
   const exRate = parseFloat(data.exchange_rate || 0)
-  // Usamos el buy_rate ya que el exchange_rate se copia al received_rate en compras
   const isPurchase = buyRate > 0 && buyRate !== exRate
 
-  // 3. Cálculos Financieros
-  const charged = parseFloat(data.commission_total_amount || 0)
-  const cost = parseFloat(data.commission_provider_amount || 0)
-  const adminShare = parseFloat(data.commission_admin_amount || 0)
-  const netProfit = charged - cost - adminShare
+  // --- CÁLCULOS FINANCIEROS CORREGIDOS ---
+  const charged = parseFloat(data.commission_total_amount || 0)     // Ingreso Bruto
+  const cost = parseFloat(data.commission_provider_amount || 0)     // Costo Prov
+  const adminShare = parseFloat(data.commission_admin_amount || 0)  // Costo Admin
+  const brokerShare = parseFloat(data.commission_broker_amount || 0)// Costo Broker (Nuevo)
 
-  // 🚨 FIX DE FECHA: Procesar la fecha una sola vez
+  // Utilidad Neta Real (Restando también al corredor)
+  const netProfit = charged - cost - adminShare - brokerShare
+
+  // Montos Base
+  const amountBaseSent = parseFloat(data.amount_sent || 0)
+  const amountBaseReceived = parseFloat(data.amount_received || 0)
+
+  // 🚨 CÁLCULO CLAVE PARA LA VISTA: TOTAL REAL QUE ENTRA 🚨
+  // Si es 20,000 base + 1,000 comisión = 21,000 Total
+  const amountTotalIn = amountBaseReceived + charged
+
   const rawDate = parseLaravelDate(data.created_at)
 
   return {
     id: data.id,
     number: data.number,
     status: data.status,
-
-    // 🚨 CORRECCIÓN 1: Fecha para el detalle del modal (fecha y hora)
     created_at: rawDate?.toLocaleString('es-VE') || 'N/A',
-    // 🚨 NUEVO CAMPO: Fecha formateada solo para la tabla
     date_fmt: rawDate?.toLocaleDateString() || 'N/A',
 
-    // Etiquetas
     type_label: isPurchase ? 'COMPRA' : 'INTERCAMBIO',
     is_purchase: isPurchase,
 
-    // Nombres de Actores (Con Fallback)
     client_name: client.name || 'Cliente Eliminado',
-    // 🚨 Ya no buscamos broker.user
     broker_name: broker.name || 'Directo / Sin Broker',
     provider_name: provider.name || 'N/A',
     admin_name: admin.name || 'Sistema',
 
-    // Flujo de Dinero
     from_acc_name: fromAcc.name || 'Cuenta Origen',
     from_currency: fromAcc.currency_code || '---',
-    amount_sent: parseFloat(data.amount_sent || 0),
+    amount_sent: amountBaseSent,
 
     to_acc_name: toAcc.name || 'Cuenta Destino',
     to_currency: toAcc.currency_code || '---',
-    amount_received: parseFloat(data.amount_received || 0),
 
-    // Tasas
+    // Aquí mandamos el total sumado para el modal
+    amount_received: amountBaseReceived,
+    amount_total_in: amountTotalIn, // <--- ESTE ES EL DATO PARA EL BOX VERDE
+
     rate_used: isPurchase ? buyRate : exRate,
     rate_label: isPurchase ? 'Tasa Compra' : 'Tasa Cambio',
 
-    // Finanzas
     comm_charged: charged,
     comm_cost: cost,
     comm_admin: adminShare,
+    comm_broker: brokerShare, // <--- Nuevo
     net_profit: netProfit,
   }
 }
 
-// --- API: CARGAR LISTA ---
+// --- API ---
 const fetchExchanges = async (page = 1) => {
   isLoading.value = true
   try {
     const { data } = await api.get(`/transactions/exchanges?page=${page}`)
-
     exchanges.value = data.data.map((tx) => {
       const normalized = normalizeTransactionData(tx)
       return {
         ...tx,
-        ...normalized, // Aplana los datos normalizados para uso fácil en tabla
+        ...normalized,
+        // En la tabla mostramos el Total (21k) o el base según prefieras. 
+        // Aquí dejo el total para consistencia.
         amount_out_fmt: formatMoney(normalized.amount_sent, normalized.from_currency),
-        amount_in_fmt: formatMoney(normalized.amount_received, normalized.to_currency),
+        amount_in_fmt: formatMoney(normalized.amount_total_in, normalized.to_currency),
       }
     })
-
     const { data: list, ...meta } = data
     pagination.value = meta
   } catch (e) {
@@ -176,12 +170,10 @@ const fetchExchanges = async (page = 1) => {
   }
 }
 
-// --- API: CARGAR DETALLE (MODAL) ---
 const openModal = async (id) => {
   showDetailModal.value = true
   isLoadingDetail.value = true
   selectedTx.value = null
-
   try {
     const { data } = await api.get(`/transactions/exchanges/${id}`)
     selectedTx.value = normalizeTransactionData(data)
@@ -208,9 +200,7 @@ onMounted(() => fetchExchanges())
     <div class="table-card">
       <BaseTable :headers="headers" :data="exchanges" :is-loading="isLoading">
         <tr v-for="row in exchanges" :key="row.id">
-          <td>
-            <span class="ref-text">{{ row.number }}</span>
-          </td>
+          <td><span class="ref-text">{{ row.number }}</span></td>
           <td>{{ row.date_fmt }}</td>
           <td>{{ row.client_name }}</td>
           <td>
@@ -229,13 +219,8 @@ onMounted(() => fetchExchanges())
             <button @click="openModal(row.id)" class="btn-icon view-btn" title="Ver Detalle">
               <FontAwesomeIcon icon="fa-solid fa-eye" />
             </button>
-
-            <button
-              v-if="row.status === 'pending' && canApprove"
-              @click="handleDeliver(row)"
-              class="btn-icon check-btn"
-              title="Confirmar Entrega / Completar"
-            >
+            <button v-if="row.status === 'pending' && canApprove" @click="handleDeliver(row)" class="btn-icon check-btn"
+              title="Confirmar Entrega">
               <FontAwesomeIcon icon="fa-solid fa-check-double" />
             </button>
           </td>
@@ -244,11 +229,7 @@ onMounted(() => fetchExchanges())
       <Pagination :pagination="pagination" @change-page="fetchExchanges" />
     </div>
 
-    <BaseModal
-      :show="showDetailModal"
-      title="Detalle de Transacción"
-      @close="showDetailModal = false"
-    >
+    <BaseModal :show="showDetailModal" title="Detalle de Transacción" @close="showDetailModal = false">
       <div v-if="isLoadingDetail" class="loading-modal">
         <FontAwesomeIcon icon="fa-solid fa-spinner" spin size="2x" />
         <p>Recuperando datos...</p>
@@ -282,7 +263,7 @@ onMounted(() => fetchExchanges())
           <div class="flow-card in">
             <span class="label">ENTRA EN ({{ selectedTx.to_acc_name }})</span>
             <span class="amount text-success">
-              + {{ formatMoney(selectedTx.amount_received, selectedTx.to_currency) }}
+              + {{ formatMoney(selectedTx.amount_total_in, selectedTx.to_currency) }}
             </span>
           </div>
         </div>
@@ -321,6 +302,10 @@ onMounted(() => fetchExchanges())
             <span>Costo Plataforma/Admin:</span>
             <strong class="text-danger">- {{ formatMoney(selectedTx.comm_admin) }}</strong>
           </div>
+          <div class="fin-row" v-if="selectedTx.comm_broker > 0">
+            <span>Comisión Corredor:</span>
+            <strong class="text-danger">- {{ formatMoney(selectedTx.comm_broker) }}</strong>
+          </div>
 
           <div class="fin-row total">
             <span>Utilidad Neta Real:</span>
@@ -350,12 +335,14 @@ onMounted(() => fetchExchanges())
   margin: 0 auto;
   color: var(--color-text-light);
 }
+
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
+
 .list-header h1 {
   font-size: 1.6rem;
   color: var(--color-primary);
@@ -375,6 +362,7 @@ onMounted(() => fetchExchanges())
   gap: 8px;
   transition: 0.2s;
 }
+
 .btn-new:hover {
   background: #d4a000;
 }
@@ -387,12 +375,15 @@ onMounted(() => fetchExchanges())
   font-size: 1.1rem;
   transition: 0.2s;
 }
+
 .view-btn:hover {
   color: var(--color-primary);
 }
+
 .check-btn {
   color: var(--color-success);
 }
+
 .check-btn:hover {
   color: #0ecb81;
 }
@@ -404,11 +395,13 @@ onMounted(() => fetchExchanges())
   padding: 20px;
   border: 1px solid var(--color-border);
 }
+
 .ref-text {
   font-family: monospace;
   font-weight: bold;
   color: #aaa;
 }
+
 .font-mono {
   font-family: monospace;
   letter-spacing: -0.5px;
@@ -422,26 +415,31 @@ onMounted(() => fetchExchanges())
   font-weight: bold;
   text-transform: uppercase;
 }
+
 .b-blue {
   background: rgba(52, 152, 219, 0.2);
   color: #3498db;
   border: 1px solid #3498db;
 }
+
 .b-purple {
   background: rgba(155, 89, 182, 0.2);
   color: #9b59b6;
   border: 1px solid #9b59b6;
 }
+
 .badge {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: bold;
 }
+
 .bg-success {
   background: rgba(14, 203, 129, 0.2);
   color: #0ecb81;
 }
+
 .bg-warning {
   background: rgba(243, 156, 18, 0.2);
   color: #f39c12;
@@ -453,6 +451,7 @@ onMounted(() => fetchExchanges())
   padding: 40px;
   color: #888;
 }
+
 .modal-top-bar {
   display: flex;
   justify-content: space-between;
@@ -461,15 +460,18 @@ onMounted(() => fetchExchanges())
   padding-bottom: 15px;
   border-bottom: 1px solid #333;
 }
+
 .ref-group h3 {
   margin: 0;
   color: var(--color-primary);
   font-size: 1.5rem;
 }
+
 .ref-group .date {
   font-size: 0.85rem;
   color: #777;
 }
+
 .badge-lg {
   padding: 6px 12px;
   border-radius: 6px;
@@ -489,21 +491,25 @@ onMounted(() => fetchExchanges())
   position: relative;
   overflow: hidden;
 }
+
 .flow-card {
   display: flex;
   flex-direction: column;
   z-index: 2;
   position: relative;
 }
+
 .flow-card.in {
   text-align: right;
 }
+
 .label {
   font-size: 0.7rem;
   color: #777;
   margin-bottom: 5px;
   text-transform: uppercase;
 }
+
 .amount {
   font-size: 1.3rem;
   font-weight: bold;
@@ -521,6 +527,7 @@ onMounted(() => fetchExchanges())
   justify-content: center;
   pointer-events: none;
 }
+
 .arrow-line {
   position: absolute;
   width: 60%;
@@ -529,6 +536,7 @@ onMounted(() => fetchExchanges())
   top: 50%;
   z-index: 1;
 }
+
 .flow-arrow svg {
   font-size: 1.5rem;
   color: var(--color-primary);
@@ -536,6 +544,7 @@ onMounted(() => fetchExchanges())
   z-index: 2;
   padding: 0 10px;
 }
+
 .rate-pill {
   margin-top: 35px;
   background: #222;
@@ -554,6 +563,7 @@ onMounted(() => fetchExchanges())
   gap: 15px;
   margin-bottom: 20px;
 }
+
 .info-item label {
   font-size: 0.7rem;
   color: #666;
@@ -561,6 +571,7 @@ onMounted(() => fetchExchanges())
   display: block;
   margin-bottom: 4px;
 }
+
 .info-item p {
   margin: 0;
   font-weight: 600;
@@ -574,6 +585,7 @@ onMounted(() => fetchExchanges())
   border-radius: 8px;
   border: 1px solid #333;
 }
+
 .financial-box h4 {
   margin: 0 0 15px 0;
   font-size: 0.95rem;
@@ -581,12 +593,14 @@ onMounted(() => fetchExchanges())
   border-bottom: 1px dashed #333;
   padding-bottom: 8px;
 }
+
 .fin-row {
   display: flex;
   justify-content: space-between;
   font-size: 0.95rem;
   margin-bottom: 6px;
 }
+
 .fin-row.total {
   border-top: 1px solid #444;
   padding-top: 12px;
@@ -597,9 +611,11 @@ onMounted(() => fetchExchanges())
 .text-danger {
   color: var(--color-danger);
 }
+
 .text-success {
   color: var(--color-success);
 }
+
 .btn-close {
   width: 100%;
   background: transparent;
@@ -610,6 +626,7 @@ onMounted(() => fetchExchanges())
   cursor: pointer;
   transition: 0.2s;
 }
+
 .btn-close:hover {
   background: #333;
   color: #fff;
