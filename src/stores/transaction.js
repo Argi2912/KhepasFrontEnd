@@ -49,7 +49,7 @@ export const useTransactionStore = defineStore('transaction', () => {
   const getBrokers = computed(() =>
     brokers.value.map((b) => ({
       id: b.id,
-      name: `${b.user?.name || 'Sin Nombre'} (${b.default_commission_rate}%)`,
+      name: `${b.name || 'Sin Nombre'} (${b.default_commission_rate}%)`,
       commission: b.default_commission_rate,
     })),
   )
@@ -115,6 +115,18 @@ export const useTransactionStore = defineStore('transaction', () => {
     return response.data
   }
 
+  async function markAsDelivered(id) {
+    try {
+      const response = await api.patch(`/transactions/exchanges/${id}/deliver`)
+      notify.success('Entrega confirmada exitosamente')
+      return response.data
+    } catch (error) {
+      console.error(error)
+      notify.error(error.response?.data?.message || 'Error al actualizar el estado')
+      throw error
+    }
+  }
+
   return {
     isLoadingData,
     rawAccounts: accounts,
@@ -127,5 +139,6 @@ export const useTransactionStore = defineStore('transaction', () => {
     fetchAllSupportData,
     createCurrencyExchange,
     createInternalTransaction,
+    markAsDelivered,
   }
 })

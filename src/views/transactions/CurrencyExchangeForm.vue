@@ -50,6 +50,7 @@ const form = reactive({
   commission_net_profit: 0,
 
   reference_id: '',
+  delivered: true,
 })
 
 // --- FILTROS DE CUENTAS ---
@@ -94,15 +95,21 @@ const hasSufficientBalance = computed(() => {
 
 // 1. Calcular Monto Recibido Base (Usando la tasa correcta)
 watch(
-  [() => form.amount_sent, () => form.exchange_rate, () => form.buy_rate, operationType],
-  ([sent, rate, buyRate, type]) => {
+  [
+    () => form.amount_sent,
+    () => form.exchange_rate,
+    () => form.buy_rate,
+    () => form.received_rate,
+    operationType,
+  ],
+  ([sent, rate, buyRate, receivedRate, type]) => {
     const s = parseFloat(sent) || 0
 
     let mainRate = 0
 
     if (type === 'purchase') {
       // Usa Tasa de Compra (buy_rate) para el cálculo de cuánto recibe el cliente
-      mainRate = parseFloat(buyRate) || 0
+      mainRate = parseFloat(receivedRate) || 0
     } else {
       mainRate = parseFloat(rate) || 0
     }
@@ -244,6 +251,7 @@ const handleConfirm = async () => {
       payload.platform_id = null // Aunque el campo de la plataforma ya no está visible, lo limpiamos
       payload.commission_admin_pct = 0 // Limpiar el porcentaje
       payload.commission_admin_amount = 0 // Limpiar el monto calculado
+      payload.delivered = form.delivered
     } else {
       // exchange
       payload.buy_rate = null
@@ -411,6 +419,22 @@ const handleConfirm = async () => {
             <p v-if="!hasSufficientBalance" class="error-txt">
               Saldo insuficiente en {{ fromAccount?.name }}
             </p>
+            <div v-if="operationType === 'purchase'" class="delivery-check">
+              <label class="checkbox-wrapper">
+                <input type="checkbox" v-model="form.delivered" />
+                <span class="checkmark"></span>
+                <div class="check-text">
+                  <span class="title">Entregar Divisas Inmediatamente</span>
+                  <small>
+                    {{
+                      form.delivered
+                        ? 'La transacción se marcará como COMPLETADA'
+                        : 'La transacción quedará PENDIENTE por entrega'
+                    }}
+                  </small>
+                </div>
+              </label>
+            </div>
           </div>
 
           <div class="commissions-panel">
@@ -522,6 +546,12 @@ const handleConfirm = async () => {
                 </span>
               </div>
             </div>
+          </div>
+          <div class="row" v-if="operationType === 'purchase'">
+            <span>Estado Resultante</span>
+            <span :class="form.delivered ? 'text-success' : 'text-warning'">
+              {{ form.delivered ? 'COMPLETADO' : 'PENDIENTE' }}
+            </span>
           </div>
         </div>
       </div>
@@ -829,5 +859,71 @@ const handleConfirm = async () => {
   margin-top: 15px;
   border-top: 1px solid var(--color-border);
   padding-top: 10px;
+}
+/* Estilos para el Checkbox de Entrega */
+.delivery-check {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--color-border);
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-wrapper input {
+  display: none; /* Ocultar el checkbox nativo */
+}
+
+.checkmark {
+  width: 24px;
+  height: 24px;
+  background-color: #2b2f36;
+  border: 1px solid #555;
+  border-radius: 6px;
+  position: relative;
+  transition: 0.2s;
+}
+
+.checkbox-wrapper input:checked ~ .checkmark {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.checkbox-wrapper input:checked ~ .checkmark::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 4px;
+  width: 6px;
+  height: 12px;
+  border: solid #000;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.check-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.check-text .title {
+  font-weight: bold;
+  color: var(--color-text-light);
+  font-size: 0.95rem;
+}
+
+.check-text small {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.text-warning {
+  color: #f39c12;
+  font-weight: bold;
 }
 </style>
