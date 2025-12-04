@@ -1,3 +1,4 @@
+// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
@@ -6,7 +7,7 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     // =========================================================================
-    // 0. ÁREA SUPERADMIN (Gestión Global)
+    // SUPERADMIN
     // =========================================================================
     {
       path: '/superadmin',
@@ -32,7 +33,7 @@ const router = createRouter({
     },
 
     // =========================================================================
-    // 1. RUTAS PÚBLICAS
+    // PÚBLICAS
     // =========================================================================
     {
       path: '/login',
@@ -40,22 +41,11 @@ const router = createRouter({
       component: () => import('@/views/Login.vue'),
       meta: { layout: 'AuthLayout', requiresAuth: false },
     },
+    { path: '/', name: 'root', meta: { requiresAuth: true } },
 
     // =========================================================================
-    // 2. RUTA RAÍZ (Controlador de Tráfico)
+    // DASHBOARD
     // =========================================================================
-    {
-      path: '/',
-      name: 'root',
-      meta: { requiresAuth: true },
-      // No usamos 'redirect' aquí. El guardia beforeEach decide a dónde ir.
-    },
-
-    // =========================================================================
-    // 3. ÁREA TENANT (Operativa del Negocio)
-    // =========================================================================
-
-    // --- Dashboard Principal ---
     {
       path: '/dashboard',
       name: 'dashboard',
@@ -67,19 +57,56 @@ const router = createRouter({
         permission: 'view_dashboard',
       },
     },
+
+    // =========================================================================
+    // REPORTES FINANCIEROS - AHORA SÍ FUNCIONA!
+    // =========================================================================
     {
       path: '/reports',
-      name: 'financial_reports',
-      component: () => import('@/views/reports/FinancialReportsView.vue'),
+      component: () => import('@/views/reports/ReportsLayout.vue'), // ← CORREGIDO
       meta: {
         requiresAuth: true,
-        permission: 'manage_internal_transactions', // Asegúrate de que este permiso exista en tu BD o usa 'view_dashboard'
         icon: 'fa-solid fa-chart-pie',
-        label: 'Reportes',
+        label: 'Reportes Financieros',
       },
+      children: [
+        { path: '', redirect: { name: 'reports.general' } },
+        {
+          path: 'general',
+          name: 'reports.general',
+          component: () => import('@/views/reports/FinancialReportsView.vue'),
+          meta: { label: 'Resumen General' },
+        },
+        {
+          path: 'clients',
+          name: 'reports.clients',
+          component: () => import('@/views/reports/ClientReportView.vue'),
+          meta: { label: 'Por Cliente', hiddenInMenu: true },
+        },
+        {
+          path: 'providers',
+          name: 'reports.providers',
+          component: () => import('@/views/reports/ProviderReportView.vue'),
+          meta: { label: 'Por Proveedor', hiddenInMenu: true },
+        },
+        {
+          path: 'platforms',
+          name: 'reports.platforms',
+          component: () => import('@/views/reports/PlatformReportView.vue'),
+          meta: { label: 'Por Plataforma', hiddenInMenu: true },
+        },
+        {
+          path: 'brokers',
+          name: 'reports.brokers',
+          component: () => import('@/views/reports/BrokerReportView.vue'),
+          meta: { label: 'Por Corredor', hiddenInMenu: true },
+        },
+      ],
     },
 
-    // --- Gestión de Usuarios y Seguridad ---
+    // =========================================================================
+    // GESTIÓN SIMPLE
+    // =========================================================================
     {
       path: '/users',
       name: 'users_list',
@@ -91,8 +118,6 @@ const router = createRouter({
         label: 'Gestión de Usuarios',
       },
     },
-
-    // --- Catálogos del Sistema ---
     {
       path: '/clients',
       name: 'clients_list',
@@ -121,7 +146,7 @@ const router = createRouter({
       component: () => import('@/views/brokers/BrokerList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_users', // O manage_exchanges, según prefieras
+        permission: 'manage_brokers',
         icon: 'fa-solid fa-user-tie',
         label: 'Corredores',
       },
@@ -138,115 +163,85 @@ const router = createRouter({
       },
     },
 
-    // --- Configuración Financiera ---
+    // =========================================================================
+    // CONFIGURACIÓN FINANCIERA
+    // =========================================================================
     {
-      path: '/accounts',
-      name: 'accounts_list',
-      component: () => import('@/views/accounts/AccountList.vue'),
-      meta: {
-        requiresAuth: true,
-        permission: 'manage_exchanges',
-        icon: 'fa-solid fa-wallet',
-        label: 'Cuentas Bancarias',
-      },
-    },
-    {
-      path: '/currencies',
-      name: 'currencies_list',
-      component: () => import('@/views/currencies/CurrencyListView.vue'),
-      meta: {
-        requiresAuth: true,
-        permission: 'manage_exchanges',
-        icon: 'fa-solid fa-coins',
-        label: 'Divisas',
-      },
+      path: '/financial-config',
+      component: () => import('@/views/finance/FinancialConfigLayout.vue'), // ← Crea este archivo (abajo te lo doy)
+      meta: { requiresAuth: true, icon: 'fa-solid fa-gear', label: 'Configuración Financiera' },
+      children: [
+        { path: '', redirect: { name: 'accounts_list' } },
+        {
+          path: 'accounts',
+          name: 'accounts_list',
+          component: () => import('@/views/accounts/AccountList.vue'),
+          meta: { label: 'Cuentas Bancarias', permission: 'manage_accounts', hiddenInMenu: true },
+        },
+        {
+          path: 'currencies',
+          name: 'currencies_list',
+          component: () => import('@/views/currencies/CurrencyListView.vue'),
+          meta: { label: 'Divisas', permission: 'manage_currencies', hiddenInMenu: true },
+        },
+      ],
     },
 
-    // --- MÓDULO OPERATIVO ---
-
-    // A. Home de Transacciones (Opcional, si usas TransactionHomeView)
+    // =========================================================================
+    // OPERACIONES - AHORA SÍ FUNCIONA!
+    // =========================================================================
     {
       path: '/transactions',
-      name: 'transactions_home',
-      component: () => import('@/views/transactions/TransactionHomeView.vue'),
-      meta: {
-        requiresAuth: true,
-        permission: 'view_dashboard', // El Admin Tenant tiene este permiso
-        // 🚨 AGREGAMOS ESTO PARA QUE APAREZCA EN EL MENÚ 🚨
-        icon: 'fa-solid fa-briefcase',
-        label: 'Operaciones',
-      },
+      component: () => import('@/views/transactions/TransactionsLayout.vue'), // ← Crea este archivo
+      meta: { requiresAuth: true, icon: 'fa-solid fa-briefcase', label: 'Operaciones' },
       children: [
-        // B. Operaciones de Divisas
+        { path: '', redirect: { name: 'transaction_exchange_list' } },
         {
-          path: '/exchanges',
+          path: 'exchanges',
           name: 'transaction_exchange_list',
           component: () => import('@/views/transactions/CurrencyExchangeListView.vue'),
           meta: {
-            requiresAuth: true,
-            icon: 'fa-solid fa-money-bill-transfer', // Icono del submenú
-            label: 'Operaciones Divisas', // Etiqueta del submenú
+            label: 'Operaciones Divisas',
             permission: 'manage_exchanges',
+            hiddenInMenu: true,
           },
         },
-        // Rutas ocultas (Create/Show) siguen igual...
         {
-          path: '/exchanges/create',
+          path: 'exchanges/create',
           name: 'transaction_exchange_create',
           component: () => import('@/views/transactions/CurrencyExchangeForm.vue'),
-          meta: {
-            requiresAuth: true,
-            label: 'Nueva Operación',
-            hidden: true,
-            permission: 'manage_exchanges',
-          },
+          meta: { hidden: true },
         },
         {
-          path: '/exchanges/:id',
+          path: 'exchanges/:id',
           name: 'transaction_exchange_show',
           component: () => import('@/views/transactions/CurrencyExchangeDetailView.vue'),
-          meta: {
-            requiresAuth: true,
-            label: 'Detalle de Transacción',
-            hidden: true,
-            permission: 'manage_exchanges',
-          },
+          meta: { hidden: true },
         },
-
-        // C. Caja y Gastos Internos
         {
-          path: '/internal',
+          path: 'internal',
           name: 'transaction_internal_list',
           component: () => import('@/views/transactions/InternalTransactionListView.vue'),
           meta: {
-            requiresAuth: true,
-            icon: 'fa-solid fa-cash-register',
             label: 'Caja y Gastos',
             permission: 'manage_internal_transactions',
+            hiddenInMenu: true,
           },
         },
         {
-          path: '/internal/create',
+          path: 'internal/create',
           name: 'transaction_internal_create',
           component: () => import('@/views/transactions/InternalTransactionForm.vue'),
-          meta: {
-            requiresAuth: true,
-            label: 'Cuentas por Cobrar/Pagar',
-            hidden: true,
-            permission: 'manage_internal_transactions',
-          },
+          meta: { hidden: true },
         },
-
-        // D. Cuentas por Pagar (Ledger)
         {
-          path: '/ledger',
+          path: 'ledger',
           name: 'transaction_ledger',
           component: () => import('@/views/finance/LedgerDashboard.vue'),
           meta: {
-            requiresAuth: true,
-            icon: 'fa-solid fa-file-invoice-dollar',
-            label: 'Cuentas por Pagar',
-            permission: 'manage_exchanges',
+            label: 'Cuentas por Pagar/Cobrar',
+            permission: 'manage_internal_transactions',
+            hiddenInMenu: true,
           },
         },
       ],
@@ -254,55 +249,33 @@ const router = createRouter({
   ],
 })
 
-// =============================================================================
-// GUARDIA GLOBAL DE NAVEGACIÓN (LOGIC CORE)
-// =============================================================================
+// GUARDIA GLOBAL
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-
-  // 1. Recuperar sesión si hay token pero no usuario (F5 Refresh)
   if (authStore.token && !authStore.user) {
     try {
       await authStore.fetchUser()
-    } catch (e) {
-      console.error('Sesión no válida o expirada')
+    } catch {
+      authStore.logout()
       return next({ name: 'login' })
     }
   }
 
   const isLoggedIn = authStore.isLoggedIn
-  // Detectamos Superadmin si no tiene tenant_id asociado
   const isSuperAdmin = authStore.user?.tenant_id === null
 
-  // 2. Redirección Inteligente al intentar ir a LOGIN o RAÍZ ('/')
   if (isLoggedIn && (to.name === 'login' || to.name === 'root')) {
-    // Si es Superadmin -> Panel Superadmin
-    if (isSuperAdmin) {
-      return next({ name: 'superadmin_dashboard' })
-    }
-    // Si es Usuario Tenant -> Dashboard Operativo
-    return next({ name: 'dashboard' })
+    return next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
   }
-
-  // 3. Bloquear rutas protegidas si no hay login
   if (to.meta.requiresAuth && !isLoggedIn) {
-    return next({ name: 'login' })
+    return next({ name: 'login', query: { redirect: to.fullPath } })
   }
-
-  // 4. VERIFICACIÓN DE PERMISOS (RBAC)
-  if (to.meta.permission) {
-    if (!authStore.can(to.meta.permission)) {
-      // Si el usuario ya está en una ruta válida y trata de navegar a una prohibida
-      if (from.name) {
-        notify.error(`Acceso Denegado. Requieres: ${to.meta.permission}`)
-        return next(false) // Cancela navegación
-      }
-
-      // Si entra directo por URL a una ruta prohibida, redirigir a su Home seguro
-      return next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
-    }
+  if (to.meta.permission && !authStore.can(to.meta.permission)) {
+    notify.error(`Acceso denegado: requiere permiso "${to.meta.permission}"`)
+    return from.name
+      ? next(false)
+      : next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
   }
-
   next()
 })
 

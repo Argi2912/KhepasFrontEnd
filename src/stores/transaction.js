@@ -28,6 +28,7 @@ export const useTransactionStore = defineStore('transaction', () => {
   const accounts = ref([])
   const currencies = ref([])
   const platforms = ref([]) // 🚨 NUEVO: Estado para Plataformas
+  const investors = ref([]) // 🚨 NUEVO: Estado para Inversionistas
   const isLoadingData = ref(false)
 
   // --- GETTERS ---
@@ -71,21 +72,37 @@ export const useTransactionStore = defineStore('transaction', () => {
     })),
   )
 
+  const getInvestors = computed(() =>
+    // 🚨 NUEVO: Getter para Inversionistas
+    investors.value.map((i) => ({
+      id: i.id,
+      name: i.alias ? `${i.name} (${i.alias})` : i.name, // Usar alias si existe
+    })),
+  )
+
   // --- ACTIONS ---
 
   async function fetchAllSupportData() {
     isLoadingData.value = true
     try {
       // 🚨 Agregamos la petición de '/platforms'
-      const [clientsRes, providersRes, brokersRes, accountsRes, currenciesRes, platformsRes] =
-        await Promise.all([
-          api.get('/clients?per_page=999'),
-          api.get('/providers?per_page=999'),
-          api.get('/brokers?per_page=999'),
-          api.get('/accounts?per_page=999'),
-          api.get('/currencies?per_page=999'),
-          api.get('/platforms?per_page=999'), // Endpoint de plataformas
-        ])
+      const [
+        clientsRes,
+        providersRes,
+        brokersRes,
+        accountsRes,
+        currenciesRes,
+        platformsRes,
+        investorsRes,
+      ] = await Promise.all([
+        api.get('/clients?per_page=999'),
+        api.get('/providers?per_page=999'),
+        api.get('/brokers?per_page=999'),
+        api.get('/accounts?per_page=999'),
+        api.get('/currencies?per_page=999'),
+        api.get('/platforms?per_page=999'), // Endpoint de plataformas
+        api.get('/investors?per_page=999'),
+      ])
 
       clients.value = clientsRes.data.data || clientsRes.data
       providers.value = providersRes.data.data || providersRes.data
@@ -93,6 +110,7 @@ export const useTransactionStore = defineStore('transaction', () => {
       accounts.value = accountsRes.data.data || accountsRes.data
       currencies.value = currenciesRes.data.data || currenciesRes.data
       platforms.value = platformsRes.data.data || platformsRes.data // Asignar plataformas
+      investors.value = investorsRes.data.data || investorsRes.data // 🚨 Asignar Inversionistas
     } catch (error) {
       console.error('Error cargando datos:', error)
       notify.error('Error de conexión al cargar datos necesarios')
@@ -134,6 +152,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     getProviders,
     getBrokers,
     getPlatforms, // Exportar getter
+    getInvestors,
     getAccounts,
     currencies,
     fetchAllSupportData,

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 import {
@@ -29,25 +29,33 @@ ChartJS.register(
   ArcElement,
 )
 
+// === FILTROS ===
+const period = ref('year') // 'day' | 'week' | 'month' | 'year'
+const selectedDate = ref(new Date().toISOString().split('T')[0]) // Hoy por defecto
+
+// === DATOS ===
 const isLoading = ref(false)
-const selectedYear = ref(new Date().getFullYear())
 const stats = ref({
   chart_data: { labels: [], datasets: [] },
   summary: { total_income: 0, total_expense: 0, total_profit: 0 },
   expenses_by_category: [],
+  period_info: {},
 })
 
-// Opciones para el Gráfico de Barras (Ingresos vs Gastos)
+// === OPCIONES GRÁFICOS ===
 const barOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
     legend: { position: 'top' },
-    title: { display: true, text: 'Flujo de Caja Mensual' },
+    title: {
+      display: true,
+      text: 'Flujo de Caja',
+      font: { size: 16 },
+    },
   },
 }
 
-// Opciones para el Gráfico de Dona (Categorías)
 const doughnutOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -56,25 +64,29 @@ const doughnutOptions = {
   },
 }
 
-// Computada para transformar datos de categorías al formato de Chart.js
+// === DONA - Datos dinámicos ===
 const categoryChartData = computed(() => {
   const categories = stats.value.expenses_by_category || []
   return {
-    labels: categories.map((c) => c.category),
+    labels: categories.map((c) => c.category || 'Sin categoría'),
     datasets: [
       {
-        backgroundColor: ['#3B82F6', '#F59E0B', '#10B981', '#6366F1', '#EF4444'],
-        data: categories.map((c) => c.total),
+        backgroundColor: ['#3B82F6', '#F59E0B', '#10B981', '#6366F1', '#EF4444', '#8B5CF6'],
+        data: categories.map((c) => c.total || 0),
       },
     ],
   }
 })
 
+// === FUNCIÓN PRINCIPAL ===
 const fetchStats = async () => {
   isLoading.value = true
   try {
     const response = await api.get('/statistics/performance', {
-      params: { year: selectedYear.value },
+      params: {
+        period: period.value,
+        date: selectedDate.value,
+      },
     })
     stats.value = response.data
   } catch (error) {
@@ -85,14 +97,23 @@ const fetchStats = async () => {
   }
 }
 
-// Formateo de moneda
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
-}
+// === REACTIVIDAD ===
+watch([period, selectedDate], () => {
+  fetchStats()
+})
 
+// Carga inicial
 onMounted(() => {
   fetchStats()
 })
+
+// === FORMATEO MONEDA ===
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value || 0)
+}
 </script>
 
 <template>
@@ -100,13 +121,24 @@ onMounted(() => {
     <div class="header-actions">
       <h2>Reportes Financieros</h2>
       <div class="filters">
-        <label>Año Fiscal:</label>
-        <select v-model="selectedYear" @change="fetchStats" class="year-select">
-          <option v-for="y in [2023, 2024, 2025]" :key="y" :value="y">{{ y }}</option>
+        <select v-model="period" class="year-select">
+          <option value="day">Hoy</option>
+          <option value="week">Esta semana</option>
+          <option value="month">Este mes</option>
+          <option value="year">Este año</option>
         </select>
+
+        <input
+          type="date"
+          v-model="selectedDate"
+          :max="new Date().toISOString().split('T')[0]"
+          class="year-select date-input"
+          style="margin-left: 10px"
+        />
       </div>
     </div>
 
+    <!-- SUMMARY CARDS -->
     <div class="summary-cards">
       <div class="card income">
         <div class="card-title">Ingresos Totales</div>
@@ -127,19 +159,32 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- CHARTS -->
     <div class="charts-grid">
       <div class="chart-box main-chart">
-        <h3>Evolución Mensual</h3>
+        <h3>
+          Evolución
+          <small v-if="period === 'day'">por Hora</small>
+          <small v-else-if="period === 'week'">por Día</small>
+          <small v-else-if="period === 'month'">Mensual</small>
+          <small v-else>Anual</small>
+        </h3>
         <div class="chart-wrapper">
-          <Bar v-if="!isLoading" :data="stats.chart_data" :options="barOptions" />
+          <Bar
+            v-if="!isLoading && stats.chart_data.labels?.length"
+            :data="stats.chart_data"
+            :options="barOptions"
+          />
+          <p v-else class="no-data">No hay datos para mostrar</p>
         </div>
       </div>
 
-      <div class="chart-box side-chart">
+      <!-- Dona solo en mes/año -->
+      <div class="chart-box side-chart" v-if="period === 'month' || period === 'year'">
         <h3>Distribución de Gastos</h3>
         <div class="chart-wrapper">
           <Doughnut
-            v-if="!isLoading && stats.expenses_by_category.length"
+            v-if="stats.expenses_by_category?.length"
             :data="categoryChartData"
             :options="doughnutOptions"
           />
@@ -160,14 +205,29 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 25px;
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
-.year-select {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  background: var(--color-background);
-  color: var(--color-text);
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.year-select,
+.date-input {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #1f1f1f;
+  color: white;
+  font-size: 0.95rem;
+  min-width: 160px;
+}
+
+.date-input {
+  min-width: 180px;
 }
 
 /* SUMMARY CARDS */
@@ -217,7 +277,7 @@ onMounted(() => {
   color: #ef4444;
 }
 
-/* CHARTS LAYOUT */
+/* CHARTS */
 .charts-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -227,6 +287,13 @@ onMounted(() => {
 @media (max-width: 900px) {
   .charts-grid {
     grid-template-columns: 1fr;
+  }
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filters {
+    justify-content: center;
   }
 }
 
@@ -247,5 +314,6 @@ onMounted(() => {
   text-align: center;
   margin-top: 50px;
   color: #888;
+  font-size: 1.1rem;
 }
 </style>
