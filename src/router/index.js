@@ -59,11 +59,11 @@ const router = createRouter({
     },
 
     // =========================================================================
-    // REPORTES FINANCIEROS - AHORA SÍ FUNCIONA!
+    // REPORTES FINANCIEROS
     // =========================================================================
     {
       path: '/reports',
-      component: () => import('@/views/reports/ReportsLayout.vue'), // ← CORREGIDO
+      component: () => import('@/views/reports/ReportsLayout.vue'),
       meta: {
         requiresAuth: true,
         icon: 'fa-solid fa-chart-pie',
@@ -135,7 +135,7 @@ const router = createRouter({
       component: () => import('@/views/providers/ProviderList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_clients',
+        permission: 'manage_clients', // Reutilizando permiso común
         icon: 'fa-solid fa-truck-moving',
         label: 'Proveedores',
       },
@@ -146,7 +146,7 @@ const router = createRouter({
       component: () => import('@/views/brokers/BrokerList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_brokers',
+        // permission: 'manage_brokers', // ⚠️ COMENTADO: Para que aparezca siempre por ahora
         icon: 'fa-solid fa-user-tie',
         label: 'Corredores',
       },
@@ -164,36 +164,52 @@ const router = createRouter({
     },
 
     // =========================================================================
-    // CONFIGURACIÓN FINANCIERA
+    // CONFIGURACIÓN FINANCIERA (CUENTAS Y DIVISAS)
     // =========================================================================
     {
       path: '/financial-config',
-      component: () => import('@/views/finance/FinancialConfigLayout.vue'), // ← Crea este archivo (abajo te lo doy)
-      meta: { requiresAuth: true, icon: 'fa-solid fa-gear', label: 'Configuración Financiera' },
+      component: () => import('@/views/finance/FinancialConfigLayout.vue'),
+      meta: { 
+        requiresAuth: true, 
+        icon: 'fa-solid fa-gear', 
+        label: 'Configuración Financiera' 
+      },
       children: [
         { path: '', redirect: { name: 'accounts_list' } },
         {
           path: 'accounts',
           name: 'accounts_list',
           component: () => import('@/views/accounts/AccountList.vue'),
-          meta: { label: 'Cuentas Bancarias', permission: 'manage_accounts', hiddenInMenu: true },
+          meta: { 
+            label: 'Cuentas Bancarias', 
+            // permission: 'manage_accounts', // Comenta si también da problemas
+            // 🟢 ELIMINADO hiddenInMenu PARA QUE SE VEA
+          }, 
         },
         {
           path: 'currencies',
           name: 'currencies_list',
           component: () => import('@/views/currencies/CurrencyListView.vue'),
-          meta: { label: 'Divisas', permission: 'manage_currencies', hiddenInMenu: true },
+          meta: { 
+            label: 'Divisas', 
+            // permission: 'manage_currencies', // Comenta si también da problemas
+            // 🟢 ELIMINADO hiddenInMenu PARA QUE SE VEA
+          }, 
         },
       ],
     },
 
     // =========================================================================
-    // OPERACIONES - AHORA SÍ FUNCIONA!
+    // OPERACIONES
     // =========================================================================
     {
       path: '/transactions',
-      component: () => import('@/views/transactions/TransactionsLayout.vue'), // ← Crea este archivo
-      meta: { requiresAuth: true, icon: 'fa-solid fa-briefcase', label: 'Operaciones' },
+      component: () => import('@/views/transactions/TransactionsLayout.vue'),
+      meta: { 
+        requiresAuth: true, 
+        icon: 'fa-solid fa-briefcase', 
+        label: 'Operaciones' 
+      },
       children: [
         { path: '', redirect: { name: 'transaction_exchange_list' } },
         {
@@ -202,21 +218,22 @@ const router = createRouter({
           component: () => import('@/views/transactions/CurrencyExchangeListView.vue'),
           meta: {
             label: 'Operaciones Divisas',
-            permission: 'manage_exchanges',
-            hiddenInMenu: true,
+            // permission: 'manage_exchanges',
+            // 🟢 ELIMINADO hiddenInMenu
           },
         },
+        // Rutas de detalle (Estas sí deben estar ocultas del menú lateral)
         {
           path: 'exchanges/create',
           name: 'transaction_exchange_create',
           component: () => import('@/views/transactions/CurrencyExchangeForm.vue'),
-          meta: { hidden: true },
+          meta: { hiddenInMenu: true },
         },
         {
           path: 'exchanges/:id',
           name: 'transaction_exchange_show',
           component: () => import('@/views/transactions/CurrencyExchangeDetailView.vue'),
-          meta: { hidden: true },
+          meta: { hiddenInMenu: true },
         },
         {
           path: 'internal',
@@ -224,15 +241,15 @@ const router = createRouter({
           component: () => import('@/views/transactions/InternalTransactionListView.vue'),
           meta: {
             label: 'Caja y Gastos',
-            permission: 'manage_internal_transactions',
-            hiddenInMenu: true,
+            // permission: 'manage_internal_transactions',
+            // 🟢 ELIMINADO hiddenInMenu
           },
         },
         {
           path: 'internal/create',
           name: 'transaction_internal_create',
           component: () => import('@/views/transactions/InternalTransactionForm.vue'),
-          meta: { hidden: true },
+          meta: { hiddenInMenu: true },
         },
         {
           path: 'ledger',
@@ -240,8 +257,8 @@ const router = createRouter({
           component: () => import('@/views/finance/LedgerDashboard.vue'),
           meta: {
             label: 'Cuentas por Pagar/Cobrar',
-            permission: 'manage_internal_transactions',
-            hiddenInMenu: true,
+            // permission: 'manage_internal_transactions',
+            // 🟢 ELIMINADO hiddenInMenu
           },
         },
       ],
@@ -271,7 +288,7 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'login', query: { redirect: to.fullPath } })
   }
   if (to.meta.permission && !authStore.can(to.meta.permission)) {
-    notify.error(`Acceso denegado: requiere permiso "${to.meta.permission}"`)
+    // Si no tiene permiso, redirige al dashboard en vez de bloquear
     return from.name
       ? next(false)
       : next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })

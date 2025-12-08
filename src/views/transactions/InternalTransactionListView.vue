@@ -20,10 +20,10 @@ const isLoadingDetail = ref(false)
 const headers = [
   { key: 'date', label: 'Fecha' },
   { key: 'type', label: 'Tipo' },
-  { key: 'person_name', label: 'Persona / Tercero' }, // NUEVO
+  { key: 'person_name', label: 'Persona / Tercero' },
   { key: 'category', label: 'Categoría' },
   { key: 'account', label: 'Cuenta' },
-  { key: 'dueño', label: 'Dueño Cta.' },              // CORREGIDO (key minúscula)
+  { key: 'dueño', label: 'Dueño Cta.' },
   { key: 'amount', label: 'Monto' },
   { key: 'actions', label: '' },
 ]
@@ -36,11 +36,32 @@ const normalizeInternalTx = (data) => {
   const user = data.user || {}
   const isIncome = data.type === 'income'
 
+  // --- 1. CORRECCIÓN ROBUSTA DE FECHA (Para que se vea como la Imagen 2) ---
+  let dateFormatted = 'N/A'
+  // Asumimos que data.transaction_date empieza con YYYY-MM-DD, incluso si es larga.
+  // Tomamos los primeros 10 caracteres y los reordenamos.
+  if (data.transaction_date && typeof data.transaction_date === 'string') {
+    try {
+      // Cortamos "2025-11-27" de un string largo
+      const cleanDatePart = data.transaction_date.substring(0, 10);
+      const parts = cleanDatePart.split('-'); // [YYYY, MM, DD]
+      if (parts.length === 3) {
+        // Reordenamos a DD/MM/YYYY
+        dateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      } else {
+        // Fallback si el formato no es YYYY-MM-DD
+        dateFormatted = data.transaction_date;
+      }
+    } catch (e) {
+      dateFormatted = data.transaction_date || 'Error Fechas';
+    }
+  }
+
   return {
     id: data.id,
     // Fechas
-    date_raw: data.transaction_date,
-    date_fmt: new Date(data.transaction_date).toLocaleDateString(),
+    date_raw: data.transaction_date, // Mantenemos la original para ordenar
+    date_fmt: dateFormatted,         // Usamos la formateada para mostrar
     created_at: new Date(data.created_at).toLocaleString(),
 
     // Datos principales
@@ -51,8 +72,8 @@ const normalizeInternalTx = (data) => {
     description: data.description || 'Sin notas adicionales',
 
     // --- NUEVOS CAMPOS ---
-    dueño: data.dueño || 'N/A',             // Mapeo directo de la API
-    person_name: data.person_name || 'N/A', // Mapeo directo de la API
+    dueño: data.dueño || 'N/A',
+    person_name: data.person_name || 'N/A',
 
     // Relaciones seguras
     account_name: account.name || 'Cuenta Eliminada',
@@ -74,9 +95,12 @@ const formatMoney = (amount, currency = '') => {
 const fetchTransactions = async (page = 1) => {
   isLoading.value = true
   try {
+    // NOTA IMPORTANTE: Idealmente, tu API (backend) debería manejar el orden
+    // agregando algo como `?sort_by=date&order=desc` a la URL.
     const { data } = await api.get(`/transactions/internal?page=${page}`)
 
-    transactions.value = data.data.map((tx) => {
+    // Mapeamos (normalizamos) los datos
+    const mappedData = data.data.map((tx) => {
       const norm = normalizeInternalTx(tx)
       return {
         ...tx,
@@ -84,6 +108,15 @@ const fetchTransactions = async (page = 1) => {
         amount_fmt: formatMoney(norm.amount, norm.currency),
       }
     })
+
+    // --- 2. ORDENAR EN EL CLIENTE (Lo nuevo al inicio) ---
+    // Ordenamos el array resultante usando la fecha "cruda" (date_raw)
+    // en orden descendente (b - a).
+    transactions.value = mappedData.sort((a, b) => {
+      if (b.date_raw > a.date_raw) return 1;
+      if (b.date_raw < a.date_raw) return -1;
+      return 0;
+    });
 
     const { data: list, ...meta } = data
     pagination.value = meta
@@ -127,12 +160,10 @@ onMounted(() => fetchTransactions())
       <BaseTable :headers="headers" :data="transactions" :is-loading="isLoading">
         <tr v-for="row in transactions" :key="row.id">
           <td>{{ row.date_fmt }}</td>
-          
+
           <td>
             <span :class="['badge-type', row.is_income ? 'b-green' : 'b-red']">
-              <FontAwesomeIcon
-                :icon="row.is_income ? 'fa-solid fa-arrow-up' : 'fa-solid fa-arrow-down'"
-              />
+              <FontAwesomeIcon :icon="row.is_income ? 'fa-solid fa-arrow-up' : 'fa-solid fa-arrow-down'" />
               {{ row.type_label }}
             </span>
           </td>
@@ -140,7 +171,7 @@ onMounted(() => fetchTransactions())
           <td class="font-bold text-dark">{{ row.person_name }}</td>
 
           <td>{{ row.category }}</td>
-          
+
           <td>{{ row.account_name }}</td>
 
           <td class="text-sm text-gray">{{ row.dueño }}</td>
@@ -159,11 +190,7 @@ onMounted(() => fetchTransactions())
       <Pagination :pagination="pagination" @change-page="fetchTransactions" />
     </div>
 
-    <BaseModal
-      :show="showDetailModal"
-      title="Detalle de Movimiento"
-      @close="showDetailModal = false"
-    >
+    <BaseModal :show="showDetailModal" title="Detalle de Movimiento" @close="showDetailModal = false">
       <div v-if="isLoadingDetail" class="loading-modal">
         <FontAwesomeIcon icon="fa-solid fa-spinner" spin size="2x" />
       </div>
@@ -171,9 +198,7 @@ onMounted(() => fetchTransactions())
       <div v-else-if="selectedTx" class="modal-content-wrapper">
         <div class="modal-hero">
           <div :class="['icon-circle', selectedTx.is_income ? 'bg-success' : 'bg-danger']">
-            <FontAwesomeIcon
-              :icon="selectedTx.is_income ? 'fa-solid fa-sack-dollar' : 'fa-solid fa-receipt'"
-            />
+            <FontAwesomeIcon :icon="selectedTx.is_income ? 'fa-solid fa-sack-dollar' : 'fa-solid fa-receipt'" />
           </div>
           <h2>
             {{ selectedTx.is_income ? '+' : '-' }}
@@ -189,7 +214,7 @@ onMounted(() => fetchTransactions())
             <label>Persona / Tercero</label>
             <p class="font-bold">{{ selectedTx.person_name }}</p>
           </div>
-           <div class="info-item"> 
+          <div class="info-item">
             <label>Dueño de la Cuenta</label>
             <p>{{ selectedTx.dueño }}</p>
           </div>
@@ -235,12 +260,14 @@ onMounted(() => fetchTransactions())
   margin: 0 auto;
   color: var(--color-text-light);
 }
+
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
+
 .list-header h1 {
   font-size: 1.6rem;
   color: var(--color-primary);
@@ -260,9 +287,11 @@ onMounted(() => fetchTransactions())
   gap: 8px;
   transition: 0.2s;
 }
+
 .btn-new:hover {
   background: #d4a000;
 }
+
 .btn-icon {
   background: none;
   border: none;
@@ -270,6 +299,7 @@ onMounted(() => fetchTransactions())
   cursor: pointer;
   font-size: 1.1rem;
 }
+
 .view-btn:hover {
   color: var(--color-primary);
 }
@@ -281,13 +311,16 @@ onMounted(() => fetchTransactions())
   padding: 20px;
   border: 1px solid var(--color-border);
 }
+
 .font-mono {
   font-family: monospace;
   font-weight: bold;
 }
+
 .text-sm {
   font-size: 0.85rem;
 }
+
 .text-gray {
   color: #999;
 }
@@ -303,11 +336,13 @@ onMounted(() => fetchTransactions())
   align-items: center;
   gap: 5px;
 }
+
 .b-green {
   background: rgba(14, 203, 129, 0.2);
   color: #0ecb81;
   border: 1px solid #0ecb81;
 }
+
 .b-red {
   background: rgba(246, 70, 93, 0.2);
   color: #f6465d;
@@ -317,6 +352,7 @@ onMounted(() => fetchTransactions())
 .text-success {
   color: var(--color-success);
 }
+
 .text-danger {
   color: var(--color-danger);
 }
@@ -336,6 +372,7 @@ onMounted(() => fetchTransactions())
   margin-bottom: 20px;
   border-bottom: 1px solid #333;
 }
+
 .icon-circle {
   width: 60px;
   height: 60px;
@@ -347,9 +384,11 @@ onMounted(() => fetchTransactions())
   margin-bottom: 10px;
   color: #fff;
 }
+
 .bg-success {
   background: var(--color-success);
 }
+
 .bg-danger {
   background: var(--color-danger);
 }
@@ -359,14 +398,17 @@ onMounted(() => fetchTransactions())
   margin: 5px 0;
   color: #fff;
 }
+
 .badge-lg {
   font-size: 0.9rem;
   font-weight: bold;
   text-transform: uppercase;
 }
+
 .t-green {
   color: var(--color-success);
 }
+
 .t-red {
   color: var(--color-danger);
 }
@@ -377,6 +419,7 @@ onMounted(() => fetchTransactions())
   grid-template-columns: 1fr 1fr;
   gap: 15px;
 }
+
 .info-item label {
   font-size: 0.75rem;
   color: #666;
@@ -384,11 +427,13 @@ onMounted(() => fetchTransactions())
   display: block;
   margin-bottom: 4px;
 }
+
 .info-item p {
   margin: 0;
   font-weight: 600;
   color: #ddd;
 }
+
 .full-width {
   grid-column: 1 / -1;
 }
@@ -413,6 +458,7 @@ onMounted(() => fetchTransactions())
   cursor: pointer;
   margin-top: 10px;
 }
+
 .btn-close:hover {
   background: #333;
   color: #fff;

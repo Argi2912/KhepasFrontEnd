@@ -129,18 +129,10 @@ onMounted(() => {
 
           <td class="action-buttons">
             <template v-if="authStore.can(permissionKey)">
-              <button
-                @click="openEditModal(broker.id)"
-                class="btn-icon edit"
-                title="Editar Corredor"
-              >
+              <button @click="openEditModal(broker.id)" class="btn-icon edit" title="Editar Corredor">
                 <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
               </button>
-              <button
-                @click="deleteBroker(broker.id, broker.name)"
-                class="btn-icon delete"
-                title="Eliminar Corredor"
-              >
+              <button @click="deleteBroker(broker.id, broker.name)" class="btn-icon delete" title="Eliminar Corredor">
                 <FontAwesomeIcon icon="fa-solid fa-trash" />
               </button>
             </template>
@@ -154,12 +146,8 @@ onMounted(() => {
       </template>
     </BaseCard>
 
-    <BrokerFormModal
-      :show="showBrokerModal"
-      :broker-id="brokerIdToEdit"
-      @close="showBrokerModal = false"
-      @saved="fetchBrokers(pagination.current_page || 1)"
-    />
+    <BrokerFormModal :show="showBrokerModal" :broker-id="brokerIdToEdit" @close="showBrokerModal = false"
+      @saved="fetchBrokers(pagination.current_page || 1)" />
   </div>
 </template>
 
@@ -170,6 +158,7 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 25px;
 }
+
 .header-actions h1 {
   font-size: 1.6rem;
   color: var(--color-primary);
@@ -189,6 +178,7 @@ onMounted(() => {
   border: none;
   cursor: pointer;
 }
+
 .btn-primary:hover {
   background-color: #ffc424;
 }
@@ -211,6 +201,7 @@ onMounted(() => {
   display: flex;
   gap: 8px;
 }
+
 .btn-icon {
   background: none;
   border: none;
@@ -219,12 +210,15 @@ onMounted(() => {
   padding: 5px;
   transition: transform 0.2s;
 }
+
 .btn-icon:hover {
   transform: scale(1.1);
 }
+
 .btn-icon.edit {
   color: #3498db;
 }
+
 .btn-icon.delete {
   color: var(--color-danger);
 }

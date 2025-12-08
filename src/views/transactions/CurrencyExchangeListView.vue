@@ -76,7 +76,7 @@ const parseLaravelDate = (dateString) => {
   return new Date(isoString)
 }
 
-// 🚨 FUNCIÓN MAESTRA NORMALIZADORA 🚨
+// 🚨 FUNCIÓN NORMALIZADORA (CORREGIDA) 🚨
 const normalizeTransactionData = (data) => {
   const client = data.client || {}
   const broker = data.broker || {}
@@ -87,24 +87,24 @@ const normalizeTransactionData = (data) => {
 
   const buyRate = parseFloat(data.buy_rate || 0)
   const exRate = parseFloat(data.exchange_rate || 0)
-  const isPurchase = buyRate > 0 && buyRate !== exRate
+  const isPurchase = buyRate > 0
 
-  // --- CÁLCULOS FINANCIEROS CORREGIDOS ---
+  // --- CÁLCULOS FINANCIEROS ---
   const charged = parseFloat(data.commission_total_amount || 0)     // Ingreso Bruto
   const cost = parseFloat(data.commission_provider_amount || 0)     // Costo Prov
   const adminShare = parseFloat(data.commission_admin_amount || 0)  // Costo Admin
-  const brokerShare = parseFloat(data.commission_broker_amount || 0)// Costo Broker (Nuevo)
+  const brokerShare = parseFloat(data.commission_broker_amount || 0)// Costo Broker
 
-  // Utilidad Neta Real (Restando también al corredor)
+  // Utilidad Neta Real
   const netProfit = charged - cost - adminShare - brokerShare
 
   // Montos Base
   const amountBaseSent = parseFloat(data.amount_sent || 0)
   const amountBaseReceived = parseFloat(data.amount_received || 0)
 
-  // 🚨 CÁLCULO CLAVE PARA LA VISTA: TOTAL REAL QUE ENTRA 🚨
-  // Si es 20,000 base + 1,000 comisión = 21,000 Total
-  const amountTotalIn = amountBaseReceived + charged
+  // ⚠️ CAMBIO AQUÍ: No sumamos la ganancia (charged).
+  // Mostramos exactamente lo que se recibió (ej: $100).
+  const amountTotalIn = amountBaseReceived
 
   const rawDate = parseLaravelDate(data.created_at)
 
@@ -119,7 +119,7 @@ const normalizeTransactionData = (data) => {
     is_purchase: isPurchase,
 
     client_name: client.name || 'Cliente Eliminado',
-    broker_name: broker.name || 'Directo / Sin Broker',
+    broker_name: broker.name || 'N/A',
     provider_name: provider.name || 'N/A',
     admin_name: admin.name || 'Sistema',
 
@@ -130,9 +130,9 @@ const normalizeTransactionData = (data) => {
     to_acc_name: toAcc.name || 'Cuenta Destino',
     to_currency: toAcc.currency_code || '---',
 
-    // Aquí mandamos el total sumado para el modal
+    // Ambos campos reflejan el monto base puro
     amount_received: amountBaseReceived,
-    amount_total_in: amountTotalIn, // <--- ESTE ES EL DATO PARA EL BOX VERDE
+    amount_total_in: amountTotalIn,
 
     rate_used: isPurchase ? buyRate : exRate,
     rate_label: isPurchase ? 'Tasa Compra' : 'Tasa Cambio',
@@ -140,7 +140,7 @@ const normalizeTransactionData = (data) => {
     comm_charged: charged,
     comm_cost: cost,
     comm_admin: adminShare,
-    comm_broker: brokerShare, // <--- Nuevo
+    comm_broker: brokerShare,
     net_profit: netProfit,
   }
 }
@@ -155,8 +155,7 @@ const fetchExchanges = async (page = 1) => {
       return {
         ...tx,
         ...normalized,
-        // En la tabla mostramos el Total (21k) o el base según prefieras. 
-        // Aquí dejo el total para consistencia.
+        // Usamos amount_total_in que ahora es igual al base (100)
         amount_out_fmt: formatMoney(normalized.amount_sent, normalized.from_currency),
         amount_in_fmt: formatMoney(normalized.amount_total_in, normalized.to_currency),
       }
@@ -294,7 +293,7 @@ onMounted(() => fetchExchanges())
             <span>Comisión Cobrada (Bruto):</span>
             <strong class="text-success">+ {{ formatMoney(selectedTx.comm_charged) }}</strong>
           </div>
-          <div class="fin-row">
+          <div class="fin-row" v-if="selectedTx.comm_cost > 0">
             <span>Costo Proveedor:</span>
             <strong class="text-danger">- {{ formatMoney(selectedTx.comm_cost) }}</strong>
           </div>

@@ -6,6 +6,7 @@ import { useFormValidation } from '@/utils/useFormValidation'
 import { useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 
+// TUS COMPONENTES ORIGINALES
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelectWithSearchAndCreate from '@/components/ui/BaseSelectWithSearchAndCreate.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
@@ -22,10 +23,10 @@ const isSubmitting = ref(false)
 
 // Tipos: 'purchase' | 'exchange' | 'currency_change'
 const operationType = ref('purchase')
+const isAutoCalculating = ref(false)
 
 const form = reactive({
   client_id: '',
-  // Fuente de fondos: 'own' | 'investor'
   capital_type: 'own',
   investor_id: '',
   investor_profit_pct: 0,
@@ -39,17 +40,18 @@ const form = reactive({
   to_account_id: '',
 
   amount_sent: '',
+  amount_received: '',
 
   // Tasas
   exchange_rate: '',
-  buy_rate: '',
-  received_rate: '',
+  buy_rate: '',      // Tasa Costo
+  received_rate: '', // Tasa Mercado
 
   // Comisiones
   commission_charged_pct: 0,
   commission_provider_pct: 0,
   commission_admin_pct: 0,
-  commission_broker_pct: 0,
+  commission_broker_pct: 0, // 🟢 Campo Corredor
 
   // Valores calculados
   commission_charged_amount: 0,
@@ -67,19 +69,13 @@ const form = reactive({
 const isComplexExchange = computed(() => operationType.value === 'currency_change')
 
 const sourceAccounts = computed(() => transactionStore.getAccounts)
-const destinationAccounts = computed(() => {
-  return transactionStore.getAccounts
-})
+const destinationAccounts = computed(() => transactionStore.getAccounts)
 
-const fromAccount = computed(() =>
-  transactionStore.getAccounts.find((a) => a.id == form.from_account_id),
-)
-const toAccount = computed(() =>
-  transactionStore.getAccounts.find((a) => a.id == form.to_account_id),
-)
-const selectedPlatform = computed(() =>
-  transactionStore.getPlatforms.find((p) => p.id == form.platform_id),
-)
+const fromAccount = computed(() => transactionStore.getAccounts.find((a) => a.id == form.from_account_id))
+const toAccount = computed(() => transactionStore.getAccounts.find((a) => a.id == form.to_account_id))
+const selectedPlatform = computed(() => transactionStore.getPlatforms.find((p) => p.id == form.platform_id))
+const selectedProvider = computed(() => transactionStore.getProviders.find((p) => p.id == form.provider_id))
+const selectedBroker = computed(() => transactionStore.getBrokers.find((b) => b.id == form.broker_id))
 
 const sourceName = computed(() => {
   if (form.capital_type === 'investor') {
@@ -89,22 +85,14 @@ const sourceName = computed(() => {
   return fromAccount.value?.name || ''
 })
 
-const sourceCurrency = computed(() => {
-  if (form.capital_type === 'investor') return ''
-  return fromAccount.value?.currency_code || ''
-})
-
 const commissionCurrency = computed(() => {
-  if (operationType.value === 'purchase') {
+  if (['purchase', 'currency_change'].includes(operationType.value)) {
     return toAccount.value?.currency_code || '---'
   }
   return fromAccount.value?.currency_code || '---'
 })
 
-// nota: removed unused computed `totalClientPays`
-
 const hasSufficientBalance = computed(() => {
-  // Si la fuente es inversionista, no necesitamos verificar saldo en caja
   if (form.capital_type === 'investor') return true
   if (!fromAccount.value || !form.amount_sent) return true
   const rawAccount = transactionStore.rawAccounts?.find((a) => a.id == form.from_account_id)
@@ -112,134 +100,164 @@ const hasSufficientBalance = computed(() => {
 })
 
 // --- LÓGICA MATEMÁTICA ---
+
+// 1. WATCH: Tasas -> Calcula Ganancia Bruta (MARGEN)
+watch(
+  [() => form.buy_rate, () => form.received_rate],
+  ([buy, received]) => {
+    if (operationType.value === 'purchase' && !isAutoCalculating.value) {
+      const b = parseFloat(buy) || 0
+      const r = parseFloat(received) || 0
+
+      if (b > 0 && r > 0) {
+        isAutoCalculating.value = true
+        // Margen Real: ((300 - 250) / 300) * 100 = 16.66%
+        const pct = ((r - b) / r) * 100
+        form.commission_charged_pct = pct.toFixed(2)
+        calculateAmounts()
+        setTimeout(() => isAutoCalculating.value = false, 0)
+      }
+    }
+  }
+)
+
+// 2. WATCH: % Ganancia Bruta -> Recalcula Tasa Compra
+watch(
+  () => form.commission_charged_pct,
+  (newPct) => {
+    if (operationType.value === 'purchase' && !isAutoCalculating.value) {
+      const pct = parseFloat(newPct) || 0
+      const r = parseFloat(form.received_rate) || 0
+
+      if (r > 0) {
+        isAutoCalculating.value = true
+        // Compra = 300 * (1 - 0.1666)
+        const newBuyRate = r * (1 - (pct / 100))
+        form.buy_rate = newBuyRate.toFixed(2)
+        calculateAmounts()
+        setTimeout(() => isAutoCalculating.value = false, 0)
+      }
+    }
+  }
+)
+
+// 3. WATCH: Montos y TODOS los Gastos (Para recalcular al instante)
 watch(
   [
     () => form.amount_sent,
+    () => form.amount_received,
     () => form.exchange_rate,
     () => form.buy_rate,
     () => form.received_rate,
-    operationType,
-  ],
-  ([sent, rate, buyRate, , type]) => {
-    const s = parseFloat(sent) || 0
-    let mainRate = 0
-
-    if (type === 'exchange') {
-      form.exchange_rate = 1
-      form.amount_received = s.toFixed(2)
-    } else if (type === 'purchase') {
-      const bRate = parseFloat(buyRate) || 0
-      if (s > 0 && bRate > 0) {
-        form.amount_received = (s / bRate).toFixed(2)
-      } else {
-        form.amount_received = 0
-      }
-      calculateCommissions()
-    } else {
-      mainRate = parseFloat(rate) || 0
-      if (s > 0 && mainRate > 0) form.amount_received = (s * mainRate).toFixed(2)
-      else form.amount_received = 0
-      calculateCommissions()
-    }
-  },
-  { deep: true },
-)
-
-watch(
-  [
+    // Vigilamos todos los porcentajes para actualizar la utilidad neta en tiempo real
     () => form.commission_charged_pct,
     () => form.commission_provider_pct,
-    () => form.commission_admin_pct,
     () => form.commission_broker_pct,
-    () => form.amount_received,
-    () => form.amount_sent,
+    () => form.commission_admin_pct,
     () => form.investor_profit_pct,
     () => form.capital_type,
+    operationType,
   ],
-  () => {
-    if (operationType.value !== 'exchange') {
+  ([sent, received, rate, buyRate, , , , , , , type]) => {
+    if (isAutoCalculating.value) return
+
+    if (type === 'purchase') {
+      const r = parseFloat(received) || 0
+      const bRate = parseFloat(buyRate) || 0
+
+      // En Compra: Calculamos Costo (Enviado) basado en Recibido
+      if (r > 0 && bRate > 0) {
+        const calculatedSent = (r * bRate).toFixed(2)
+        if (form.amount_sent !== calculatedSent) {
+          form.amount_sent = calculatedSent
+        }
+      }
+      calculateCommissions()
+
+    } else if (type === 'exchange') {
+      const s = parseFloat(sent) || 0
+      form.exchange_rate = 1
+      form.amount_received = s.toFixed(2)
+      calculateCommissions()
+
+    } else {
+      // Currency Change (1:1)
+      const r = parseFloat(received) || 0
+      if (r >= 0) form.amount_sent = r
       calculateCommissions()
     }
-  },
+  }
 )
 
 function calculateCommissions() {
-  const amountSent = parseFloat(form.amount_sent) || 0
+  let commissionBase = 0
 
-  if (amountSent > 0) {
-    let commissionBase = 0
+  // Definir base: En Compra y Cambio Divisa es lo que entra ($)
+  if (['purchase', 'currency_change'].includes(operationType.value)) {
+    commissionBase = parseFloat(form.amount_received) || 0
+  } else {
+    commissionBase = parseFloat(form.amount_sent) || 0
+  }
 
-    if (operationType.value === 'purchase') {
-      // GANANCIA (SPREAD)
-      const entryRate = parseFloat(form.received_rate) || 0
-      const buyRate = parseFloat(form.buy_rate) || 0
+  if (commissionBase > 0) {
 
-      if (entryRate > 0 && buyRate > 0) {
-        const spread = entryRate - buyRate
-        form.commission_charged_amount = (parseFloat(form.amount_received) * spread).toFixed(2)
-      } else {
-        form.commission_charged_amount = 0
-      }
-      commissionBase = parseFloat(form.amount_received) || 0
-    } else {
-      commissionBase = amountSent
-      form.commission_charged_amount = (
-        (commissionBase * (parseFloat(form.commission_charged_pct) || 0)) /
-        100
-      ).toFixed(2)
-    }
-
-    // COSTOS
-    form.commission_provider_amount = (
-      (commissionBase * (parseFloat(form.commission_provider_pct) || 0)) /
-      100
+    // 1. Ganancia Bruta
+    form.commission_charged_amount = (
+      (commissionBase * (parseFloat(form.commission_charged_pct) || 0)) / 100
     ).toFixed(2)
 
-    // Admin (Solo en Complex)
-    if (isComplexExchange.value) {
+    // 2. Costo Proveedor
+    form.commission_provider_amount = (
+      (commissionBase * (parseFloat(form.commission_provider_pct) || 0)) / 100
+    ).toFixed(2)
+
+    // 3. Costo Corredor
+    form.commission_broker_amount = (
+      (commissionBase * (parseFloat(form.commission_broker_pct) || 0)) / 100
+    ).toFixed(2)
+
+    // 4. Costo Admin
+    if (isComplexExchange.value || operationType.value === 'exchange') {
       form.commission_admin_amount = (
-        (commissionBase * (parseFloat(form.commission_admin_pct) || 0)) /
-        100
+        (commissionBase * (parseFloat(form.commission_admin_pct) || 0)) / 100
       ).toFixed(2)
     } else {
       form.commission_admin_amount = 0
     }
 
-    // CORREDOR (Solo si NO es Compra)
-    if (form.broker_id && operationType.value !== 'purchase') {
-      form.commission_broker_amount = (
-        (commissionBase * (parseFloat(form.commission_broker_pct) || 0)) /
-        100
-      ).toFixed(2)
-    } else {
-      form.commission_broker_amount = 0
-    }
-
-    // UTILIDAD NETA
-    form.commission_net_profit = (
-      parseFloat(form.commission_charged_amount) -
-      parseFloat(form.commission_provider_amount) -
-      parseFloat(form.commission_admin_amount) -
-      parseFloat(form.commission_broker_amount)
-    ).toFixed(2)
-
-    // Si la fuente de fondos es inversionista, calcular monto del inversionista
+    // 5. Costo Inversionista
     if (form.capital_type === 'investor') {
       const pct = parseFloat(form.investor_profit_pct) || 0
       form.investor_profit_amount = (
-        ((parseFloat(form.commission_charged_amount) || 0) * pct) /
-        100
-      ).toFixed(2)
-      form.commission_net_after_investor = (
-        parseFloat(form.commission_net_profit) - parseFloat(form.investor_profit_amount)
+        ((parseFloat(form.commission_charged_amount) || 0) * pct) / 100
       ).toFixed(2)
     } else {
       form.investor_profit_amount = 0
+    }
+
+    // 6. UTILIDAD NETA (Resta todo)
+    form.commission_net_profit = (
+      parseFloat(form.commission_charged_amount) -
+      parseFloat(form.commission_provider_amount) -
+      parseFloat(form.commission_broker_amount) -
+      parseFloat(form.commission_admin_amount) -
+      parseFloat(form.investor_profit_amount)
+    ).toFixed(2)
+
+    // Si hay inversionista, la utilidad final para la empresa es lo que queda después de pagarle
+    if (form.capital_type === 'investor') {
+      form.commission_net_after_investor = form.commission_net_profit // Ya restado arriba
+    } else {
       form.commission_net_after_investor = form.commission_net_profit
     }
+
   } else {
     resetCommissions()
   }
+}
+
+function calculateAmounts() {
+  calculateCommissions()
 }
 
 function resetCommissions() {
@@ -250,18 +268,19 @@ function resetCommissions() {
   form.commission_net_profit = 0
   form.investor_profit_amount = 0
   form.investor_profit_pct = 0
-  form.commission_net_after_investor = 0
 }
 
 watch(operationType, () => {
   form.from_account_id = ''
   form.to_account_id = ''
   form.amount_sent = ''
+  form.amount_received = ''
   form.exchange_rate = ''
   form.buy_rate = ''
   form.received_rate = ''
   form.provider_id = ''
   form.platform_id = ''
+
   form.commission_charged_pct = 0
   form.commission_provider_pct = 0
   form.commission_admin_pct = 0
@@ -305,22 +324,13 @@ const handleConfirm = async () => {
 
   if (operationType.value === 'purchase') {
     if (!form.buy_rate || !form.received_rate)
-      return Swal.fire('Falta Datos', 'Ingrese tasas.', 'warning')
-  }
-
-  if (operationType.value === 'exchange' && !form.exchange_rate) {
-    form.exchange_rate = 1
+      return Swal.fire('Falta Datos', 'Ingrese ambas tasas (Compra y Mercado).', 'warning')
   }
 
   isSubmitting.value = true
   try {
     let payload = { ...form }
 
-    // Do not send broker amount field — backend DB doesn't have this column
-    delete payload.commission_broker_amount
-
-    // Si la fuente es inversionista, enviar explicitamente null en `from_account_id`
-    // para evitar errores en backends que esperan la clave, pero permiten valor nulo.
     if (form.capital_type === 'investor') {
       payload.from_account_id = null
     }
@@ -333,6 +343,7 @@ const handleConfirm = async () => {
       ).toFixed(2)
       payload.buy_rate = null
       payload.received_rate = null
+      payload.delivered = form.delivered
     } else if (operationType.value === 'exchange') {
       payload.operation_type = 'exchange'
       payload.buy_rate = null
@@ -340,19 +351,15 @@ const handleConfirm = async () => {
       payload.provider_id = null
       payload.broker_id = null
     } else {
+      // PURCHASE
       payload.operation_type = 'purchase'
       payload.exchange_rate = null
-      // payload.platform_id SE ENVÍA SI FUE SELECCIONADO
       payload.commission_admin_pct = 0
       payload.commission_admin_amount = 0
-
-      // Corredor se envía ID pero monto 0
-      payload.commission_broker_pct = 0
-      payload.commission_broker_amount = 0
-
       payload.delivered = form.delivered
     }
 
+    // Si no hay corredor seleccionado, limpiar valores
     if (!payload.broker_id) {
       payload.commission_broker_pct = 0
       payload.commission_broker_amount = 0
@@ -388,22 +395,13 @@ const handleConfirm = async () => {
           <p class="subtitle">Paso {{ currentStep }} / {{ totalSteps }}</p>
         </div>
         <div class="type-switcher">
-          <button
-            :class="{ active: operationType === 'purchase' }"
-            @click="operationType = 'purchase'"
-          >
+          <button :class="{ active: operationType === 'purchase' }" @click="operationType = 'purchase'">
             Compra
           </button>
-          <button
-            :class="{ active: operationType === 'exchange' }"
-            @click="operationType = 'exchange'"
-          >
+          <button :class="{ active: operationType === 'exchange' }" @click="operationType = 'exchange'">
             Intercambio
           </button>
-          <button
-            :class="{ active: operationType === 'currency_change' }"
-            @click="operationType = 'currency_change'"
-          >
+          <button :class="{ active: operationType === 'currency_change' }" @click="operationType = 'currency_change'">
             Cambio Divisa
           </button>
         </div>
@@ -414,103 +412,55 @@ const handleConfirm = async () => {
       <div class="form-body">
         <div v-if="currentStep === 1" class="step-content fade-in">
           <div class="grid-2">
-            <BaseSelectWithSearchAndCreate
-              label="Cliente *"
-              :options="transactionStore.getClients"
-              v-model="form.client_id"
-              required
-              create-endpoint="/clients"
-              :create-fields="{ name: '' }"
-              create-label="Cliente"
-            />
+            <BaseSelectWithSearchAndCreate label="Cliente *" :options="transactionStore.getClients"
+              v-model="form.client_id" required create-endpoint="/clients" :create-fields="{ name: '' }"
+              create-label="Cliente" />
 
             <div class="col-span-2">
               <label class="small-label">Fuente de Fondos</label>
               <div class="type-switcher" style="margin-top: 8px">
-                <button
-                  :class="{ active: form.capital_type === 'own' }"
-                  @click="form.capital_type = 'own'"
-                >
+                <button :class="{ active: form.capital_type === 'own' }" @click="form.capital_type = 'own'">
                   Propio
                 </button>
-                <button
-                  :class="{ active: form.capital_type === 'investor' }"
-                  @click="form.capital_type = 'investor'"
-                >
+                <button :class="{ active: form.capital_type === 'investor' }" @click="form.capital_type = 'investor'">
                   Inversionista
                 </button>
               </div>
             </div>
 
             <div v-if="form.capital_type === 'investor'" class="col-span-2">
-              <BaseSelectWithSearchAndCreate
-                label="Inversionista *"
-                :options="transactionStore.getInvestors"
-                v-model="form.investor_id"
-                required
-                create-endpoint="/investors"
-                :create-fields="{ name: '' }"
-                create-label="Inversionista"
-              />
+              <BaseSelectWithSearchAndCreate label="Inversionista *" :options="transactionStore.getInvestors"
+                v-model="form.investor_id" required create-endpoint="/investors" :create-fields="{ name: '' }"
+                create-label="Inversionista" />
             </div>
 
             <div v-if="operationType === 'exchange'">
-              <BaseSelectWithSearchAndCreate
-                label="Admin (Plataforma) *"
-                :options="transactionStore.getPlatforms"
-                v-model="form.platform_id"
-                required
-                create-endpoint="/platforms"
-                :create-fields="{ name: '' }"
-                create-label="Plataforma"
-              />
+              <BaseSelectWithSearchAndCreate label="Admin (Plataforma) *" :options="transactionStore.getPlatforms"
+                v-model="form.platform_id" required create-endpoint="/platforms" :create-fields="{ name: '' }"
+                create-label="Plataforma" />
             </div>
 
             <template v-if="operationType !== 'exchange'">
-              <BaseSelectWithSearchAndCreate
-                label="Corredor (Opcional)"
-                :options="transactionStore.getBrokers"
-                v-model="form.broker_id"
-                create-endpoint="/brokers"
-                :create-fields="{ name: '' }"
-                create-label="Corredor"
-              />
+              <BaseSelectWithSearchAndCreate label="Corredor (Opcional)" :options="transactionStore.getBrokers"
+                v-model="form.broker_id" create-endpoint="/brokers" :create-fields="{ name: '' }"
+                create-label="Corredor" />
 
               <div class="grid-2-nested col-span-2">
-                <BaseSelectWithSearchAndCreate
-                  label="Proveedor (Liquidez)"
-                  :options="transactionStore.getProviders"
-                  v-model="form.provider_id"
-                  :required="isComplexExchange"
-                  create-endpoint="/providers"
-                  :create-fields="{ name: '' }"
-                  create-label="Proveedor"
-                />
+                <BaseSelectWithSearchAndCreate label="Proveedor (Liquidez)" :options="transactionStore.getProviders"
+                  v-model="form.provider_id" :required="isComplexExchange" create-endpoint="/providers"
+                  :create-fields="{ name: '' }" create-label="Proveedor" />
 
-                <BaseSelectWithSearchAndCreate
-                  v-if="isComplexExchange || operationType === 'purchase'"
-                  label="Plataforma / Admin"
-                  :options="transactionStore.getPlatforms"
-                  v-model="form.platform_id"
-                  :required="isComplexExchange"
-                  create-endpoint="/platforms"
-                  :create-fields="{ name: '' }"
-                  create-label="Plataforma"
-                />
+                <BaseSelectWithSearchAndCreate v-if="isComplexExchange" label="Plataforma / Admin"
+                  :options="transactionStore.getPlatforms" v-model="form.platform_id" :required="isComplexExchange"
+                  create-endpoint="/platforms" :create-fields="{ name: '' }" create-label="Plataforma" />
               </div>
               <div class="divider col-span-2"></div>
             </template>
 
             <template v-if="form.capital_type !== 'investor'">
-              <BaseSelectWithSearchAndCreate
-                label="Cuenta Origen (Sale) *"
-                :options="sourceAccounts"
-                v-model="form.from_account_id"
-                required
-                create-endpoint="/accounts"
-                :create-fields="{ name: '' }"
-                create-label="Cuenta"
-              />
+              <BaseSelectWithSearchAndCreate label="Cuenta Origen (Sale) *" :options="sourceAccounts"
+                v-model="form.from_account_id" required create-endpoint="/accounts" :create-fields="{ name: '' }"
+                create-label="Cuenta" />
             </template>
             <template v-else>
               <div class="input-group">
@@ -519,15 +469,9 @@ const handleConfirm = async () => {
               </div>
             </template>
 
-            <BaseSelectWithSearchAndCreate
-              label="Cuenta Destino (Entra) *"
-              :options="destinationAccounts"
-              v-model="form.to_account_id"
-              required
-              create-endpoint="/accounts"
-              :create-fields="{ name: '' }"
-              create-label="Cuenta"
-            />
+            <BaseSelectWithSearchAndCreate label="Cuenta Destino (Entra) *" :options="destinationAccounts"
+              v-model="form.to_account_id" required create-endpoint="/accounts" :create-fields="{ name: '' }"
+              create-label="Cuenta" />
           </div>
         </div>
 
@@ -535,80 +479,62 @@ const handleConfirm = async () => {
           <div class="calc-panel">
             <div class="calc-row">
               <div class="input-group">
-                <label>Monto Enviado</label>
-                <input
-                  type="number"
-                  v-model="form.amount_sent"
-                  placeholder="0.00"
-                  class="big-input"
-                />
+                <label v-if="operationType === 'purchase' || isComplexExchange">Monto Recibido (USD)</label>
+                <label v-else>Monto Enviado</label>
+
+                <input v-if="operationType === 'purchase' || isComplexExchange" type="number"
+                  v-model="form.amount_received" placeholder="0.00" class="big-input" />
+                <input v-else type="number" v-model="form.amount_sent" placeholder="0.00" class="big-input" />
               </div>
 
               <div class="operator">
-                {{ operationType === 'exchange' ? '' : operationType === 'purchase' ? '÷' : '×' }}
+                {{ operationType === 'exchange' ? '' : operationType === 'purchase' ? '×' : '×' }}
               </div>
+
               <div v-if="operationType === 'exchange'" class="operator">
                 <FontAwesomeIcon icon="fa-solid fa-arrow-right" />
               </div>
 
               <div class="rate-inputs-container">
-                <div v-if="operationType !== 'purchase'" class="input-group full-width-rate">
-                  <template v-if="operationType !== 'exchange'">
-                    <label>Tasa</label>
-                    <input
-                      type="number"
-                      v-model="form.exchange_rate"
-                      placeholder="1.00"
-                      class="big-input rate-input"
-                    />
-                  </template>
+                <div v-if="operationType === 'purchase'" class="grid-2-rates">
+                  <div class="input-group">
+                    <label>Tasa Compra (Costo)</label>
+                    <input type="number" v-model="form.buy_rate" placeholder="250" class="big-input rate-input" />
+                  </div>
+                  <div class="input-group">
+                    <label>Tasa Mercado Real</label>
+                    <input type="number" v-model="form.received_rate" placeholder="300" class="big-input rate-input" />
+                  </div>
                 </div>
 
-                <div v-else class="grid-2-rates">
-                  <div class="input-group">
-                    <label>Tasa Compra</label>
-                    <input
-                      type="number"
-                      v-model="form.buy_rate"
-                      placeholder="150"
-                      class="big-input rate-input"
-                    />
-                  </div>
-                  <div class="input-group">
-                    <label>Tasa Mercado/Real</label>
-                    <input
-                      type="number"
-                      v-model="form.received_rate"
-                      placeholder="300"
-                      class="big-input rate-input"
-                    />
-                  </div>
+                <div v-else-if="operationType !== 'exchange'" class="input-group full-width-rate">
+                  <label>Tasa</label>
+                  <input type="number" v-model="form.exchange_rate" placeholder="1.00" class="big-input rate-input" />
                 </div>
               </div>
 
               <div v-if="operationType !== 'exchange'" class="operator">=</div>
 
               <div class="input-group">
-                <label>Monto Recibido</label>
-                <input
-                  type="text"
-                  :value="form.amount_received"
-                  readonly
-                  class="big-input readonly"
-                />
+                <label v-if="operationType === 'purchase'">Monto Enviado (BS)</label>
+                <label v-else>Monto Recibido</label>
+
+                <input v-if="operationType === 'purchase'" type="number" v-model="form.amount_sent" placeholder="0.00"
+                  class="big-input" readonly style="background: #1e2023; color: #ccc;" />
+                <input v-else type="text" :value="form.amount_received" readonly class="big-input readonly" />
               </div>
             </div>
+
             <p v-if="!hasSufficientBalance" class="error-txt">
               Saldo insuficiente en {{ fromAccount?.name }}
             </p>
 
-            <div v-if="operationType === 'purchase'" class="delivery-check">
+            <div v-if="['purchase', 'currency_change'].includes(operationType)" class="delivery-check">
               <label class="checkbox-wrapper">
                 <input type="checkbox" v-model="form.delivered" />
                 <span class="checkmark"></span>
                 <div class="check-text">
-                  <span class="title">Entregar Divisas Inmediatamente</span>
-                  <small>{{ form.delivered ? 'COMPLETADA' : 'PENDIENTE' }}</small>
+                  <span class="title">Entregar Inmediatamente</span>
                 </div>
               </label>
             </div>
@@ -616,23 +542,17 @@ const handleConfirm = async () => {
 
           <div v-if="operationType !== 'exchange'" class="commissions-panel">
             <div class="panel-header-flex">
-              <h4>Rentabilidad (Spread)</h4>
+              <h4>{{ operationType === 'purchase' ? 'Rentabilidad (Spread)' : 'Rentabilidad Cambio Divisa' }}</h4>
             </div>
 
-            <div
-              class="commissions-grid"
-              :class="{ 'grid-2': operationType === 'purchase', 'grid-3': isComplexExchange }"
-            >
-              <div class="comm-card income">
-                <label>{{
-                  operationType === 'purchase' ? 'Ganancia Bruta (Spread)' : 'Comisión Cobrada (%)'
-                }}</label>
+            <div class="commissions-grid grid-3">
 
-                <div v-if="operationType !== 'purchase'" class="pct-input-wrapper">
+              <div class="comm-card income">
+                <label>{{ operationType === 'purchase' ? 'Ganancia Bruta (%)' : 'Comisión (%)' }}</label>
+                <div class="pct-input-wrapper">
                   <input type="number" v-model="form.commission_charged_pct" placeholder="0" />
                   <span>%</span>
                 </div>
-
                 <div class="calc-result text-success">+ {{ form.commission_charged_amount }}</div>
               </div>
 
@@ -643,6 +563,15 @@ const handleConfirm = async () => {
                   <span>%</span>
                 </div>
                 <div class="calc-result text-danger">- {{ form.commission_provider_amount }}</div>
+              </div>
+
+              <div class="comm-card expense">
+                <label>Costo Corredor (%)</label>
+                <div class="pct-input-wrapper">
+                  <input type="number" v-model="form.commission_broker_pct" placeholder="0" />
+                  <span>%</span>
+                </div>
+                <div class="calc-result text-danger">- {{ form.commission_broker_amount }}</div>
               </div>
 
               <div v-if="isComplexExchange" class="comm-card expense">
@@ -662,19 +591,10 @@ const handleConfirm = async () => {
                 </div>
                 <div class="calc-result text-danger">- {{ form.investor_profit_amount }}</div>
               </div>
-
-              <div v-if="form.broker_id && operationType !== 'purchase'" class="comm-card expense">
-                <label>Costo Corredor (%)</label>
-                <div class="pct-input-wrapper">
-                  <input type="number" v-model="form.commission_broker_pct" placeholder="0" />
-                  <span>%</span>
-                </div>
-                <div class="calc-result text-danger">- {{ form.commission_broker_amount }}</div>
-              </div>
             </div>
 
             <div class="total-profit-bar">
-              <span>Ganancia Neta:</span>
+              <span>Utilidad Real (Neta):</span>
               <strong :class="form.commission_net_profit >= 0 ? 'text-success' : 'text-danger'">
                 {{ form.commission_net_profit }} {{ commissionCurrency }}
               </strong>
@@ -692,9 +612,7 @@ const handleConfirm = async () => {
             <div class="summary-table">
               <div class="row">
                 <span>Cliente</span>
-                <strong>{{
-                  transactionStore.getClients.find((c) => c.id == form.client_id)?.name
-                }}</strong>
+                <strong>{{transactionStore.getClients.find((c) => c.id == form.client_id)?.name}}</strong>
               </div>
 
               <div class="row" v-if="form.platform_id">
@@ -702,47 +620,52 @@ const handleConfirm = async () => {
                 <span>{{ selectedPlatform?.name }}</span>
               </div>
 
-              <div class="row" v-if="form.broker_id && operationType === 'purchase'">
+              <div class="row" v-if="form.broker_id">
                 <span>Corredor</span>
-                <span>{{
-                  transactionStore.getBrokers.find((b) => b.id == form.broker_id)?.name
-                }}</span>
+                <span>{{transactionStore.getBrokers.find((b) => b.id == form.broker_id)?.name}}</span>
+              </div>
+
+              <div class="row" v-if="form.provider_id">
+                <span>Proveedor</span>
+                <span>{{ selectedProvider?.name }}</span>
               </div>
 
               <div class="divider"></div>
 
               <div class="row highlight">
                 <span>Monto Enviado ({{ fromAccount?.name }})</span>
-                <span class="text-danger"
-                  >- {{ form.amount_sent }} {{ fromAccount?.currency_code }}</span
-                >
+                <span class="text-danger">- {{ form.amount_sent }} {{ fromAccount?.currency_code }}</span>
               </div>
 
               <div class="row highlight">
                 <span>Monto Recibido ({{ toAccount?.name }})</span>
-                <span class="text-success"
-                  >+ {{ form.amount_received }} {{ toAccount?.currency_code }}</span
-                >
+                <span class="text-success">+ {{ form.amount_received }} {{ toAccount?.currency_code }}</span>
               </div>
 
               <div v-if="operationType === 'purchase'" class="row">
-                <span>Spread (Ganancia/Unidad)</span>
-                <span>{{
-                  (parseFloat(form.received_rate) - parseFloat(form.buy_rate)).toFixed(2)
-                }}</span>
+                <span>Tasa Compra</span>
+                <span>{{ form.buy_rate }}</span>
               </div>
-
               <div v-if="operationType === 'purchase'" class="row">
-                <span>Estado</span>
-                <span>{{ form.delivered ? 'COMPLETADA' : 'PENDIENTE' }}</span>
+                <span>Tasa Mercado</span>
+                <span>{{ form.received_rate }}</span>
               </div>
 
               <template v-if="operationType !== 'exchange'">
                 <div class="divider"></div>
+                <div class="row" v-if="form.commission_provider_amount > 0">
+                  <span>Pago Proveedor</span>
+                  <span class="text-danger">- {{ form.commission_provider_amount }}</span>
+                </div>
+                <div class="row" v-if="form.commission_broker_amount > 0">
+                  <span>Pago Corredor</span>
+                  <span class="text-danger">- {{ form.commission_broker_amount }}</span>
+                </div>
+
                 <div class="row total">
-                  <span>Ganancia Neta ({{ commissionCurrency }})</span>
+                  <span>Utilidad Real</span>
                   <span :class="form.commission_net_profit >= 0 ? 'text-success' : 'text-danger'">
-                    {{ form.commission_net_profit }}
+                    {{ form.commission_net_profit }} {{ commissionCurrency }}
                   </span>
                 </div>
               </template>
@@ -761,12 +684,7 @@ const handleConfirm = async () => {
           Siguiente
           <FontAwesomeIcon icon="fa-solid fa-arrow-right" />
         </button>
-        <button
-          v-if="currentStep === totalSteps"
-          @click="handleConfirm"
-          class="btn-success"
-          :disabled="isSubmitting"
-        >
+        <button v-if="currentStep === totalSteps" @click="handleConfirm" class="btn-success" :disabled="isSubmitting">
           {{ isSubmitting ? 'Procesando...' : 'Confirmar' }}
         </button>
       </div>
@@ -1125,12 +1043,12 @@ const handleConfirm = async () => {
   transition: 0.2s;
 }
 
-.checkbox-wrapper input:checked ~ .checkmark {
+.checkbox-wrapper input:checked~.checkmark {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
 }
 
-.checkbox-wrapper input:checked ~ .checkmark::after {
+.checkbox-wrapper input:checked~.checkmark::after {
   content: '';
   position: absolute;
   left: 8px;
