@@ -119,6 +119,18 @@ export const useTransactionStore = defineStore('transaction', () => {
     }
   }
 
+  async function fetchProfitMatrixReport(filters = {}) {
+    try {
+      // Asumiendo que creaste la ruta en el backend como /reports/profit-matrix
+      const response = await api.get('/reports/profit-matrix', { params: filters })
+      return response.data
+    } catch (error) {
+      console.error('Error cargando matriz:', error)
+      notify.error('Error al obtener el reporte de rentabilidad')
+      throw error
+    }
+  }
+
   // Crear Transacción Unificada
   async function createCurrencyExchange(payload) {
     const response = await api.post('/transactions/exchanges', payload)
@@ -159,5 +171,6 @@ export const useTransactionStore = defineStore('transaction', () => {
     createCurrencyExchange,
     createInternalTransaction,
     markAsDelivered,
+    fetchProfitMatrixReport,
   }
 })

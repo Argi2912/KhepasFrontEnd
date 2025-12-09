@@ -101,6 +101,15 @@ const router = createRouter({
           component: () => import('@/views/reports/BrokerReportView.vue'),
           meta: { label: 'Por Corredor', hiddenInMenu: true },
         },
+        {
+          path: 'profit-matrix',
+          name: 'reports.profit_matrix',
+          component: () => import('@/views/reports/ProfitMatrixView.vue'),
+          meta: {
+            label: 'Matriz de Rentabilidad',
+            icon: 'fa-solid fa-table-cells', // Icono sugerido
+          },
+        },
       ],
     },
 
@@ -169,10 +178,10 @@ const router = createRouter({
     {
       path: '/financial-config',
       component: () => import('@/views/finance/FinancialConfigLayout.vue'),
-      meta: { 
-        requiresAuth: true, 
-        icon: 'fa-solid fa-gear', 
-        label: 'Configuración Financiera' 
+      meta: {
+        requiresAuth: true,
+        icon: 'fa-solid fa-gear',
+        label: 'Configuración Financiera',
       },
       children: [
         { path: '', redirect: { name: 'accounts_list' } },
@@ -180,21 +189,21 @@ const router = createRouter({
           path: 'accounts',
           name: 'accounts_list',
           component: () => import('@/views/accounts/AccountList.vue'),
-          meta: { 
-            label: 'Cuentas Bancarias', 
+          meta: {
+            label: 'Cuentas Bancarias',
             // permission: 'manage_accounts', // Comenta si también da problemas
             // 🟢 ELIMINADO hiddenInMenu PARA QUE SE VEA
-          }, 
+          },
         },
         {
           path: 'currencies',
           name: 'currencies_list',
           component: () => import('@/views/currencies/CurrencyListView.vue'),
-          meta: { 
-            label: 'Divisas', 
+          meta: {
+            label: 'Divisas',
             // permission: 'manage_currencies', // Comenta si también da problemas
             // 🟢 ELIMINADO hiddenInMenu PARA QUE SE VEA
-          }, 
+          },
         },
       ],
     },
@@ -205,10 +214,10 @@ const router = createRouter({
     {
       path: '/transactions',
       component: () => import('@/views/transactions/TransactionsLayout.vue'),
-      meta: { 
-        requiresAuth: true, 
-        icon: 'fa-solid fa-briefcase', 
-        label: 'Operaciones' 
+      meta: {
+        requiresAuth: true,
+        icon: 'fa-solid fa-briefcase',
+        label: 'Operaciones',
       },
       children: [
         { path: '', redirect: { name: 'transaction_exchange_list' } },
