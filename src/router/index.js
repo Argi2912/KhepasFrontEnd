@@ -116,6 +116,7 @@ const router = createRouter({
     // =========================================================================
     // GESTIÓN SIMPLE
     // =========================================================================
+    
     {
       path: '/users',
       name: 'users_list',
@@ -269,6 +270,7 @@ const router = createRouter({
             // permission: 'manage_internal_transactions',
             // 🟢 ELIMINADO hiddenInMenu
           },
+          
         },
       ],
     },

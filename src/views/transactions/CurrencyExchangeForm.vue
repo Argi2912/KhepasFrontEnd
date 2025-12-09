@@ -44,14 +44,14 @@ const form = reactive({
 
   // Tasas
   exchange_rate: '',
-  buy_rate: '',      // Tasa Costo
-  received_rate: '', // Tasa Mercado
+  buy_rate: '',      // Tasa Costo (Compra)
+  received_rate: '', // Tasa Mercado (Referencia)
 
   // Comisiones
   commission_charged_pct: 0,
   commission_provider_pct: 0,
   commission_admin_pct: 0,
-  commission_broker_pct: 0, // 🟢 Campo Corredor
+  commission_broker_pct: 0,
 
   // Valores calculados
   commission_charged_amount: 0,
@@ -69,11 +69,19 @@ const form = reactive({
 const isComplexExchange = computed(() => operationType.value === 'currency_change')
 
 const sourceAccounts = computed(() => transactionStore.getAccounts)
-const destinationAccounts = computed(() => transactionStore.getAccounts)
+const destinationAccounts = computed(() => {
+  return transactionStore.getAccounts
+})
 
-const fromAccount = computed(() => transactionStore.getAccounts.find((a) => a.id == form.from_account_id))
-const toAccount = computed(() => transactionStore.getAccounts.find((a) => a.id == form.to_account_id))
-const selectedPlatform = computed(() => transactionStore.getPlatforms.find((p) => p.id == form.platform_id))
+const fromAccount = computed(() =>
+  transactionStore.getAccounts.find((a) => a.id == form.from_account_id),
+)
+const toAccount = computed(() =>
+  transactionStore.getAccounts.find((a) => a.id == form.to_account_id),
+)
+const selectedPlatform = computed(() =>
+  transactionStore.getPlatforms.find((p) => p.id == form.platform_id),
+)
 const selectedProvider = computed(() => transactionStore.getProviders.find((p) => p.id == form.provider_id))
 const selectedBroker = computed(() => transactionStore.getBrokers.find((b) => b.id == form.broker_id))
 
@@ -85,8 +93,13 @@ const sourceName = computed(() => {
   return fromAccount.value?.name || ''
 })
 
+const sourceCurrency = computed(() => {
+  if (form.capital_type === 'investor') return ''
+  return fromAccount.value?.currency_code || ''
+})
+
 const commissionCurrency = computed(() => {
-  if (['purchase', 'currency_change'].includes(operationType.value)) {
+  if (operationType.value === 'purchase') {
     return toAccount.value?.currency_code || '---'
   }
   return fromAccount.value?.currency_code || '---'
@@ -101,7 +114,6 @@ const hasSufficientBalance = computed(() => {
 
 // --- LÓGICA MATEMÁTICA ---
 
-// 1. WATCH: Tasas -> Calcula Ganancia Bruta (MARGEN)
 watch(
   [() => form.buy_rate, () => form.received_rate],
   ([buy, received]) => {
@@ -111,7 +123,6 @@ watch(
 
       if (b > 0 && r > 0) {
         isAutoCalculating.value = true
-        // Margen Real: ((300 - 250) / 300) * 100 = 16.66%
         const pct = ((r - b) / r) * 100
         form.commission_charged_pct = pct.toFixed(2)
         calculateAmounts()
@@ -121,7 +132,6 @@ watch(
   }
 )
 
-// 2. WATCH: % Ganancia Bruta -> Recalcula Tasa Compra
 watch(
   () => form.commission_charged_pct,
   (newPct) => {
@@ -131,7 +141,6 @@ watch(
 
       if (r > 0) {
         isAutoCalculating.value = true
-        // Compra = 300 * (1 - 0.1666)
         const newBuyRate = r * (1 - (pct / 100))
         form.buy_rate = newBuyRate.toFixed(2)
         calculateAmounts()
@@ -141,7 +150,6 @@ watch(
   }
 )
 
-// 3. WATCH: Montos y TODOS los Gastos (Para recalcular al instante)
 watch(
   [
     () => form.amount_sent,
@@ -149,7 +157,6 @@ watch(
     () => form.exchange_rate,
     () => form.buy_rate,
     () => form.received_rate,
-    // Vigilamos todos los porcentajes para actualizar la utilidad neta en tiempo real
     () => form.commission_charged_pct,
     () => form.commission_provider_pct,
     () => form.commission_broker_pct,
@@ -158,41 +165,53 @@ watch(
     () => form.capital_type,
     operationType,
   ],
-  ([sent, received, rate, buyRate, , , , , , , type]) => {
-    if (isAutoCalculating.value) return
+  ([
+    sent,
+    received,
+    rate,
+    buyRate,
+    receivedRate,
+    pctCharged,
+    pctProvider,
+    pctBroker,
+    pctAdmin,
+    pctInvestor,
+    capitalType,
+    type
+  ]) => {
+
+    if (isAutoCalculating.value) return;
 
     if (type === 'purchase') {
-      const r = parseFloat(received) || 0
-      const bRate = parseFloat(buyRate) || 0
+      const r = parseFloat(received) || 0;
+      const bRate = parseFloat(buyRate) || 0;
 
-      // En Compra: Calculamos Costo (Enviado) basado en Recibido
+      // 🔥 FIX: Calcular correctamente monto enviado
       if (r > 0 && bRate > 0) {
-        const calculatedSent = (r * bRate).toFixed(2)
+        const calculatedSent = (r * bRate).toFixed(2);
         if (form.amount_sent !== calculatedSent) {
-          form.amount_sent = calculatedSent
+          form.amount_sent = calculatedSent;
         }
       }
-      calculateCommissions()
 
+      calculateCommissions();
     } else if (type === 'exchange') {
-      const s = parseFloat(sent) || 0
-      form.exchange_rate = 1
-      form.amount_received = s.toFixed(2)
-      calculateCommissions()
-
+      const s = parseFloat(sent) || 0;
+      form.exchange_rate = 1;
+      form.amount_received = s.toFixed(2);
+      calculateCommissions();
     } else {
-      // Currency Change (1:1)
-      const r = parseFloat(received) || 0
-      if (r >= 0) form.amount_sent = r
-      calculateCommissions()
+      const r = parseFloat(received) || 0;
+      if (r >= 0) form.amount_sent = r;
+      calculateCommissions();
     }
   }
-)
+);
+
 
 function calculateCommissions() {
   let commissionBase = 0
 
-  // Definir base: En Compra y Cambio Divisa es lo que entra ($)
   if (['purchase', 'currency_change'].includes(operationType.value)) {
     commissionBase = parseFloat(form.amount_received) || 0
   } else {
@@ -201,60 +220,66 @@ function calculateCommissions() {
 
   if (commissionBase > 0) {
 
-    // 1. Ganancia Bruta
-    form.commission_charged_amount = (
-      (commissionBase * (parseFloat(form.commission_charged_pct) || 0)) / 100
-    ).toFixed(2)
+    // 1) Calcular % ganancia bruta basado en tasas
+    let grossPct = parseFloat(form.commission_charged_pct)
+    if (isNaN(grossPct) || grossPct === 0) {
+      const r = parseFloat(form.received_rate) || 0
+      const b = parseFloat(form.buy_rate) || 0
 
-    // 2. Costo Proveedor
-    form.commission_provider_amount = (
-      (commissionBase * (parseFloat(form.commission_provider_pct) || 0)) / 100
-    ).toFixed(2)
+      if (r > 0) grossPct = ((r - b) / r) * 100
+      else grossPct = 0
 
-    // 3. Costo Corredor
-    form.commission_broker_amount = (
-      (commissionBase * (parseFloat(form.commission_broker_pct) || 0)) / 100
-    ).toFixed(2)
+      form.commission_charged_pct = grossPct
+    }
 
-    // 4. Costo Admin
+    // 2) Ganancia bruta en monto
+    const grossAmount = commissionBase * (grossPct / 100)
+    form.commission_charged_amount = grossAmount
+
+    // Leer % ingresado por el usuario (sobre el monto base)
+    const provInput = parseFloat(form.commission_provider_pct) || 0
+    const brokerInput = parseFloat(form.commission_broker_pct) || 0
+    const adminInput = parseFloat(form.commission_admin_pct) || 0
+    const investorInput = parseFloat(form.investor_profit_pct) || 0
+
+    // 3) Convertir % del usuario (sobre monto base) a su equivalente sobre ganancia bruta
+    // monto que quiere cada uno:
+    const provAmountDesired = commissionBase * (provInput / 100)
+    const brokerAmountDesired = commissionBase * (brokerInput / 100)
+    const adminAmountDesired = commissionBase * (adminInput / 100)
+    const investorAmountDesired = commissionBase * (investorInput / 100)
+
+    // ahora se aplican sobre la ganancia bruta:
+    form.commission_provider_amount = provAmountDesired
+    form.commission_broker_amount = brokerAmountDesired
+
     if (isComplexExchange.value || operationType.value === 'exchange') {
-      form.commission_admin_amount = (
-        (commissionBase * (parseFloat(form.commission_admin_pct) || 0)) / 100
-      ).toFixed(2)
+      form.commission_admin_amount = adminAmountDesired
     } else {
       form.commission_admin_amount = 0
     }
 
-    // 5. Costo Inversionista
     if (form.capital_type === 'investor') {
-      const pct = parseFloat(form.investor_profit_pct) || 0
-      form.investor_profit_amount = (
-        ((parseFloat(form.commission_charged_amount) || 0) * pct) / 100
-      ).toFixed(2)
+      form.investor_profit_amount = investorAmountDesired
     } else {
       form.investor_profit_amount = 0
     }
 
-    // 6. UTILIDAD NETA (Resta todo)
-    form.commission_net_profit = (
-      parseFloat(form.commission_charged_amount) -
-      parseFloat(form.commission_provider_amount) -
-      parseFloat(form.commission_broker_amount) -
-      parseFloat(form.commission_admin_amount) -
-      parseFloat(form.investor_profit_amount)
-    ).toFixed(2)
+    // 4) Utilidad final
+    const totalDeductions =
+      form.commission_provider_amount +
+      form.commission_broker_amount +
+      form.commission_admin_amount +
+      form.investor_profit_amount
 
-    // Si hay inversionista, la utilidad final para la empresa es lo que queda después de pagarle
-    if (form.capital_type === 'investor') {
-      form.commission_net_after_investor = form.commission_net_profit // Ya restado arriba
-    } else {
-      form.commission_net_after_investor = form.commission_net_profit
-    }
+    form.commission_net_profit = grossAmount - totalDeductions
+    form.commission_net_after_investor = form.commission_net_profit
 
   } else {
     resetCommissions()
   }
 }
+
 
 function calculateAmounts() {
   calculateCommissions()
@@ -268,6 +293,7 @@ function resetCommissions() {
   form.commission_net_profit = 0
   form.investor_profit_amount = 0
   form.investor_profit_pct = 0
+  form.commission_net_after_investor = 0
 }
 
 watch(operationType, () => {
@@ -280,7 +306,6 @@ watch(operationType, () => {
   form.received_rate = ''
   form.provider_id = ''
   form.platform_id = ''
-
   form.commission_charged_pct = 0
   form.commission_provider_pct = 0
   form.commission_admin_pct = 0
@@ -289,6 +314,7 @@ watch(operationType, () => {
 })
 
 onMounted(async () => {
+  // Asegúrate de que los datos se carguen antes de que se rendericen los selectores
   await transactionStore.fetchAllSupportData()
 })
 
@@ -359,7 +385,6 @@ const handleConfirm = async () => {
       payload.delivered = form.delivered
     }
 
-    // Si no hay corredor seleccionado, limpiar valores
     if (!payload.broker_id) {
       payload.commission_broker_pct = 0
       payload.commission_broker_amount = 0
@@ -478,6 +503,7 @@ const handleConfirm = async () => {
         <div v-if="currentStep === 2" class="step-content fade-in">
           <div class="calc-panel">
             <div class="calc-row">
+
               <div class="input-group">
                 <label v-if="operationType === 'purchase' || isComplexExchange">Monto Recibido (USD)</label>
                 <label v-else>Monto Enviado</label>
@@ -496,6 +522,7 @@ const handleConfirm = async () => {
               </div>
 
               <div class="rate-inputs-container">
+
                 <div v-if="operationType === 'purchase'" class="grid-2-rates">
                   <div class="input-group">
                     <label>Tasa Compra (Costo)</label>
@@ -529,7 +556,7 @@ const handleConfirm = async () => {
               Saldo insuficiente en {{ fromAccount?.name }}
             </p>
 
-            <div v-if="['purchase', 'currency_change'].includes(operationType)" class="delivery-check">
+            <div v-if="operationType === 'purchase' || isComplexExchange" class="delivery-check">
               <label class="checkbox-wrapper">
                 <input type="checkbox" v-model="form.delivered" />
                 <span class="checkmark"></span>
@@ -595,8 +622,8 @@ const handleConfirm = async () => {
 
             <div class="total-profit-bar">
               <span>Utilidad Real (Neta):</span>
-              <strong :class="form.commission_net_profit >= 0 ? 'text-success' : 'text-danger'">
-                {{ form.commission_net_profit }} {{ commissionCurrency }}
+              <strong :class="form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'">
+                {{ form.commission_net_after_investor }} {{ commissionCurrency }}
               </strong>
             </div>
           </div>
@@ -661,11 +688,19 @@ const handleConfirm = async () => {
                   <span>Pago Corredor</span>
                   <span class="text-danger">- {{ form.commission_broker_amount }}</span>
                 </div>
+                <div class="row" v-if="form.commission_admin_amount > 0">
+                  <span>Pago Plataforma</span>
+                  <span class="text-danger">- {{ form.commission_admin_amount }}</span>
+                </div>
+                <div class="row" v-if="form.investor_profit_amount > 0">
+                  <span>Pago Inversionista</span>
+                  <span class="text-danger">- {{ form.investor_profit_amount }}</span>
+                </div>
 
                 <div class="row total">
                   <span>Utilidad Real</span>
-                  <span :class="form.commission_net_profit >= 0 ? 'text-success' : 'text-danger'">
-                    {{ form.commission_net_profit }} {{ commissionCurrency }}
+                  <span :class="form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'">
+                    {{ form.commission_net_after_investor }} {{ commissionCurrency }}
                   </span>
                 </div>
               </template>

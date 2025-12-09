@@ -66,6 +66,7 @@ const menuItems = computed(() => {
     '/admi-platforms',
     '/financial-config',
     '/transactions',
+
   ]
   visibleRoutes.sort((a, b) => {
     const ia = order.indexOf(a.path)
@@ -116,32 +117,18 @@ const menuItems = computed(() => {
     <nav class="menu">
       <template v-for="item in menuItems" :key="item.path || item.name">
         <!-- GRUPO (Dropdown) -->
-        <div
-          v-if="item.type === 'group'"
-          class="menu-group"
-          :class="{ active: route.path.startsWith(item.path) }"
-        >
+        <div v-if="item.type === 'group'" class="menu-group" :class="{ active: route.path.startsWith(item.path) }">
           <div class="menu-item menu-parent" @click="toggleGroup(item.path)">
             <FontAwesomeIcon :icon="item.icon" class="menu-icon" />
             <span v-if="isOpen" class="menu-label">{{ item.label }}</span>
-            <FontAwesomeIcon
-              v-if="isOpen"
-              :icon="
-                openGroups.has(item.path) ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'
-              "
-              class="chevron"
-            />
+            <FontAwesomeIcon v-if="isOpen" :icon="openGroups.has(item.path) ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'
+              " class="chevron" />
           </div>
 
           <Transition name="slide-fade">
             <div v-if="isOpen && openGroups.has(item.path)" class="submenu">
-              <router-link
-                v-for="child in item.children"
-                :key="child.name"
-                :to="{ name: child.name }"
-                class="menu-sub-item"
-                active-class="sub-active"
-              >
+              <router-link v-for="child in item.children" :key="child.name" :to="{ name: child.name }"
+                class="menu-sub-item" active-class="sub-active">
                 {{ child.label }}
               </router-link>
             </div>
@@ -157,9 +144,7 @@ const menuItems = computed(() => {
     </nav>
 
     <div class="user-footer" v-if="isOpen">
-      <span class="tenant-name"
-        >Tenant: {{ authStore.authUser?.tenant?.name || 'SuperAdmin' }}</span
-      >
+      <span class="tenant-name">Tenant: {{ authStore.authUser?.tenant?.name || 'SuperAdmin' }}</span>
     </div>
   </aside>
 </template>
@@ -268,9 +253,11 @@ const menuItems = computed(() => {
 .is-closed .menu-label {
   display: none;
 }
+
 .is-closed .menu-icon {
   margin-right: 0;
 }
+
 .is-closed .menu-item {
   justify-content: center;
   padding: 12px 0;
@@ -289,14 +276,17 @@ const menuItems = computed(() => {
   margin-bottom: 5px;
   font-weight: bold;
 }
+
 .menu-parent:hover {
   background-color: var(--color-hover);
 }
 
 /* Estilo para el padre cuando una de sus rutas hijas está activa */
 .menu-group.active .menu-parent {
-  background: var(--color-active-bg); /* Mismo fondo gris oscuro */
-  color: var(--color-primary); /* Texto amarillo como acento */
+  background: var(--color-active-bg);
+  /* Mismo fondo gris oscuro */
+  color: var(--color-primary);
+  /* Texto amarillo como acento */
   border-radius: 8px;
 }
 
@@ -368,6 +358,7 @@ const menuItems = computed(() => {
 /* Solo para controlar la altura máxima durante la transición */
 .slide-fade-enter-to,
 .slide-fade-leave-from {
-  max-height: 500px; /* Asegura que la altura máxima sea suficiente */
+  max-height: 500px;
+  /* Asegura que la altura máxima sea suficiente */
 }
 </style>

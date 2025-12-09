@@ -33,7 +33,8 @@ const handleSubmit = async () => {
   isSubmitting.value = true
   try {
     await transactionStore.createInternalTransaction(form)
-    router.push({ name: 'transactions_home' })
+    // CAMBIO REALIZADO: Regresar a la página anterior
+    router.back()
   } catch (error) {
     handleAxiosError(error)
   } finally {
@@ -60,52 +61,22 @@ const handleSubmit = async () => {
         </div>
 
         <div class="form-grid">
-          <BaseSelect
-            label="Cuenta Afectada"
-            :options="transactionStore.getAccounts"
-            v-model="form.account_id"
-            required
-            :error="errors.account_id"
-          />
+          <BaseSelect label="Cuenta Afectada" :options="transactionStore.getAccounts" v-model="form.account_id" required
+            :error="errors.account_id" />
 
-          <BaseInput
-            label="Monto"
-            type="number"
-            v-model="form.amount"
-            required
-            :error="errors.amount"
-          />
-          
-          <BaseInput
-            label="Dueño de la Cuenta"
-            placeholder="Titular de la cuenta"
-            v-model="form.dueño"
-            required
-            :error="errors.dueño"
-          />
+          <BaseInput label="Monto" type="number" v-model="form.amount" required :error="errors.amount" />
 
-          <BaseInput
-            label="Nombre de la Persona"
-            placeholder="Quien entrega o recibe el dinero"
-            v-model="form.person_name"
-            required
-            :error="errors.person_name"
-          />
+          <BaseInput label="Dueño de la Cuenta" placeholder="Titular de la cuenta" v-model="form.dueño" required
+            :error="errors.dueño" />
+
+          <BaseInput label="Nombre de la Persona" placeholder="Quien entrega o recibe el dinero"
+            v-model="form.person_name" required :error="errors.person_name" />
         </div>
 
-        <BaseInput
-          label="Categoría (Ej: Nómina, Servicios, Alquiler)"
-          v-model="form.category"
-          required
-          :error="errors.category"
-          class="mt-4"
-        />
+        <BaseInput label="Categoría (Ej: Nómina, Servicios, Alquiler)" v-model="form.category" required
+          :error="errors.category" class="mt-4" />
 
-        <BaseInput 
-            label="Descripción / Notas" 
-            v-model="form.description" 
-            class="mt-4"
-        />
+        <BaseInput label="Descripción / Notas" v-model="form.description" class="mt-4" />
 
         <div class="actions">
           <button type="button" @click="router.back()" class="btn-cancel">Cancelar</button>
@@ -123,6 +94,7 @@ const handleSubmit = async () => {
   max-width: 600px;
   margin: 20px auto;
 }
+
 .card {
   background: var(--color-secondary);
   padding: 30px;
@@ -136,6 +108,7 @@ const handleSubmit = async () => {
   overflow: hidden;
   margin-bottom: 20px;
 }
+
 .type-selector label {
   flex: 1;
   text-align: center;
@@ -144,16 +117,20 @@ const handleSubmit = async () => {
   font-weight: bold;
   opacity: 0.7;
 }
+
 .type-selector input {
   display: none;
 }
+
 .type-selector label.active {
   opacity: 1;
   color: white;
 }
+
 .type-selector label.income.active {
   background-color: #28a745;
 }
+
 .type-selector label.expense.active {
   background-color: #dc3545;
 }
@@ -164,6 +141,7 @@ const handleSubmit = async () => {
   gap: 20px;
   margin-bottom: 20px;
 }
+
 .actions {
   display: flex;
   justify-content: flex-end;
@@ -179,6 +157,7 @@ const handleSubmit = async () => {
   border-radius: 5px;
   cursor: pointer;
 }
+
 .btn-cancel {
   background: transparent;
   border: 1px solid #ccc;
