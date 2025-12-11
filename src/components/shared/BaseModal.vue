@@ -1,5 +1,3 @@
-// src/components/shared/BaseModal.vue
-
 <script setup>
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 

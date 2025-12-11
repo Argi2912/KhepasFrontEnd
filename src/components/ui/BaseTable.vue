@@ -1,16 +1,14 @@
-// src/components/ui/BaseTable.vue
 <script setup>
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 defineProps({
   headers: {
-    type: Array, // [{ key: 'id', label: 'ID' }, ...]
+    type: Array,
     required: true,
   },
   data: {
     type: Array,
-    // 🚨 CORRECCIÓN: Se elimina 'required: true' y se añade un default.
-    default: () => [], // Array vacío por defecto para evitar 'undefined' en data.length
+    default: () => [],
   },
   isLoading: {
     type: Boolean,
@@ -26,6 +24,7 @@ defineProps({
         <tr>
           <th v-for="header in headers" :key="header.key">{{ header.label }}</th>
           <th>Acciones</th>
+          <!-- ← Mantenemos esta para el resto de tablas -->
         </tr>
       </thead>
       <tbody>
@@ -35,23 +34,23 @@ defineProps({
           </td>
         </tr>
 
-        <slot v-else>
-          <tr v-if="data.length === 0">
-            <td :colspan="headers.length + 1" class="no-data">No hay registros disponibles.</td>
-          </tr>
-        </slot>
+        <tr v-else-if="data.length === 0" class="no-data-row">
+          <td :colspan="headers.length + 1">No hay registros disponibles.</td>
+        </tr>
+
+        <slot v-else />
       </tbody>
     </table>
   </div>
 </template>
 
 <style scoped>
-/* ... (Estilos se mantienen) ... */
+/* Tus estilos originales se mantienen igual */
 .table-container {
   overflow-x: auto;
   margin-top: 20px;
   border-radius: 8px;
-  background-color: var(--color-secondary); /* Fondo general de la tabla */
+  background-color: var(--color-secondary);
 }
 
 .data-table {
@@ -92,7 +91,7 @@ defineProps({
 }
 
 .loading-row td,
-.no-data {
+.no-data-row td {
   text-align: center !important;
   font-style: italic;
   opacity: 0.7;

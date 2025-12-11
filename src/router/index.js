@@ -116,7 +116,7 @@ const router = createRouter({
     // =========================================================================
     // GESTIÓN SIMPLE
     // =========================================================================
-    
+
     {
       path: '/users',
       name: 'users_list',
@@ -148,6 +148,17 @@ const router = createRouter({
         permission: 'manage_clients', // Reutilizando permiso común
         icon: 'fa-solid fa-truck-moving',
         label: 'Proveedores',
+      },
+    },
+    {
+      path: '/investors',
+      name: 'investors_list',
+      component: () => import('@/views/investors/InvestorList.vue'),
+      meta: {
+        requiresAuth: true,
+        permission: 'manage_exchanges', // o crea uno nuevo: 'manage_investors'
+        icon: 'fa-solid fa-handshake-angle',
+        label: 'Inversionistas',
       },
     },
     {
@@ -270,7 +281,6 @@ const router = createRouter({
             // permission: 'manage_internal_transactions',
             // 🟢 ELIMINADO hiddenInMenu
           },
-          
         },
       ],
     },
