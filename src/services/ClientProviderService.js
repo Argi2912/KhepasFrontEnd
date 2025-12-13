@@ -42,6 +42,16 @@ class ClientProviderService {
   async delete(resource, id) {
     return api.delete(`/${resource}/${id}`)
   }
+
+  /**
+   * NUEVO: Agrega saldo a una entidad (Provider o Investor).
+   * @param {string} resource 'providers' o 'investors'
+   * @param {number} id ID de la entidad
+   * @param {object} data { amount: 100, description: '...' }
+   */
+  async addBalance(resource, id, data) {
+    return api.post(`/${resource}/${id}/balance`, data)
+  }
 }
 
 export default new ClientProviderService()

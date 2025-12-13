@@ -3,6 +3,10 @@ import { ref, watch } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 
+// Componentes UI Estándar
+import BaseModal from '@/components/ui/BaseModal.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
+
 const props = defineProps({
   show: Boolean,
   investorId: [Number, null],
@@ -15,6 +19,8 @@ const form = ref({
   alias: '',
   email: '',
   phone: '',
+  interest_rate: '', // <--- NUEVO
+  payout_day: '',    // <--- NUEVO
   is_active: true,
 })
 
@@ -28,7 +34,13 @@ watch(
       loading.value = true
       try {
         const { data } = await api.get(`/investors/${id}`)
-        form.value = { ...data, is_active: data.is_active == 1 }
+        // Asignamos datos y aseguramos valores por defecto para los nuevos campos
+        form.value = {
+          ...data,
+          is_active: data.is_active == 1,
+          interest_rate: data.interest_rate || 0,
+          payout_day: data.payout_day || 30
+        }
         title.value = 'Editar Inversionista'
       } catch (err) {
         notify.error('Error al cargar datos del inversionista')
@@ -37,7 +49,16 @@ watch(
         loading.value = false
       }
     } else if (!id) {
-      form.value = { name: '', alias: '', email: '', phone: '', is_active: true }
+      // Valores iniciales (Reset)
+      form.value = {
+        name: '',
+        alias: '',
+        email: '',
+        phone: '',
+        interest_rate: 0,  // <--- Por defecto 0%
+        payout_day: 30,    // <--- Por defecto día 30
+        is_active: true
+      }
       title.value = 'Registrar Inversionista'
     }
   },
@@ -66,104 +87,108 @@ const submit = async () => {
 </script>
 
 <template>
-  <teleport to="body">
-    <div v-if="show" class="modal-backdrop" @click.self="emit('close')">
-      <div class="modal">
-        <h2>{{ title }}</h2>
+  <BaseModal :show="show" :title="title" @close="emit('close')">
 
-        <form @submit.prevent="submit">
-          <div class="form-group">
-            <label>Nombre Completo *</label>
-            <input v-model="form.name" required type="text" />
-          </div>
+    <form @submit.prevent="submit" id="investorForm">
 
-          <div class="form-group">
-            <label>Alias (opcional)</label>
-            <input v-model="form.alias" type="text" />
-          </div>
+      <BaseInput v-model="form.name" label="Nombre Completo" required placeholder="Ej: Juan Pérez" />
 
-          <div class="form-group">
-            <label>Email</label>
-            <input v-model="form.email" type="email" />
-          </div>
-
-          <div class="form-group">
-            <label>Teléfono</label>
-            <input v-model="form.phone" type="text" />
-          </div>
-
-          <div class="form-group checkbox">
-            <label>
-              <input v-model="form.is_active" type="checkbox" />
-              Activo
-            </label>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" @click="emit('close')" class="btn-secondary">Cancelar</button>
-            <button type="submit" :disabled="loading" class="btn-primary">
-              {{ loading ? 'Guardando...' : 'Guardar' }}
-            </button>
-          </div>
-        </form>
+      <div class="form-row">
+        <BaseInput v-model="form.alias" label="Alias (Opcional)" placeholder="Ej: Socio Juan" />
+        <BaseInput v-model="form.phone" label="Teléfono" placeholder="+58 412..." />
       </div>
-    </div>
-  </teleport>
+
+      <BaseInput v-model="form.email" label="Email" type="email" placeholder="correo@ejemplo.com" />
+
+      <div class="interest-section">
+        <h4><i class="fas fa-chart-line"></i> Configuración de Rendimiento</h4>
+
+        <div class="form-row">
+          <BaseInput v-model="form.interest_rate" label="Tasa de Interés (%)" required type="number" step="0.01" min="0"
+            placeholder="Ej: 5.00" />
+
+          <BaseInput v-model="form.payout_day" label="Día de Corte Mensual" required type="number" min="1" max="31"
+            placeholder="Ej: 30" />
+        </div>
+
+        <p class="info-text">
+          El sistema sumará automáticamente el <strong>{{ form.interest_rate }}%</strong>
+          al saldo total cada día <strong>{{ form.payout_day }}</strong> del mes.
+        </p>
+      </div>
+
+      <div class="checkbox-group">
+        <label>
+          <input v-model="form.is_active" type="checkbox" />
+          <span class="ml-2">Inversionista Activo</span>
+        </label>
+      </div>
+
+    </form>
+
+    <template #footer>
+      <div class="modal-actions">
+        <button type="button" @click="emit('close')" class="btn-secondary" :disabled="loading">
+          Cancelar
+        </button>
+        <button type="submit" form="investorForm" class="btn-primary" :disabled="loading">
+          {{ loading ? 'Guardando...' : 'Guardar Datos' }}
+        </button>
+      </div>
+    </template>
+
+  </BaseModal>
 </template>
 
 <style scoped>
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+/* Estilos para el grid de 2 columnas */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 
-.modal {
-  background: var(--color-secondary);
-  border-radius: 12px;
-  width: 90%;
-  max-width: 500px;
-  padding: 30px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+/* Sección visual para destacar la configuración de intereses */
+.interest-section {
+
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 20px;
+  margin-top: 10px;
 }
 
-h2 {
+.interest-section h4 {
   margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 0.95rem;
   color: var(--color-primary);
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-label {
-  display: block;
-  margin-bottom: 6px;
   font-weight: 600;
 }
 
-input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+.info-text {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin: 10px 0 0 0;
+  font-style: italic;
+  line-height: 1.4;
 }
 
-.checkbox {
+.checkbox-group {
+  margin-top: 15px;
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
+.ml-2 {
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+/* Botones alineados con tu tema */
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 12px;
-  margin-top: 30px;
 }
 
 .btn-primary,
@@ -172,16 +197,30 @@ input {
   border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
+  border: none;
+  font-size: 0.95rem;
 }
 
 .btn-primary {
   background: var(--color-primary);
   color: white;
-  border: none;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: #f1f1f1;
-  border: 1px solid #ccc;
+  background: #e2e6ea;
+  color: #495057;
+}
+
+.btn-secondary:hover {
+  background: #dbe2e8;
 }
 </style>

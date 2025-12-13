@@ -27,7 +27,7 @@ const isAutoCalculating = ref(false)
 
 const form = reactive({
   client_id: '',
-  capital_type: 'own',
+  capital_type: 'own', // Valores: 'own', 'investor', 'provider'
   investor_id: '',
   investor_profit_pct: 0,
   investor_profit_amount: 0,
@@ -90,11 +90,17 @@ const sourceName = computed(() => {
     const inv = transactionStore.getInvestors.find((i) => i.id == form.investor_id)
     return inv?.name || 'Fondo Inversionista'
   }
+  // 🟢 CAMBIO: Mostrar nombre del proveedor si es capital de proveedor
+  if (form.capital_type === 'provider') {
+    const prov = transactionStore.getProviders.find((p) => p.id == form.provider_id)
+    return prov?.name || 'Fondo Proveedor'
+  }
   return fromAccount.value?.name || ''
 })
 
 const sourceCurrency = computed(() => {
-  if (form.capital_type === 'investor') return ''
+  // 🟢 CAMBIO: Si es Inversionista o Proveedor, no mostramos moneda origen
+  if (form.capital_type === 'investor' || form.capital_type === 'provider') return ''
   return fromAccount.value?.currency_code || ''
 })
 
@@ -106,7 +112,9 @@ const commissionCurrency = computed(() => {
 })
 
 const hasSufficientBalance = computed(() => {
-  if (form.capital_type === 'investor') return true
+  // 🟢 CAMBIO: Si es proveedor, también saltamos la validación de saldo
+  if (form.capital_type === 'investor' || form.capital_type === 'provider') return true
+
   if (!fromAccount.value || !form.amount_sent) return true
   const rawAccount = transactionStore.rawAccounts?.find((a) => a.id == form.from_account_id)
   return rawAccount ? parseFloat(rawAccount.balance) >= parseFloat(form.amount_sent) : true
@@ -186,7 +194,6 @@ watch(
       const r = parseFloat(received) || 0;
       const bRate = parseFloat(buyRate) || 0;
 
-      // 🔥 FIX: Calcular correctamente monto enviado
       if (r > 0 && bRate > 0) {
         const calculatedSent = (r * bRate).toFixed(2);
         if (form.amount_sent !== calculatedSent) {
@@ -321,10 +328,19 @@ onMounted(async () => {
 // --- NAVEGACIÓN ---
 const nextStep = () => {
   if (currentStep.value === 1) {
-    const missingFrom = form.capital_type === 'investor' ? false : !form.from_account_id
+    // 🟢 CAMBIO: Si es capital externo (investor/provider), no exigimos from_account_id
+    const isExternalCapital = ['investor', 'provider'].includes(form.capital_type)
+    const missingFrom = isExternalCapital ? false : !form.from_account_id
+
     if (missingFrom || !form.to_account_id || !form.client_id) {
       return Swal.fire('Falta información', 'Complete los campos obligatorios (*).', 'warning')
     }
+
+    // 🟢 CAMBIO: Validación específica para proveedor
+    if (form.capital_type === 'provider' && !form.provider_id) {
+      return Swal.fire('Falta información', 'Seleccione el Proveedor Financista.', 'warning')
+    }
+
     if (operationType.value === 'exchange' && !form.platform_id) {
       return Swal.fire('Falta información', 'Seleccione el Admin (Plataforma).', 'warning')
     }
@@ -357,7 +373,8 @@ const handleConfirm = async () => {
   try {
     let payload = { ...form }
 
-    if (form.capital_type === 'investor') {
+    // 🟢 CAMBIO: Limpiar cuenta origen si es inversionista O proveedor
+    if (['investor', 'provider'].includes(form.capital_type)) {
       payload.from_account_id = null
     }
 
@@ -374,7 +391,12 @@ const handleConfirm = async () => {
       payload.operation_type = 'exchange'
       payload.buy_rate = null
       payload.received_rate = null
-      payload.provider_id = null
+
+      // 🟢 CAMBIO: Solo limpiamos provider_id si NO estamos usando capital de proveedor
+      if (form.capital_type !== 'provider') {
+        payload.provider_id = null
+      }
+
       payload.broker_id = null
     } else {
       // PURCHASE
@@ -450,6 +472,9 @@ const handleConfirm = async () => {
                 <button :class="{ active: form.capital_type === 'investor' }" @click="form.capital_type = 'investor'">
                   Inversionista
                 </button>
+                <button :class="{ active: form.capital_type === 'provider' }" @click="form.capital_type = 'provider'">
+                  Proveedor
+                </button>
               </div>
             </div>
 
@@ -457,6 +482,12 @@ const handleConfirm = async () => {
               <BaseSelectWithSearchAndCreate label="Inversionista *" :options="transactionStore.getInvestors"
                 v-model="form.investor_id" required create-endpoint="/investors" :create-fields="{ name: '' }"
                 create-label="Inversionista" />
+            </div>
+
+            <div v-if="form.capital_type === 'provider'" class="col-span-2">
+              <BaseSelectWithSearchAndCreate label="Proveedor (Financista) *" :options="transactionStore.getProviders"
+                v-model="form.provider_id" required create-endpoint="/providers" :create-fields="{ name: '' }"
+                create-label="Proveedor" />
             </div>
 
             <div v-if="operationType === 'exchange'">
@@ -471,9 +502,9 @@ const handleConfirm = async () => {
                 create-label="Corredor" />
 
               <div class="grid-2-nested col-span-2">
-                <BaseSelectWithSearchAndCreate label="Proveedor (Liquidez)" :options="transactionStore.getProviders"
-                  v-model="form.provider_id" :required="isComplexExchange" create-endpoint="/providers"
-                  :create-fields="{ name: '' }" create-label="Proveedor" />
+                <BaseSelectWithSearchAndCreate v-if="form.capital_type !== 'provider'" label="Proveedor (Liquidez)"
+                  :options="transactionStore.getProviders" v-model="form.provider_id" :required="isComplexExchange"
+                  create-endpoint="/providers" :create-fields="{ name: '' }" create-label="Proveedor" />
 
                 <BaseSelectWithSearchAndCreate v-if="isComplexExchange" label="Plataforma / Admin"
                   :options="transactionStore.getPlatforms" v-model="form.platform_id" :required="isComplexExchange"
@@ -482,7 +513,7 @@ const handleConfirm = async () => {
               <div class="divider col-span-2"></div>
             </template>
 
-            <template v-if="form.capital_type !== 'investor'">
+            <template v-if="form.capital_type === 'own'">
               <BaseSelectWithSearchAndCreate label="Cuenta Origen (Sale) *" :options="sourceAccounts"
                 v-model="form.from_account_id" required create-endpoint="/accounts" :create-fields="{ name: '' }"
                 create-label="Cuenta" />
@@ -660,8 +691,8 @@ const handleConfirm = async () => {
               <div class="divider"></div>
 
               <div class="row highlight">
-                <span>Monto Enviado ({{ fromAccount?.name }})</span>
-                <span class="text-danger">- {{ form.amount_sent }} {{ fromAccount?.currency_code }}</span>
+                <span>Monto Enviado ({{ sourceName }})</span>
+                <span class="text-danger">- {{ form.amount_sent }} {{ sourceCurrency }}</span>
               </div>
 
               <div class="row highlight">

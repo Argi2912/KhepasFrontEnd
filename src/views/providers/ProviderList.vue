@@ -11,7 +11,8 @@ import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
-import ProviderFormModal from '@/components/shared/ProviderFormModal.vue' // 🚨 IMPORTANTE
+import ProviderFormModal from '@/components/shared/ProviderFormModal.vue'
+import BalanceFormModal from '@/components/shared/BalanceFormModal.vue' // <--- 1. NUEVO IMPORT
 
 const authStore = useAuthStore()
 const permissionKey = 'manage_exchanges' // Usamos el permiso de transacciones
@@ -19,6 +20,10 @@ const permissionKey = 'manage_exchanges' // Usamos el permiso de transacciones
 // Estado del Modal
 const showProviderModal = ref(false)
 const providerIdToEdit = ref(null)
+
+// Estado del Modal de Saldo (NUEVO)
+const showBalanceModal = ref(false)
+const selectedProvider = ref(null)
 
 // Estado de la Lista
 const providers = ref([])
@@ -29,6 +34,7 @@ const isLoading = ref(false)
 const tableHeaders = [
   { key: 'name', label: 'Nombre' },
   { key: 'email', label: 'Email' },
+  { key: 'current_balance', label: 'Saldo Disponible' }, // <--- 2. NUEVA COLUMNA
   { key: 'phone', label: 'Teléfono' },
   { key: 'created_at', label: 'Registro' },
 ]
@@ -60,6 +66,17 @@ const openCreateModal = () => {
 const openEditModal = (providerId) => {
   providerIdToEdit.value = providerId
   showProviderModal.value = true
+}
+
+// 3. NUEVA FUNCION: Abrir modal de saldo
+const openBalanceModal = (provider) => {
+  selectedProvider.value = provider
+  showBalanceModal.value = true
+}
+
+// 4. NUEVA FUNCION: Formatear moneda
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
 }
 
 /**
@@ -109,10 +126,20 @@ onMounted(() => {
         <tr v-for="provider in providers" :key="provider.id">
           <td>{{ provider.name }}</td>
           <td>{{ provider.email }}</td>
+
+          <td style="font-weight: bold; color: #27ae60;">
+            {{ formatCurrency(provider.current_balance) }}
+          </td>
+
           <td>{{ provider.phone }}</td>
           <td>{{ new Date(provider.created_at).toLocaleDateString() }}</td>
           <td class="action-buttons">
             <template v-if="authStore.can(permissionKey)">
+
+              <button @click="openBalanceModal(provider)" class="btn-icon add-funds" title="Agregar Saldo">
+                <FontAwesomeIcon icon="fa-solid fa-wallet" />
+              </button>
+
               <button @click="openEditModal(provider.id)" class="btn-icon edit">
                 <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
               </button>
@@ -130,12 +157,12 @@ onMounted(() => {
       </template>
     </BaseCard>
 
-    <ProviderFormModal
-      :show="showProviderModal"
-      :provider-id="providerIdToEdit"
-      @close="showProviderModal = false"
-      @saved="fetchProviders(pagination.current_page || 1)"
-    />
+    <ProviderFormModal :show="showProviderModal" :provider-id="providerIdToEdit" @close="showProviderModal = false"
+      @saved="fetchProviders(pagination.current_page || 1)" />
+
+    <BalanceFormModal :show="showBalanceModal" resource="providers" :entity-id="selectedProvider?.id"
+      :entity-name="selectedProvider?.name" @close="showBalanceModal = false"
+      @saved="fetchProviders(pagination.current_page || 1)" />
   </div>
 </template>
 
@@ -147,9 +174,11 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 25px;
 }
+
 .header-actions h1 {
   font-size: 1.6rem;
 }
+
 .btn-primary {
   background-color: var(--color-primary);
   color: var(--color-secondary);
@@ -159,13 +188,16 @@ onMounted(() => {
   font-weight: bold;
   transition: background-color 0.2s;
 }
+
 .btn-primary:hover {
   background-color: #ffc424;
 }
+
 .action-buttons {
   display: flex;
   gap: 8px;
 }
+
 .btn-icon {
   background: none;
   border: none;
@@ -174,18 +206,33 @@ onMounted(() => {
   padding: 5px;
   transition: color 0.2s;
 }
+
 .btn-icon.edit {
   color: #3498db;
 }
+
 .btn-icon.edit:hover {
   color: #2980b9;
 }
+
 .btn-icon.delete {
   color: var(--color-danger);
 }
+
 .btn-icon.delete:hover {
   color: #c0392b;
 }
+
+.btn-icon.add-funds {
+  color: #27ae60;
+}
+
+.btn-icon.add-funds:hover {
+  color: #219150;
+  background-color: #e8f8f5;
+  border-radius: 4px;
+}
+
 .no-actions {
   font-size: 0.85rem;
   opacity: 0.5;
