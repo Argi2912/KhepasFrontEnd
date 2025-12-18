@@ -90,6 +90,13 @@ const router = createRouter({
           meta: { label: 'Por Proveedor', hiddenInMenu: true },
         },
         {
+          path: 'investors',
+          name: 'reports.investors',
+          component: () => import('@/views/reports/InvestorReport.vue'),
+          meta: { label: 'Por Inversionista', hiddenInMenu: true },
+        },
+
+        {
           path: 'platforms',
           name: 'reports.platforms',
           component: () => import('@/views/reports/PlatformReportView.vue'),
