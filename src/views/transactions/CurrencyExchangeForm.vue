@@ -27,7 +27,7 @@ const isAutoCalculating = ref(false)
 
 const form = reactive({
   client_id: '',
-  capital_type: 'own', // Valores: 'own', 'investor'
+  capital_type: 'own', // Valores: 'own', 'investor', 'provider'
   investor_id: '',
   investor_profit_pct: 0,
   investor_profit_amount: 0,
@@ -66,16 +66,12 @@ const form = reactive({
 })
 
 // --- COMPUTED HELPERS ---
-
-// 1. Obtener el objeto completo del inversionista seleccionado
-const selectedInvestor = computed(() =>
-  transactionStore.getInvestors.find((i) => i.id == form.investor_id)
-)
-
 const isComplexExchange = computed(() => operationType.value === 'currency_change')
 
 const sourceAccounts = computed(() => transactionStore.getAccounts)
-const destinationAccounts = computed(() => transactionStore.getAccounts)
+const destinationAccounts = computed(() => {
+  return transactionStore.getAccounts
+})
 
 const fromAccount = computed(() =>
   transactionStore.getAccounts.find((a) => a.id == form.from_account_id),
@@ -89,21 +85,22 @@ const selectedPlatform = computed(() =>
 const selectedProvider = computed(() => transactionStore.getProviders.find((p) => p.id == form.provider_id))
 const selectedBroker = computed(() => transactionStore.getBrokers.find((b) => b.id == form.broker_id))
 
-// 2. Modificamos sourceName para mostrar el saldo disponible
 const sourceName = computed(() => {
   if (form.capital_type === 'investor') {
-    if (!selectedInvestor.value) return 'Seleccione Inversionista'
-
-    // Leemos el saldo que ahora el Store SI deja pasar
-    const balance = parseFloat(selectedInvestor.value.balance || 0)
-
-    return `${selectedInvestor.value.name} (Disp: $${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })})`
+    const inv = transactionStore.getInvestors.find((i) => i.id == form.investor_id)
+    return inv?.name || 'Fondo Inversionista'
+  }
+  // 🟢 CAMBIO: Mostrar nombre del proveedor si es capital de proveedor
+  if (form.capital_type === 'provider') {
+    const prov = transactionStore.getProviders.find((p) => p.id == form.provider_id)
+    return prov?.name || 'Fondo Proveedor'
   }
   return fromAccount.value?.name || ''
 })
 
 const sourceCurrency = computed(() => {
-  if (form.capital_type === 'investor') return ''
+  // 🟢 CAMBIO: Si es Inversionista o Proveedor, no mostramos moneda origen
+  if (form.capital_type === 'investor' || form.capital_type === 'provider') return ''
   return fromAccount.value?.currency_code || ''
 })
 
@@ -114,31 +111,16 @@ const commissionCurrency = computed(() => {
   return fromAccount.value?.currency_code || '---'
 })
 
-// 3. VALIDACIÓN DE SALDO
 const hasSufficientBalance = computed(() => {
-  // Caso A: Cuenta Propia
-  if (form.capital_type === 'own') {
-    if (!fromAccount.value || !form.amount_sent) return true
-    const rawAccount = transactionStore.rawAccounts?.find((a) => a.id == form.from_account_id)
-    return rawAccount ? parseFloat(rawAccount.balance) >= parseFloat(form.amount_sent) : true
-  }
+  // 🟢 CAMBIO: Si es proveedor, también saltamos la validación de saldo
+  if (form.capital_type === 'investor' || form.capital_type === 'provider') return true
 
-  // Caso B: Inversionista
-  if (form.capital_type === 'investor') {
-    if (!selectedInvestor.value || !form.amount_sent) return true
-
-    // Obtenemos saldo
-    const investorBal = parseFloat(selectedInvestor.value.balance || 0)
-    const amountToSend = parseFloat(form.amount_sent)
-
-    // Si el monto a enviar es mayor al saldo, retorna false (error)
-    return investorBal >= amountToSend
-  }
-
-  return true
+  if (!fromAccount.value || !form.amount_sent) return true
+  const rawAccount = transactionStore.rawAccounts?.find((a) => a.id == form.from_account_id)
+  return rawAccount ? parseFloat(rawAccount.balance) >= parseFloat(form.amount_sent) : true
 })
 
-// --- LÓGICA MATEMÁTICA (Igual que antes) ---
+// --- LÓGICA MATEMÁTICA ---
 
 watch(
   [() => form.buy_rate, () => form.received_rate],
@@ -244,6 +226,8 @@ function calculateCommissions() {
   }
 
   if (commissionBase > 0) {
+
+    // 1) Calcular % ganancia bruta basado en tasas
     let grossPct = parseFloat(form.commission_charged_pct)
     if (isNaN(grossPct) || grossPct === 0) {
       const r = parseFloat(form.received_rate) || 0
@@ -255,19 +239,24 @@ function calculateCommissions() {
       form.commission_charged_pct = grossPct
     }
 
+    // 2) Ganancia bruta en monto
     const grossAmount = commissionBase * (grossPct / 100)
     form.commission_charged_amount = grossAmount
 
+    // Leer % ingresado por el usuario (sobre el monto base)
     const provInput = parseFloat(form.commission_provider_pct) || 0
     const brokerInput = parseFloat(form.commission_broker_pct) || 0
     const adminInput = parseFloat(form.commission_admin_pct) || 0
     const investorInput = parseFloat(form.investor_profit_pct) || 0
 
+    // 3) Convertir % del usuario (sobre monto base) a su equivalente sobre ganancia bruta
+    // monto que quiere cada uno:
     const provAmountDesired = commissionBase * (provInput / 100)
     const brokerAmountDesired = commissionBase * (brokerInput / 100)
     const adminAmountDesired = commissionBase * (adminInput / 100)
     const investorAmountDesired = commissionBase * (investorInput / 100)
 
+    // ahora se aplican sobre la ganancia bruta:
     form.commission_provider_amount = provAmountDesired
     form.commission_broker_amount = brokerAmountDesired
 
@@ -283,6 +272,7 @@ function calculateCommissions() {
       form.investor_profit_amount = 0
     }
 
+    // 4) Utilidad final
     const totalDeductions =
       form.commission_provider_amount +
       form.commission_broker_amount +
@@ -331,17 +321,24 @@ watch(operationType, () => {
 })
 
 onMounted(async () => {
+  // Asegúrate de que los datos se carguen antes de que se rendericen los selectores
   await transactionStore.fetchAllSupportData()
 })
 
 // --- NAVEGACIÓN ---
 const nextStep = () => {
   if (currentStep.value === 1) {
-    const isExternalCapital = ['investor'].includes(form.capital_type)
+    // 🟢 CAMBIO: Si es capital externo (investor/provider), no exigimos from_account_id
+    const isExternalCapital = ['investor', 'provider'].includes(form.capital_type)
     const missingFrom = isExternalCapital ? false : !form.from_account_id
 
     if (missingFrom || !form.to_account_id || !form.client_id) {
       return Swal.fire('Falta información', 'Complete los campos obligatorios (*).', 'warning')
+    }
+
+    // 🟢 CAMBIO: Validación específica para proveedor
+    if (form.capital_type === 'provider' && !form.provider_id) {
+      return Swal.fire('Falta información', 'Seleccione el Proveedor Financista.', 'warning')
     }
 
     if (operationType.value === 'exchange' && !form.platform_id) {
@@ -376,12 +373,10 @@ const handleConfirm = async () => {
   try {
     let payload = { ...form }
 
-    if (form.capital_type === 'investor') {
+    // 🟢 CAMBIO: Limpiar cuenta origen si es inversionista O proveedor
+    if (['investor', 'provider'].includes(form.capital_type)) {
       payload.from_account_id = null
     }
-
-    payload.commission_provider_amount = 0
-    payload.commission_provider_pct = 0
 
     if (operationType.value === 'currency_change') {
       payload.operation_type = 'exchange'
@@ -396,9 +391,15 @@ const handleConfirm = async () => {
       payload.operation_type = 'exchange'
       payload.buy_rate = null
       payload.received_rate = null
-      payload.provider_id = null
+
+      // 🟢 CAMBIO: Solo limpiamos provider_id si NO estamos usando capital de proveedor
+      if (form.capital_type !== 'provider') {
+        payload.provider_id = null
+      }
+
       payload.broker_id = null
     } else {
+      // PURCHASE
       payload.operation_type = 'purchase'
       payload.exchange_rate = null
       payload.commission_admin_pct = 0
@@ -471,6 +472,9 @@ const handleConfirm = async () => {
                 <button :class="{ active: form.capital_type === 'investor' }" @click="form.capital_type = 'investor'">
                   Inversionista
                 </button>
+                <button :class="{ active: form.capital_type === 'provider' }" @click="form.capital_type = 'provider'">
+                  Proveedor
+                </button>
               </div>
             </div>
 
@@ -478,6 +482,12 @@ const handleConfirm = async () => {
               <BaseSelectWithSearchAndCreate label="Inversionista *" :options="transactionStore.getInvestors"
                 v-model="form.investor_id" required create-endpoint="/investors" :create-fields="{ name: '' }"
                 create-label="Inversionista" />
+            </div>
+
+            <div v-if="form.capital_type === 'provider'" class="col-span-2">
+              <BaseSelectWithSearchAndCreate label="Proveedor (Financista) *" :options="transactionStore.getProviders"
+                v-model="form.provider_id" required create-endpoint="/providers" :create-fields="{ name: '' }"
+                create-label="Proveedor" />
             </div>
 
             <div v-if="operationType === 'exchange'">
@@ -492,9 +502,9 @@ const handleConfirm = async () => {
                 create-label="Corredor" />
 
               <div class="grid-2-nested col-span-2">
-                <BaseSelectWithSearchAndCreate label="Proveedor (Liquidez)" :options="transactionStore.getProviders"
-                  v-model="form.provider_id" :required="isComplexExchange" create-endpoint="/providers"
-                  :create-fields="{ name: '' }" create-label="Proveedor" />
+                <BaseSelectWithSearchAndCreate v-if="form.capital_type !== 'provider'" label="Proveedor (Liquidez)"
+                  :options="transactionStore.getProviders" v-model="form.provider_id" :required="isComplexExchange"
+                  create-endpoint="/providers" :create-fields="{ name: '' }" create-label="Proveedor" />
 
                 <BaseSelectWithSearchAndCreate v-if="isComplexExchange" label="Plataforma / Admin"
                   :options="transactionStore.getPlatforms" v-model="form.platform_id" :required="isComplexExchange"
@@ -574,9 +584,7 @@ const handleConfirm = async () => {
             </div>
 
             <p v-if="!hasSufficientBalance" class="error-txt">
-              Saldo insuficiente en
-              <span v-if="form.capital_type === 'own'">{{ fromAccount?.name }}</span>
-              <span v-else-if="form.capital_type === 'investor'">{{ selectedInvestor?.name }}</span>
+              Saldo insuficiente en {{ fromAccount?.name }}
             </p>
 
             <div v-if="operationType === 'purchase' || isComplexExchange" class="delivery-check">
@@ -704,7 +712,7 @@ const handleConfirm = async () => {
               <template v-if="operationType !== 'exchange'">
                 <div class="divider"></div>
                 <div class="row" v-if="form.commission_provider_amount > 0">
-                  <span>Pago Proveedor (Estimado)</span>
+                  <span>Pago Proveedor</span>
                   <span class="text-danger">- {{ form.commission_provider_amount }}</span>
                 </div>
                 <div class="row" v-if="form.commission_broker_amount > 0">
