@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
 
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -133,6 +134,17 @@ const router = createRouter({
         permission: 'manage_users',
         icon: 'fa-solid fa-user-gear',
         label: 'Gestión de Usuarios',
+      },
+    },
+    {
+      path: '/employees',
+      name: 'employees_list',
+      component: () => import('@/views/employees/EmployeeList.vue'),
+      meta: {
+        requiresAuth: true,
+        //permission: 'manage_employees',
+        icon: 'fa-solid fa-user-tie',
+        label: 'Gestion De Nominas',
       },
     },
     {

@@ -35,7 +35,7 @@ const handleLogin = async () => {
   <div class="login-card-container">
     <div class="login-card">
       <div class="header">
-        <h1 class="logo-text">Kephas Financial</h1>
+        <h1 class="logo-text">TuConpay</h1>
         <p class="subtitle">Acceso al Panel de Administración del Tenant</p>
       </div>
 
@@ -44,14 +44,8 @@ const handleLogin = async () => {
           <label for="email">Email</label>
           <div class="input-wrapper">
             <FontAwesomeIcon icon="fa-solid fa-user" class="input-icon" />
-            <input
-              id="email"
-              v-model="form.email"
-              type="email"
-              :disabled="isLoading"
-              placeholder="admin@tenant.com"
-              required
-            />
+            <input id="email" v-model="form.email" type="email" :disabled="isLoading" placeholder="admin@tenant.com"
+              required />
           </div>
         </div>
 
@@ -59,14 +53,8 @@ const handleLogin = async () => {
           <label for="password">Contraseña</label>
           <div class="input-wrapper">
             <FontAwesomeIcon icon="fa-solid fa-lock" class="input-icon" />
-            <input
-              id="password"
-              v-model="form.password"
-              type="password"
-              :disabled="isLoading"
-              placeholder="********"
-              required
-            />
+            <input id="password" v-model="form.password" type="password" :disabled="isLoading" placeholder="********"
+              required />
           </div>
         </div>
 

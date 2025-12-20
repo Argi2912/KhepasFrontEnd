@@ -36,7 +36,7 @@ const isProcessing = ref(false)
 // --- COMPUTADAS ---
 const accountsOptions = computed(() => transactionStore.getAccounts)
 
-// Headers (sin "Acciones" porque BaseTable la agrega sola)
+// Headers de la tabla
 const headers = [
   { key: 'date', label: 'Fecha' },
   { key: 'entity', label: 'Entidad' },
@@ -46,15 +46,21 @@ const headers = [
   { key: 'status', label: 'Estado' },
 ]
 
+// --- HELPERS VISUALES ---
+const formatMoney = (amount) => {
+  return Number(amount).toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  })
+}
+
 // --- CARGA DE DATOS ---
 const fetchDashboard = async () => {
   loading.value = true
   try {
-    // Resumen
     const { data: summaryData } = await api.get('/ledger/summary')
     summary.value = summaryData
 
-    // Listado con filtros
     const params = {
       type: activeTab.value,
       search: searchQuery.value.trim() || undefined,
@@ -78,9 +84,18 @@ const fetchDashboard = async () => {
         displayStatus = 'Parcial'
       }
 
+      let prettyType = 'Desconocido'
+      if (item.entity_type) {
+        if (item.entity_type.includes('Employee')) prettyType = 'Empleado'
+        else if (item.entity_type.includes('Provider')) prettyType = 'Proveedor'
+        else if (item.entity_type.includes('Client')) prettyType = 'Cliente'
+        else if (item.entity_type.includes('Broker')) prettyType = 'Corredor'
+        else prettyType = item.entity_type.split('\\').pop()
+      }
+
       return {
         id: item.id,
-        date: new Date(item.created_at).toLocaleDateString('es-VE'),
+        date: new Date(item.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short' }),
         description: item.description,
         amount,
         original_amount: original,
@@ -88,13 +103,11 @@ const fetchDashboard = async () => {
         pending_amount: pending,
         display_status: displayStatus,
         has_pending: pending > 0.01,
-
         entity_name: item.entity
           ? item.entity.name || item.entity.alias || item.entity.user?.name || 'Sin nombre'
           : '---',
-        entity_type: item.entity_type ? item.entity_type.split('\\').pop() : 'Desconocido',
-
-        tx_number: item.transaction ? item.transaction.number : 'Manual',
+        entity_type: prettyType,
+        tx_number: item.transaction ? item.transaction.number : 'MANUAL',
       }
     })
   } catch (e) {
@@ -110,16 +123,12 @@ onMounted(() => {
   fetchDashboard()
 })
 
-// Recargar automáticamente al cambiar filtros o tab (con debounce)
 watch(
   [activeTab, searchQuery, startDate, endDate],
-  () => {
-    fetchDashboard()
-  },
+  () => { fetchDashboard() },
   { debounce: 600 },
 )
 
-// --- ACCIONES ---
 const switchTab = (tab) => {
   activeTab.value = tab
 }
@@ -168,71 +177,54 @@ const confirmPayment = async () => {
     isProcessing.value = false
   }
 }
-
-const getStatusClass = (status) => {
-  switch (status) {
-    case 'Pagado':
-      return 'text-success font-bold'
-    case 'Parcial':
-      return 'text-primary font-bold'
-    default:
-      return 'text-danger font-bold'
-  }
-}
 </script>
 
 <template>
   <div class="ledger-dashboard">
     <h1 class="page-title">Libro Mayor - Cuentas por Pagar / Cobrar</h1>
 
-    <!-- Resumen -->
     <div class="summary-grid">
-      <div
-        class="summary-card payable"
-        :class="{ active: activeTab === 'payable' }"
-        @click="switchTab('payable')"
-      >
-        <div class="icon-box"><FontAwesomeIcon icon="fa-solid fa-arrow-up" /></div>
+      <div class="summary-card payable" :class="{ active: activeTab === 'payable' }" @click="switchTab('payable')">
+        <div class="icon-box">
+          <FontAwesomeIcon icon="fa-solid fa-arrow-up" />
+        </div>
         <div class="info">
           <h3>Por Pagar</h3>
           <div class="amount text-danger">
-            ${{
-              (summary.payable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })
-            }}
+            ${{ (summary.payable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }) }}
           </div>
         </div>
       </div>
 
-      <div
-        class="summary-card receivable"
-        :class="{ active: activeTab === 'receivable' }"
-        @click="switchTab('receivable')"
-      >
-        <div class="icon-box"><FontAwesomeIcon icon="fa-solid fa-arrow-down" /></div>
+      <div class="summary-card receivable" :class="{ active: activeTab === 'receivable' }"
+        @click="switchTab('receivable')">
+        <div class="icon-box">
+          <FontAwesomeIcon icon="fa-solid fa-arrow-down" />
+        </div>
         <div class="info">
           <h3>Por Cobrar</h3>
           <div class="amount text-success">
-            ${{
-              (summary.receivable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })
-            }}
+            ${{ (summary.receivable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }) }}
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Barra de Filtros -->
     <div class="filters-bar">
-      <div class="filters-grid">
-        <BaseInput
-          v-model="searchQuery"
-          label="Buscar"
-          placeholder="Descripción, entidad, referencia..."
-          icon="fa-solid fa-magnifying-glass"
-        />
+      <div class="filters-flex">
 
-        <BaseInput v-model="startDate" label="Desde" type="date" />
+        <div class="filter-item search-input">
+          <BaseInput v-model="searchQuery" label="Buscar" placeholder="Descripción, entidad, referencia..."
+            icon="fa-solid fa-magnifying-glass" />
+        </div>
 
-        <BaseInput v-model="endDate" label="Hasta" type="date" />
+        <div class="filter-item date-input">
+          <BaseInput v-model="startDate" label="Desde" type="date" />
+        </div>
+
+        <div class="filter-item date-input">
+          <BaseInput v-model="endDate" label="Hasta" type="date" />
+        </div>
 
         <div class="filter-actions">
           <button class="btn-refresh" @click="fetchDashboard">
@@ -242,10 +234,10 @@ const getStatusClass = (status) => {
             <FontAwesomeIcon icon="fa-solid fa-rotate-left" /> Limpiar
           </button>
         </div>
+
       </div>
     </div>
 
-    <!-- Tabla -->
     <div class="list-section">
       <div class="list-header">
         <h2>{{ activeTab === 'payable' ? 'Cuentas por Pagar' : 'Cuentas por Cobrar' }}</h2>
@@ -256,48 +248,47 @@ const getStatusClass = (status) => {
 
       <BaseTable :headers="headers" :data="entries" :isLoading="loading">
         <tr v-for="entry in entries" :key="entry.id">
-          <td>{{ entry.date }}</td>
+          <td class="text-secondary">{{ entry.date }}</td>
           <td>
             <div class="entity-cell">
-              <div class="entity-name">{{ entry.entity_name }}</div>
-              <div class="entity-badge">{{ entry.entity_type }}</div>
+              <span class="entity-name">{{ entry.entity_name }}</span>
+              <span class="entity-badge">{{ entry.entity_type }}</span>
             </div>
           </td>
-          <td>{{ entry.description }}</td>
-          <td class="font-mono">{{ entry.tx_number }}</td>
+          <td class="desc-cell">
+            <span :title="entry.description">{{ entry.description }}</span>
+          </td>
           <td>
-            <div>
-              <div v-if="entry.original_amount > 0">
-                <strong>Original:</strong> ${{ entry.original_amount.toFixed(2) }}<br />
-                <strong>Pagado:</strong> ${{ entry.paid_amount.toFixed(2) }}<br />
-                <strong>Pendiente:</strong> ${{ entry.pending_amount.toFixed(2) }}
-              </div>
-              <div v-else>${{ entry.amount.toFixed(2) }}</div>
+            <span class="ref-tag">{{ entry.tx_number }}</span>
+          </td>
+          <td class="amount-cell">
+            <div class="main-amount" :class="activeTab === 'payable' ? 'text-danger' : 'text-success'">
+              {{ formatMoney(entry.pending_amount) }}
+            </div>
+            <div class="sub-amount">
+              <span v-if="entry.paid_amount > 0">
+                Pagado: {{ formatMoney(entry.paid_amount) }}
+              </span>
+              <span class="total-line">
+                Original: {{ formatMoney(entry.original_amount) }}
+              </span>
             </div>
           </td>
           <td>
-            <span :class="getStatusClass(entry.display_status)">
+            <span :class="['status-pill', entry.display_status.toLowerCase()]">
               {{ entry.display_status }}
             </span>
           </td>
-          <!-- Acciones -->
-          <td>
-            <button
-              v-if="entry.has_pending"
-              class="btn-pay"
-              :class="{ 'btn-collect': activeTab === 'receivable' }"
-              @click="openPayModal(entry)"
-            >
-              <FontAwesomeIcon icon="fa-solid fa-money-bill" />
+          <td class="actions-cell">
+            <button v-if="entry.has_pending" class="btn-action" @click="openPayModal(entry)">
               {{ activeTab === 'payable' ? 'Abonar' : 'Cobrar' }}
             </button>
-            <span v-else class="text-success font-bold">Completado</span>
+            <span v-else class="check-icon">✔</span>
           </td>
         </tr>
       </BaseTable>
     </div>
 
-    <!-- Modal Abono -->
     <BaseModal :show="showPayModal" title="Registrar Abono" @close="showPayModal = false">
       <div v-if="selectedEntry">
         <div class="modal-alert">
@@ -309,29 +300,14 @@ const getStatusClass = (status) => {
           </div>
         </div>
 
-        <BaseSelect
-          label="Cuenta para el movimiento"
-          :options="accountsOptions"
-          v-model="paymentForm.account_id"
-          placeholder="Selecciona una cuenta"
-          required
-        />
+        <BaseSelect label="Cuenta para el movimiento" :options="accountsOptions" v-model="paymentForm.account_id"
+          placeholder="Selecciona una cuenta" required />
 
-        <BaseInput
-          label="Monto a abonar"
-          type="number"
-          step="0.01"
-          v-model.number="paymentForm.amount"
-          placeholder="0.00"
-          required
-        />
+        <BaseInput label="Monto a abonar" type="number" step="0.01" v-model.number="paymentForm.amount"
+          placeholder="0.00" required />
 
-        <BaseInput
-          label="Descripción (opcional)"
-          type="text"
-          v-model="paymentForm.description"
-          placeholder="Ej: Abono parcial vía Zelle"
-        />
+        <BaseInput label="Descripción (opcional)" type="text" v-model="paymentForm.description"
+          placeholder="Ej: Abono parcial vía Zelle" />
       </div>
 
       <template #footer>
@@ -347,6 +323,7 @@ const getStatusClass = (status) => {
 </template>
 
 <style scoped>
+/* --- TÍTULOS Y ESTRUCTURA --- */
 .page-title {
   font-size: 1.8rem;
   color: var(--color-primary);
@@ -361,20 +338,21 @@ const getStatusClass = (status) => {
 }
 
 .summary-card {
-  background: var(--color-secondary);
+  background: #1e1e1e;
   padding: 20px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 20px;
   cursor: pointer;
-  border: 1px solid var(--color-border);
+  border: 1px solid #333;
   transition: all 0.2s;
 }
 
 .summary-card:hover,
 .summary-card.active {
   border-color: var(--color-primary);
+  background: #252525;
 }
 
 .summary-card .icon-box {
@@ -383,71 +361,100 @@ const getStatusClass = (status) => {
 }
 
 .summary-card.payable .icon-box {
-  color: var(--color-danger);
+  color: #ff5252;
 }
+
 .summary-card.receivable .icon-box {
-  color: var(--color-success);
+  color: #4caf50;
 }
 
 .info h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  color: #aaa;
+  color: #888;
+  letter-spacing: 1px;
 }
 
 .info .amount {
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: bold;
-  margin: 5px 0;
+  margin-top: 5px;
 }
 
-/* Barra de filtros */
+/* --- FILTROS (RENOVADO CON FLEXBOX) --- */
 .filters-bar {
-  background: var(--color-secondary);
+  background: #1e1e1e;
   padding: 20px;
   border-radius: 8px;
   margin-bottom: 20px;
-  border: 1px solid var(--color-border);
+  border: 1px solid #333;
 }
 
-.filters-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.filters-flex {
+  display: flex;
+  flex-wrap: wrap;
   gap: 15px;
-  align-items: end;
+  /* La magia: alinea todo al fondo del contenedor */
+  align-items: flex-end;
+}
+
+/* Controla el ancho de los inputs para que se estiren ordenadamente */
+.filter-item {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* El input de búsqueda puede ser más ancho si hay espacio */
+.search-input {
+  flex: 2;
+  min-width: 250px;
+}
+
+.date-input {
+  flex: 1;
+  min-width: 150px;
 }
 
 .filter-actions {
   display: flex;
   gap: 10px;
+  /* Asegura que los botones no se estiren verticalmente */
+  align-self: flex-end;
+  padding-bottom: 1px;
+  /* Ajuste fino por si los inputs tienen bordes extraños */
 }
 
 .btn-refresh,
 .btn-clear {
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-light);
-  padding: 10px 15px;
+  background: #2c2c2c;
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 0 15px;
+  /* Padding lateral */
   border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  height: 42px;
+  /* Altura fija estándar para coincidir con inputs */
+  white-space: nowrap;
 }
 
-.btn-refresh:hover,
-.btn-clear:hover {
-  background: var(--color-hover);
+.btn-refresh:hover {
+  background: #333;
   color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
-/* Lista */
+/* --- TABLA --- */
 .list-section {
-  background: var(--color-secondary);
+  background: #1e1e1e;
   padding: 20px;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
+  border: 1px solid #333;
 }
 
 .list-header {
@@ -457,13 +464,27 @@ const getStatusClass = (status) => {
   margin-bottom: 15px;
 }
 
+td {
+  vertical-align: middle;
+  padding: 12px 8px;
+  border-bottom: 1px solid #2c2c2c;
+}
+
+.text-secondary {
+  color: #666;
+  font-size: 0.9rem;
+}
+
 .entity-cell {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .entity-name {
-  font-weight: bold;
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.95rem;
 }
 
 .entity-badge {
@@ -472,47 +493,113 @@ const getStatusClass = (status) => {
   color: #aaa;
   padding: 2px 6px;
   border-radius: 4px;
-  margin-top: 2px;
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.font-mono {
-  font-family: monospace;
+.desc-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ccc;
+  font-size: 0.9rem;
 }
 
-.text-success {
-  color: var(--color-success);
-}
-.text-danger {
-  color: var(--color-danger);
-}
-.text-primary {
+.ref-tag {
+  font-family: 'Consolas', monospace;
+  background: #111;
   color: var(--color-primary);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  border: 1px solid #333;
 }
 
-.btn-pay {
-  background: var(--color-danger);
-  color: white;
-  border: none;
-  padding: 6px 12px;
+.amount-cell {
+  text-align: right;
+}
+
+.main-amount {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.sub-amount {
+  font-size: 0.75rem;
+  color: #666;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.total-line {
+  border-top: 1px dashed #333;
+  padding-top: 1px;
+  margin-top: 1px;
+  display: inline-block;
+}
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.status-pill.pendiente {
+  background: rgba(255, 82, 82, 0.15);
+  color: #ff5252;
+}
+
+.status-pill.parcial {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.status-pill.pagado {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+
+.actions-cell {
+  text-align: center;
+}
+
+.btn-action {
+  background: transparent;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 5px 15px;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-action:hover {
+  background: var(--color-primary);
+  color: #000;
   font-weight: bold;
 }
 
-.btn-pay:hover {
-  background: #c0392b;
+.check-icon {
+  color: #4caf50;
+  font-size: 1.2rem;
 }
 
-.btn-collect {
-  background: var(--color-success);
-  color: #000;
+.text-success {
+  color: #4caf50 !important;
 }
 
-.btn-collect:hover {
-  background: #27ae60;
+.text-danger {
+  color: #ff5252 !important;
 }
 
-/* Modal */
+/* --- MODAL --- */
 .modal-alert {
   background: rgba(240, 185, 11, 0.1);
   padding: 15px;
@@ -520,13 +607,9 @@ const getStatusClass = (status) => {
   border-left: 3px solid var(--color-primary);
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 20px;
-}
-
-.modal-alert svg {
-  color: var(--color-primary);
-  margin-top: 3px;
+  color: #ddd;
 }
 
 .modal-footer-actions {
@@ -538,7 +621,7 @@ const getStatusClass = (status) => {
 
 .btn-cancel {
   background: transparent;
-  border: 1px solid #555;
+  border: 1px solid #444;
   color: #ccc;
   padding: 10px 20px;
   border-radius: 6px;
@@ -558,5 +641,21 @@ const getStatusClass = (status) => {
 .btn-confirm:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-refresh {
+  background: #2c2c2c;
+  color: #ccc;
+  padding: 0 15px;
+  /* Padding lateral */
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  /* Altura fija estándar para coincidir con inputs */
+
 }
 </style>
