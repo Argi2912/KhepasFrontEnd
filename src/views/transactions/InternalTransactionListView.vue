@@ -18,7 +18,7 @@ const isLoadingDetail = ref(false)
 
 // --- DEFINICIÓN DE COLUMNAS ---
 const headers = [
-  { key: 'date', label: 'Fecha' },
+  { key: 'date_fmt', label: 'Fecha' }, // Ajusté la key para que ordene visualmente si base table lo usa
   { key: 'type', label: 'Tipo' },
   { key: 'person_name', label: 'Persona / Tercero' },
   { key: 'category', label: 'Categoría' },
@@ -28,7 +28,7 @@ const headers = [
   { key: 'actions', label: '' },
 ]
 
-// --- HELPER: NORMALIZACIÓN DE DATOS ---
+// --- HELPER: NORMALIZACIÓN DE DATOS INTELIGENTE ---
 const normalizeInternalTx = (data) => {
   if (!data) return {}
 
@@ -36,20 +36,15 @@ const normalizeInternalTx = (data) => {
   const user = data.user || {}
   const isIncome = data.type === 'income'
 
-  // --- 1. CORRECCIÓN ROBUSTA DE FECHA (Para que se vea como la Imagen 2) ---
+  // 1. CORRECCIÓN DE FECHA
   let dateFormatted = 'N/A'
-  // Asumimos que data.transaction_date empieza con YYYY-MM-DD, incluso si es larga.
-  // Tomamos los primeros 10 caracteres y los reordenamos.
   if (data.transaction_date && typeof data.transaction_date === 'string') {
     try {
-      // Cortamos "2025-11-27" de un string largo
       const cleanDatePart = data.transaction_date.substring(0, 10);
-      const parts = cleanDatePart.split('-'); // [YYYY, MM, DD]
+      const parts = cleanDatePart.split('-');
       if (parts.length === 3) {
-        // Reordenamos a DD/MM/YYYY
         dateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
       } else {
-        // Fallback si el formato no es YYYY-MM-DD
         dateFormatted = data.transaction_date;
       }
     } catch (e) {
@@ -57,30 +52,50 @@ const normalizeInternalTx = (data) => {
     }
   }
 
+  // 2. 🧠 LÓGICA DE NOMBRE (PRIORIDAD: ENTIDAD > MANUAL)
+  let finalPersonName = 'N/A'
+
+  if (data.entity) {
+    // Si viene de base de datos (Cliente, Empleado, etc.)
+    finalPersonName = data.entity.name || data.entity.alias || data.entity.business_name || 'Entidad s/n'
+  } else if (data.person_name) {
+    // Si fue escrito a mano
+    finalPersonName = data.person_name
+  }
+
+  // 3. 🧠 LÓGICA DE DUEÑO/TIPO (PRIORIDAD: MANUAL > DEDUCIDO)
+  let finalOwner = data.dueño || 'N/A'
+
+  // Si no hay dueño manual pero hay tipo de entidad, lo traducimos
+  if (finalOwner === 'N/A' && data.entity_type) {
+    if (data.entity_type.includes('Client')) finalOwner = 'Cliente'
+    else if (data.entity_type.includes('Provider')) finalOwner = 'Proveedor'
+    else if (data.entity_type.includes('Employee')) finalOwner = 'Empleado'
+    else if (data.entity_type.includes('Broker')) finalOwner = 'Corredor'
+    else if (data.entity_type.includes('Platform')) finalOwner = 'Plataforma'
+    else if (data.entity_type.includes('Investor')) finalOwner = 'Inversionista'
+  }
+
   return {
     id: data.id,
-    // Fechas
-    date_raw: data.transaction_date, // Mantenemos la original para ordenar
-    date_fmt: dateFormatted,         // Usamos la formateada para mostrar
+    date_raw: data.transaction_date,
+    date_fmt: dateFormatted,
     created_at: new Date(data.created_at).toLocaleString(),
 
-    // Datos principales
     type: data.type,
     type_label: isIncome ? 'INGRESO' : 'EGRESO',
     is_income: isIncome,
     category: data.category || 'General',
     description: data.description || 'Sin notas adicionales',
 
-    // --- NUEVOS CAMPOS ---
-    dueño: data.dueño || 'N/A',
-    person_name: data.person_name || 'N/A',
+    // --- CAMPOS CORREGIDOS ---
+    dueño: finalOwner,
+    person_name: finalPersonName,
 
-    // Relaciones seguras
     account_name: account.name || 'Cuenta Eliminada',
     currency: account.currency_code || '',
     user_name: user.name || 'Usuario Eliminado',
 
-    // Montos
     amount: parseFloat(data.amount || 0),
   }
 }
@@ -95,11 +110,8 @@ const formatMoney = (amount, currency = '') => {
 const fetchTransactions = async (page = 1) => {
   isLoading.value = true
   try {
-    // NOTA IMPORTANTE: Idealmente, tu API (backend) debería manejar el orden
-    // agregando algo como `?sort_by=date&order=desc` a la URL.
     const { data } = await api.get(`/transactions/internal?page=${page}`)
 
-    // Mapeamos (normalizamos) los datos
     const mappedData = data.data.map((tx) => {
       const norm = normalizeInternalTx(tx)
       return {
@@ -109,9 +121,7 @@ const fetchTransactions = async (page = 1) => {
       }
     })
 
-    // --- 2. ORDENAR EN EL CLIENTE (Lo nuevo al inicio) ---
-    // Ordenamos el array resultante usando la fecha "cruda" (date_raw)
-    // en orden descendente (b - a).
+    // Ordenar por fecha descendente
     transactions.value = mappedData.sort((a, b) => {
       if (b.date_raw > a.date_raw) return 1;
       if (b.date_raw < a.date_raw) return -1;
@@ -171,7 +181,6 @@ onMounted(() => fetchTransactions())
           <td class="font-bold text-dark">{{ row.person_name }}</td>
 
           <td>{{ row.category }}</td>
-
           <td>{{ row.account_name }}</td>
 
           <td class="text-sm text-gray">{{ row.dueño }}</td>

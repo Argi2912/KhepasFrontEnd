@@ -60,12 +60,14 @@ const menuItems = computed(() => {
     '/dashboard',
     '/reports',
     '/users',
+    '/employees',
     '/clients',
     '/providers',
     '/brokers',
     '/admi-platforms',
     '/financial-config',
     '/transactions',
+
 
   ]
   visibleRoutes.sort((a, b) => {
@@ -110,7 +112,7 @@ const menuItems = computed(() => {
 <template>
   <aside :class="['sidebar', { 'is-closed': !isOpen }]">
     <div class="logo-section">
-      <span v-if="isOpen" class="logo-text">K E P H A S</span>
+      <span v-if="isOpen" class="logo-text">TuConpay</span>
       <FontAwesomeIcon v-else icon="fa-solid fa-bolt" class="logo-icon-closed" />
     </div>
 
