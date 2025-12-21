@@ -36,6 +36,16 @@ const isProcessing = ref(false)
 // --- COMPUTADAS ---
 const accountsOptions = computed(() => transactionStore.getAccounts)
 
+const filteredAccounts = computed(() => {
+  if (!selectedEntry.value || !selectedEntry.value.currency_code) {
+    return transactionStore.getAccounts
+  }
+  // Filtra las cuentas que tengan la misma moneda que la deuda
+  return transactionStore.getAccounts.filter(
+    (acc) => acc.currency === selectedEntry.value.currency_code,
+  )
+})
+
 // Headers de la tabla
 const headers = [
   { key: 'date', label: 'Fecha' },
@@ -47,10 +57,10 @@ const headers = [
 ]
 
 // --- HELPERS VISUALES ---
-const formatMoney = (amount) => {
+const formatMoney = (amount, currency = 'USD') => {
   return Number(amount).toLocaleString('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: currency,
   })
 }
 
@@ -95,9 +105,13 @@ const fetchDashboard = async () => {
 
       return {
         id: item.id,
-        date: new Date(item.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short' }),
+        date: new Date(item.created_at).toLocaleDateString('es-VE', {
+          day: '2-digit',
+          month: 'short',
+        }),
         description: item.description,
         amount,
+        currency_code: item.currency_code || 'USD',
         original_amount: original,
         paid_amount: paid,
         pending_amount: pending,
@@ -125,7 +139,9 @@ onMounted(() => {
 
 watch(
   [activeTab, searchQuery, startDate, endDate],
-  () => { fetchDashboard() },
+  () => {
+    fetchDashboard()
+  },
   { debounce: 600 },
 )
 
@@ -184,27 +200,38 @@ const confirmPayment = async () => {
     <h1 class="page-title">Libro Mayor - Cuentas por Pagar / Cobrar</h1>
 
     <div class="summary-grid">
-      <div class="summary-card payable" :class="{ active: activeTab === 'payable' }" @click="switchTab('payable')">
+      <div
+        class="summary-card payable"
+        :class="{ active: activeTab === 'payable' }"
+        @click="switchTab('payable')"
+      >
         <div class="icon-box">
           <FontAwesomeIcon icon="fa-solid fa-arrow-up" />
         </div>
         <div class="info">
           <h3>Por Pagar</h3>
           <div class="amount text-danger">
-            ${{ (summary.payable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }) }}
+            ${{
+              (summary.payable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })
+            }}
           </div>
         </div>
       </div>
 
-      <div class="summary-card receivable" :class="{ active: activeTab === 'receivable' }"
-        @click="switchTab('receivable')">
+      <div
+        class="summary-card receivable"
+        :class="{ active: activeTab === 'receivable' }"
+        @click="switchTab('receivable')"
+      >
         <div class="icon-box">
           <FontAwesomeIcon icon="fa-solid fa-arrow-down" />
         </div>
         <div class="info">
           <h3>Por Cobrar</h3>
           <div class="amount text-success">
-            ${{ (summary.receivable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }) }}
+            ${{
+              (summary.receivable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })
+            }}
           </div>
         </div>
       </div>
@@ -212,10 +239,13 @@ const confirmPayment = async () => {
 
     <div class="filters-bar">
       <div class="filters-flex">
-
         <div class="filter-item search-input">
-          <BaseInput v-model="searchQuery" label="Buscar" placeholder="Descripción, entidad, referencia..."
-            icon="fa-solid fa-magnifying-glass" />
+          <BaseInput
+            v-model="searchQuery"
+            label="Buscar"
+            placeholder="Descripción, entidad, referencia..."
+            icon="fa-solid fa-magnifying-glass"
+          />
         </div>
 
         <div class="filter-item date-input">
@@ -234,7 +264,6 @@ const confirmPayment = async () => {
             <FontAwesomeIcon icon="fa-solid fa-rotate-left" /> Limpiar
           </button>
         </div>
-
       </div>
     </div>
 
@@ -262,15 +291,18 @@ const confirmPayment = async () => {
             <span class="ref-tag">{{ entry.tx_number }}</span>
           </td>
           <td class="amount-cell">
-            <div class="main-amount" :class="activeTab === 'payable' ? 'text-danger' : 'text-success'">
-              {{ formatMoney(entry.pending_amount) }}
+            <div
+              class="main-amount"
+              :class="activeTab === 'payable' ? 'text-danger' : 'text-success'"
+            >
+              {{ formatMoney(entry.pending_amount, entry.currency_code) }}
             </div>
             <div class="sub-amount">
               <span v-if="entry.paid_amount > 0">
-                Pagado: {{ formatMoney(entry.paid_amount) }}
+                Pagado: {{ formatMoney(entry.paid_amount, entry.currency_code) }}
               </span>
               <span class="total-line">
-                Original: {{ formatMoney(entry.original_amount) }}
+                Original: {{ formatMoney(entry.original_amount, entry.currency_code) }}
               </span>
             </div>
           </td>
@@ -296,18 +328,40 @@ const confirmPayment = async () => {
           <div>
             <strong>{{ selectedEntry.entity_name }}</strong> ({{ selectedEntry.entity_type }})<br />
             {{ selectedEntry.description }}<br />
-            <strong>Saldo pendiente: ${{ selectedEntry.pending_amount.toFixed(2) }}</strong>
+            <strong
+              >Saldo pendiente:
+              {{ formatMoney(selectedEntry.pending_amount, selectedEntry.currency_code) }}</strong
+            >
           </div>
         </div>
 
-        <BaseSelect label="Cuenta para el movimiento" :options="accountsOptions" v-model="paymentForm.account_id"
-          placeholder="Selecciona una cuenta" required />
+        <BaseSelect
+          label="Cuenta para el movimiento"
+          :options="filteredAccounts"
+          v-model="paymentForm.account_id"
+          placeholder="Selecciona una cuenta"
+          required
+        />
 
-        <BaseInput label="Monto a abonar" type="number" step="0.01" v-model.number="paymentForm.amount"
-          placeholder="0.00" required />
+        <p v-if="filteredAccounts.length === 0" class="text-danger text-sm mt-1">
+          ⚠️ No tienes cuentas en {{ selectedEntry.currency_code }} para realizar este pago.
+        </p>
 
-        <BaseInput label="Descripción (opcional)" type="text" v-model="paymentForm.description"
-          placeholder="Ej: Abono parcial vía Zelle" />
+        <BaseInput
+          label="Monto a abonar"
+          type="number"
+          step="0.01"
+          v-model.number="paymentForm.amount"
+          placeholder="0.00"
+          required
+        />
+
+        <BaseInput
+          label="Descripción (opcional)"
+          type="text"
+          v-model="paymentForm.description"
+          placeholder="Ej: Abono parcial vía Zelle"
+        />
       </div>
 
       <template #footer>
@@ -656,6 +710,5 @@ td {
   gap: 6px;
   height: 36px;
   /* Altura fija estándar para coincidir con inputs */
-
 }
 </style>

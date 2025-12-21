@@ -3,7 +3,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
 
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -55,12 +54,12 @@ const router = createRouter({
         requiresAuth: true,
         icon: 'fa-solid fa-gauge-high',
         label: 'Dashboard',
-        permission: 'view_dashboard',
+        permission: 'view_dashboard', // Todos (Admin, Analista, Cajero) deben tener este permiso
       },
     },
 
     // =========================================================================
-    // REPORTES FINANCIEROS
+    // REPORTES FINANCIEROS (Solo Analista y Admin)
     // =========================================================================
     {
       path: '/reports',
@@ -69,6 +68,7 @@ const router = createRouter({
         requiresAuth: true,
         icon: 'fa-solid fa-chart-pie',
         label: 'Reportes Financieros',
+        permission: 'view_reports', // 🔒 AQUÍ PROTEGEMOS EL MÓDULO ENTERO
       },
       children: [
         { path: '', redirect: { name: 'reports.general' } },
@@ -108,14 +108,14 @@ const router = createRouter({
           component: () => import('@/views/reports/ProfitMatrixView.vue'),
           meta: {
             label: 'Matriz de Rentabilidad',
-            icon: 'fa-solid fa-table-cells', // Icono sugerido
+            icon: 'fa-solid fa-table-cells',
           },
         },
       ],
     },
 
     // =========================================================================
-    // GESTIÓN SIMPLE
+    // GESTIÓN SIMPLE (Solo Admin / RRHH)
     // =========================================================================
 
     {
@@ -124,7 +124,7 @@ const router = createRouter({
       component: () => import('@/views/users/TenantUserListView.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_users',
+        permission: 'manage_users', // 🔒 Solo Admin
         icon: 'fa-solid fa-user-gear',
         label: 'Gestión de Usuarios',
       },
@@ -135,7 +135,7 @@ const router = createRouter({
       component: () => import('@/views/employees/EmployeeList.vue'),
       meta: {
         requiresAuth: true,
-        //permission: 'manage_employees',
+        permission: 'manage_employees', // 🔒 DESCOMENTADO: Solo Admin/RRHH
         icon: 'fa-solid fa-user-tie',
         label: 'Gestion De Nominas',
       },
@@ -146,7 +146,7 @@ const router = createRouter({
       component: () => import('@/views/clients/ClientList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_clients',
+        permission: 'manage_clients', // 🔒 Cajero y Admin
         icon: 'fa-solid fa-users',
         label: 'Clientes',
       },
@@ -157,7 +157,7 @@ const router = createRouter({
       component: () => import('@/views/providers/ProviderList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_clients', // Reutilizando permiso común
+        permission: 'manage_clients',
         icon: 'fa-solid fa-truck-moving',
         label: 'Proveedores',
       },
@@ -168,7 +168,7 @@ const router = createRouter({
       component: () => import('@/views/investors/InvestorList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_exchanges', // o crea uno nuevo: 'manage_investors'
+        permission: 'manage_investors', // 🔒 Solo Admin (Cambiado de manage_exchanges para seguridad)
         icon: 'fa-solid fa-handshake-angle',
         label: 'Inversionistas',
       },
@@ -179,7 +179,7 @@ const router = createRouter({
       component: () => import('@/views/brokers/BrokerList.vue'),
       meta: {
         requiresAuth: true,
-        // permission: 'manage_brokers', // ⚠️ COMENTADO: Para que aparezca siempre por ahora
+        permission: 'manage_brokers', // 🔒 DESCOMENTADO: Solo Admin
         icon: 'fa-solid fa-user-tie',
         label: 'Corredores',
       },
@@ -190,14 +190,14 @@ const router = createRouter({
       component: () => import('@/views/admi/PlatformList.vue'),
       meta: {
         requiresAuth: true,
-        permission: 'manage_platforms',
+        permission: 'manage_platforms', // 🔒 Solo Admin
         icon: 'fa-solid fa-server',
         label: 'Plataformas',
       },
     },
 
     // =========================================================================
-    // CONFIGURACIÓN FINANCIERA (CUENTAS Y DIVISAS)
+    // CONFIGURACIÓN FINANCIERA (Solo Admin)
     // =========================================================================
     {
       path: '/financial-config',
@@ -206,6 +206,7 @@ const router = createRouter({
         requiresAuth: true,
         icon: 'fa-solid fa-gear',
         label: 'Configuración Financiera',
+        permission: 'manage_finance', // 🔒 AÑADIDO: Protege todo el menú para Cajeros/Analistas
       },
       children: [
         { path: '', redirect: { name: 'accounts_list' } },
@@ -215,8 +216,7 @@ const router = createRouter({
           component: () => import('@/views/accounts/AccountList.vue'),
           meta: {
             label: 'Cuentas Bancarias',
-            // permission: 'manage_accounts', // Comenta si también da problemas
-            // 🟢 ELIMINADO hiddenInMenu PARA QUE SE VEA
+            permission: 'manage_finance', // 🔒 DESCOMENTADO
           },
         },
         {
@@ -225,15 +225,14 @@ const router = createRouter({
           component: () => import('@/views/currencies/CurrencyListView.vue'),
           meta: {
             label: 'Divisas',
-            // permission: 'manage_currencies', // Comenta si también da problemas
-            // 🟢 ELIMINADO hiddenInMenu PARA QUE SE VEA
+            permission: 'manage_finance', // 🔒 DESCOMENTADO
           },
         },
       ],
     },
 
     // =========================================================================
-    // OPERACIONES
+    // OPERACIONES (Admin y Cajero)
     // =========================================================================
     {
       path: '/transactions',
@@ -242,6 +241,7 @@ const router = createRouter({
         requiresAuth: true,
         icon: 'fa-solid fa-briefcase',
         label: 'Operaciones',
+        // SIN PERMISO EN EL PADRE: Para que puedan entrar tanto Cajero (a Exchanges) como Admin
       },
       children: [
         { path: '', redirect: { name: 'transaction_exchange_list' } },
@@ -251,38 +251,36 @@ const router = createRouter({
           component: () => import('@/views/transactions/CurrencyExchangeListView.vue'),
           meta: {
             label: 'Operaciones Divisas',
-            // permission: 'manage_exchanges',
-            // 🟢 ELIMINADO hiddenInMenu
+            permission: 'manage_exchanges', // 🔒 DESCOMENTADO: Cajero y Admin
           },
         },
-        // Rutas de detalle (Estas sí deben estar ocultas del menú lateral)
         {
           path: 'exchanges/create',
           name: 'transaction_exchange_create',
           component: () => import('@/views/transactions/CurrencyExchangeForm.vue'),
-          meta: { hiddenInMenu: true },
+          meta: { hiddenInMenu: true, permission: 'manage_exchanges' },
         },
         {
           path: 'exchanges/:id',
           name: 'transaction_exchange_show',
           component: () => import('@/views/transactions/CurrencyExchangeDetailView.vue'),
-          meta: { hiddenInMenu: true },
+          meta: { hiddenInMenu: true, permission: 'manage_exchanges' },
         },
+        // --- CAJA INTERNA (Solo Admin) ---
         {
           path: 'internal',
           name: 'transaction_internal_list',
           component: () => import('@/views/transactions/InternalTransactionListView.vue'),
           meta: {
             label: 'Caja y Gastos',
-            // permission: 'manage_internal_transactions',
-            // 🟢 ELIMINADO hiddenInMenu
+            permission: 'manage_internal_transactions', // 🔒 DESCOMENTADO: Solo Admin
           },
         },
         {
           path: 'internal/create',
           name: 'transaction_internal_create',
           component: () => import('@/views/transactions/InternalTransactionForm.vue'),
-          meta: { hiddenInMenu: true },
+          meta: { hiddenInMenu: true, permission: 'manage_internal_transactions' },
         },
         {
           path: 'ledger',
@@ -290,8 +288,7 @@ const router = createRouter({
           component: () => import('@/views/finance/LedgerDashboard.vue'),
           meta: {
             label: 'Cuentas por Pagar/Cobrar',
-            // permission: 'manage_internal_transactions',
-            // 🟢 ELIMINADO hiddenInMenu
+            permission: 'manage_internal_transactions', // 🔒 DESCOMENTADO: Solo Admin
           },
         },
       ],
@@ -321,7 +318,7 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'login', query: { redirect: to.fullPath } })
   }
   if (to.meta.permission && !authStore.can(to.meta.permission)) {
-    // Si no tiene permiso, redirige al dashboard en vez de bloquear
+    // Si no tiene permiso, lo mandamos al dashboard o login según corresponda
     return from.name
       ? next(false)
       : next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
