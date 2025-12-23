@@ -12,7 +12,8 @@ import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import InvestorFormModal from '@/components/shared/InvestorFormModal.vue'
-import BalanceFormModal from '@/components/shared/BalanceFormModal.vue' // <--- 1. NUEVO IMPORT
+import BalanceFormModal from '@/components/shared/BalanceFormModal.vue'
+import InvestorTransferModal from '@/components/shared/InvestorTransferModal.vue'
 
 const authStore = useAuthStore()
 const permissionKey = 'manage_exchanges'
@@ -20,8 +21,9 @@ const permissionKey = 'manage_exchanges'
 const showInvestorModal = ref(false)
 const investorIdToEdit = ref(null)
 
-// Estado para la Billetera (NUEVO)
+// Estados para Modales
 const showBalanceModal = ref(false)
+const showTransferModal = ref(false)
 const selectedInvestor = ref(null)
 
 const investors = ref([])
@@ -31,12 +33,9 @@ const isLoading = ref(false)
 
 const tableHeaders = [
   { key: 'name', label: 'Nombre Completo' },
-  { key: 'alias', label: 'Alias' },
-  { key: 'current_balance', label: 'Capital / Saldo' }, // <--- 2. NUEVA COLUMNA
-  { key: 'email', label: 'Email' },
-  { key: 'phone', label: 'Teléfono' },
+  { key: 'current_balance', label: 'Capital vs Disponible' },
+  { key: 'phone', label: 'Contacto' },
   { key: 'status', label: 'Estado' },
-  { key: 'created_at', label: 'Registrado' },
   { key: 'actions', label: '' },
 ]
 
@@ -67,37 +66,37 @@ const openEditModal = (id) => {
   showInvestorModal.value = true
 }
 
-// NUEVO: Abrir modal de saldo
+// Abrir Modal para INGRESAR dinero
 const openBalanceModal = (investor) => {
   selectedInvestor.value = investor
   showBalanceModal.value = true
 }
 
-// NUEVO: Formato de moneda
+// Abrir Modal para MOVER dinero
+const openTransferModal = (investor) => {
+  selectedInvestor.value = investor
+  showTransferModal.value = true
+}
+
+// Formato de moneda
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
 }
 
 const deleteInvestor = async (id, name) => {
   if (!authStore.can(permissionKey)) {
-    notify.error('No tienes permiso para eliminar inversionistas.')
+    notify.error('No tienes permiso.')
     return
   }
-
-  const confirmed = await alert.confirm(
-    `¿Eliminar al inversionista "${name}"?`,
-    'Esta acción eliminará al inversionista y podría afectar reportes históricos.',
-  )
-
+  const confirmed = await alert.confirm(`¿Eliminar al inversionista "${name}"?`)
   if (!confirmed) return
 
   try {
     await api.delete(`/investors/${id}`)
-    notify.success('Inversionista eliminado correctamente.')
+    notify.success('Inversionista eliminado.')
     fetchInvestors(pagination.value.current_page || 1)
   } catch (error) {
-    const msg = error.response?.data?.data?.message || 'No se pudo eliminar.'
-    notify.error(msg)
+    notify.error('No se pudo eliminar.')
   }
 }
 
@@ -119,30 +118,53 @@ onMounted(() => fetchInvestors())
     <BaseCard title="Listado de Inversionistas">
       <BaseTable :headers="tableHeaders" :data="investors" :is-loading="isLoading">
         <tr v-for="investor in investors" :key="investor.id">
+
           <td>
-            <strong>{{ investor.name }}</strong>
-          </td>
-          <td>
-            <span class="badge" v-if="investor.alias">{{ investor.alias }}</span>
-            <span v-else class="text-muted">—</span>
+            <div class="user-info">
+              <strong>{{ investor.name }}</strong>
+              <small class="text-muted" v-if="investor.alias">({{ investor.alias }})</small>
+            </div>
           </td>
 
-          <td style="font-weight: bold; color: #27ae60;">
-            {{ formatCurrency(investor.current_balance) }}
+          <td>
+            <div class="balance-cell">
+
+              <div class="capital-row">
+                <span class="label">Capital Base:</span>
+                <span class="value-base">{{ formatCurrency(investor.capital_historico) }}</span>
+              </div>
+
+              <div class="balance-row">
+                <span class="label">Disp. Mover:</span>
+                <span class="value-liquid">{{ formatCurrency(investor.available_balance || investor.current_balance)
+                  }}</span>
+              </div>
+            </div>
           </td>
 
-          <td>{{ investor.email || '—' }}</td>
-          <td>{{ investor.phone || '—' }}</td>
+          <td>
+            <div style="display:flex; flex-direction:column; font-size:0.85rem;">
+              <span>{{ investor.email }}</span>
+              <span class="text-muted">{{ investor.phone }}</span>
+            </div>
+          </td>
+
           <td>
             <span class="badge" :class="investor.is_active ? 'badge-success' : 'badge-danger'">
               {{ investor.is_active ? 'Activo' : 'Inactivo' }}
             </span>
           </td>
-          <td>{{ new Date(investor.created_at).toLocaleDateString() }}</td>
+
           <td class="action-buttons">
 
-            <button @click="openBalanceModal(investor)" class="btn-icon add-funds" title="Agregar Capital">
-              <FontAwesomeIcon icon="fa-solid fa-wallet" />
+            <button @click="openBalanceModal(investor)" class="btn-icon add-funds"
+              title="Ingresar Capital (Aumenta Base)">
+              <FontAwesomeIcon icon="fa-solid fa-circle-dollar-to-slot" />
+            </button>
+
+            <button @click="openTransferModal(investor)" class="btn-icon transfer"
+              title="Mover a Mis Cuentas (Solo Liquidez)">
+              <FontAwesomeIcon icon="fa-solid fa-money-bill-transfer" />
             </button>
 
             <template v-if="authStore.can(permissionKey)">
@@ -153,7 +175,6 @@ onMounted(() => fetchInvestors())
                 <FontAwesomeIcon icon="fa-solid fa-trash" />
               </button>
             </template>
-            <span v-else class="no-actions">Sin permiso</span>
           </td>
         </tr>
       </BaseTable>
@@ -169,6 +190,10 @@ onMounted(() => fetchInvestors())
     <BalanceFormModal :show="showBalanceModal" resource="investors" :entity-id="selectedInvestor?.id"
       :entity-name="selectedInvestor?.name" @close="showBalanceModal = false"
       @saved="fetchInvestors(pagination.current_page || 1)" />
+
+    <InvestorTransferModal :show="showTransferModal" :investor="selectedInvestor" @close="showTransferModal = false"
+      @saved="fetchInvestors(pagination.current_page || 1)" />
+
   </div>
 </template>
 

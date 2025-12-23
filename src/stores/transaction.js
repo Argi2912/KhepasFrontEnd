@@ -27,8 +27,8 @@ export const useTransactionStore = defineStore('transaction', () => {
   const brokers = ref([])
   const accounts = ref([])
   const currencies = ref([])
-  const platforms = ref([]) 
-  const investors = ref([]) 
+  const platforms = ref([]) // 🚨 NUEVO: Estado para Plataformas
+  const investors = ref([]) // 🚨 NUEVO: Estado para Inversionistas
   const isLoadingData = ref(false)
 
   // --- GETTERS ---
@@ -55,6 +55,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     })),
   )
 
+  // 🚨 NUEVO: Getter para Plataformas
   const getPlatforms = computed(() =>
     platforms.value.map((p) => ({
       id: p.id,
@@ -72,13 +73,10 @@ export const useTransactionStore = defineStore('transaction', () => {
   )
 
   const getInvestors = computed(() =>
+    // 🚨 NUEVO: Getter para Inversionistas
     investors.value.map((i) => ({
       id: i.id,
-      name: i.alias ? `${i.name} (${i.alias})` : i.name,
-      // ✅ CORRECCIÓN FINAL: Pasamos el saldo al componente
-      current_balance: i.current_balance, 
-      available_balance: i.available_balance,
-      balance: i.available_balance // Fallback
+      name: i.alias ? `${i.name} (${i.alias})` : i.name, // Usar alias si existe
     })),
   )
 
@@ -87,6 +85,7 @@ export const useTransactionStore = defineStore('transaction', () => {
   async function fetchAllSupportData() {
     isLoadingData.value = true
     try {
+      // 🚨 Agregamos la petición de '/platforms'
       const [
         clientsRes,
         providersRes,
@@ -101,7 +100,7 @@ export const useTransactionStore = defineStore('transaction', () => {
         api.get('/brokers?per_page=999'),
         api.get('/accounts?per_page=999'),
         api.get('/currencies?per_page=999'),
-        api.get('/platforms?per_page=999'),
+        api.get('/platforms?per_page=999'), // Endpoint de plataformas
         api.get('/investors?per_page=999'),
       ])
 
@@ -110,10 +109,8 @@ export const useTransactionStore = defineStore('transaction', () => {
       brokers.value = brokersRes.data.data || brokersRes.data
       accounts.value = accountsRes.data.data || accountsRes.data
       currencies.value = currenciesRes.data.data || currenciesRes.data
-      platforms.value = platformsRes.data.data || platformsRes.data
-      // Asegurar lectura correcta de la paginación de Laravel
-      investors.value = investorsRes.data.data || investorsRes.data 
-      
+      platforms.value = platformsRes.data.data || platformsRes.data // Asignar plataformas
+      investors.value = investorsRes.data.data || investorsRes.data // 🚨 Asignar Inversionistas
     } catch (error) {
       console.error('Error cargando datos:', error)
       notify.error('Error de conexión al cargar datos necesarios')
@@ -124,6 +121,7 @@ export const useTransactionStore = defineStore('transaction', () => {
 
   async function fetchProfitMatrixReport(filters = {}) {
     try {
+      // Asumiendo que creaste la ruta en el backend como /reports/profit-matrix
       const response = await api.get('/reports/profit-matrix', { params: filters })
       return response.data
     } catch (error) {
@@ -165,7 +163,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     getClients,
     getProviders,
     getBrokers,
-    getPlatforms,
+    getPlatforms, // Exportar getter
     getInvestors,
     getAccounts,
     currencies,
@@ -173,6 +171,5 @@ export const useTransactionStore = defineStore('transaction', () => {
     createCurrencyExchange,
     createInternalTransaction,
     markAsDelivered,
-    fetchProfitMatrixReport,
   }
 })
