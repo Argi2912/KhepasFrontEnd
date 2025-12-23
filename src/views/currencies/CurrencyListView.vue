@@ -114,20 +114,12 @@ onMounted(() => {
             <td>{{ new Date(currency.created_at).toLocaleDateString() }}</td>
             <td class="action-buttons">
               <template v-if="authStore.can(permissionKey)">
-                <button
-                  @click="openEditModal(currency.code)"
-                  class="btn-icon edit"
-                  title="Editar Nombre"
-                >
-                  <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
-                </button>
-                <button
-                  @click="deleteCurrency(currency.code, currency.name)"
-                  class="btn-icon delete"
-                  title="Eliminar divisa"
-                >
-                  <FontAwesomeIcon icon="fa-solid fa-trash" />
-                </button>
+                <BaseButton @click="openModal(currency)" icon="fa-pen" class="btn-sm btn-primary" />
+                <BaseButton
+                  @click="deleteCurrency(currency.id)"
+                  icon="fa-trash"
+                  class="btn-sm btn-danger"
+                />
               </template>
               <span v-else class="no-actions">No autorizado</span>
             </td>
