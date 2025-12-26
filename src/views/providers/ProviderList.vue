@@ -1,47 +1,43 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-
 import api from '@/services/api'
 import alert from '@/services/alert'
 import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
+// Componentes
 import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import ProviderFormModal from '@/components/shared/ProviderFormModal.vue'
-import BalanceFormModal from '@/components/shared/BalanceFormModal.vue' // <--- 1. NUEVO IMPORT
+import BalanceFormModal from '@/components/shared/BalanceFormModal.vue'
 
 const authStore = useAuthStore()
-const permissionKey = 'manage_exchanges' // Usamos el permiso de transacciones
+const permissionKey = 'manage_exchanges'
 
-// Estado del Modal
+// Estados Modales
 const showProviderModal = ref(false)
 const providerIdToEdit = ref(null)
-
-// Estado del Modal de Saldo (NUEVO)
 const showBalanceModal = ref(false)
 const selectedProvider = ref(null)
 
-// Estado de la Lista
+// Datos Tabla
 const providers = ref([])
 const pagination = ref({})
 const filters = ref({})
 const isLoading = ref(false)
 
+// Definición de Columnas
 const tableHeaders = [
-  { key: 'name', label: 'Nombre' },
-  { key: 'email', label: 'Email' },
-  { key: 'current_balance', label: 'Saldo Disponible' }, // <--- 2. NUEVA COLUMNA
-  { key: 'phone', label: 'Teléfono' },
-  { key: 'created_at', label: 'Registro' },
+  { key: 'name', label: 'Proveedor / Contacto' },
+  { key: 'financials', label: 'Capital vs Disponible' }, // <--- COLUMNA COMBINADA
+  { key: 'contact', label: 'Contacto' },
+  { key: 'status', label: 'Estado' },
+  { key: 'actions', label: 'Acciones' }
 ]
 
-/**
- * Carga la lista de proveedores desde la API.
- */
 const fetchProviders = async (page = 1) => {
   isLoading.value = true
   const params = { page: page, ...filters.value }
@@ -52,12 +48,13 @@ const fetchProviders = async (page = 1) => {
     const { data, ...pagData } = response.data
     pagination.value = pagData
   } catch (error) {
-    notify.error('Error al cargar la lista de proveedores.')
+    notify.error('Error al cargar proveedores.')
   } finally {
     isLoading.value = false
   }
 }
 
+// Modales
 const openCreateModal = () => {
   providerIdToEdit.value = null
   showProviderModal.value = true
@@ -68,87 +65,102 @@ const openEditModal = (providerId) => {
   showProviderModal.value = true
 }
 
-// 3. NUEVA FUNCION: Abrir modal de saldo
 const openBalanceModal = (provider) => {
   selectedProvider.value = provider
   showBalanceModal.value = true
 }
 
-// 4. NUEVA FUNCION: Formatear moneda
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
-}
-
-/**
- * Confirma y elimina un proveedor.
- */
 const deleteProvider = async (providerId, providerName) => {
-  if (!authStore.can(permissionKey)) {
-    notify.error('No tienes permiso para eliminar proveedores.')
-    return
-  }
+  if (!authStore.can(permissionKey)) return notify.error('No autorizado.')
 
-  const confirmed = await alert.confirm(
-    `¿Eliminar a ${providerName}?`,
-    'Esta acción es irreversible y afectará transacciones históricas.',
-  )
-
-  if (confirmed) {
+  if (await alert.confirm(`¿Eliminar a ${providerName}?`, 'Esto afectará el historial contable.')) {
     try {
       await api.delete(`/providers/${providerId}`)
-      notify.success('Proveedor eliminado correctamente.')
+      notify.success('Eliminado correctamente.')
       fetchProviders(pagination.value.current_page)
     } catch (error) {
-      console.error('Error deleting provider:', error)
+      console.error(error)
+      notify.error('No se pudo eliminar.')
     }
   }
 }
 
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
+}
+
 watch(filters, () => fetchProviders(1), { deep: true })
-onMounted(() => {
-  fetchProviders()
-})
+onMounted(() => fetchProviders())
 </script>
 
 <template>
   <div class="provider-list">
     <div class="header-actions">
-      <h1>Proveedores Registrados</h1>
+      <h1>Proveedores</h1>
       <button v-if="authStore.can(permissionKey)" @click="openCreateModal" class="btn-primary">
-        <FontAwesomeIcon icon="fa-solid fa-circle-user" /> Agregar Proveedor
+        <FontAwesomeIcon icon="fa-solid fa-circle-plus" /> Nuevo Proveedor
       </button>
     </div>
 
     <FilterBar @update:filters="filters = $event" />
 
-    <BaseCard title="Listado y Filtros">
+    <BaseCard>
       <BaseTable :headers="tableHeaders" :data="providers" :is-loading="isLoading">
         <tr v-for="provider in providers" :key="provider.id">
-          <td>{{ provider.name }}</td>
-          <td>{{ provider.email }}</td>
 
-          <td style="font-weight: bold; color: #27ae60;">
-            {{ formatCurrency(provider.current_balance) }}
+          <td>
+            <div class="provider-info">
+              <span class="name">{{ provider.name }}</span>
+              <span class="email">{{ provider.email }}</span>
+            </div>
           </td>
 
-          <td>{{ provider.phone }}</td>
-          <td>{{ new Date(provider.created_at).toLocaleDateString() }}</td>
-          <td class="action-buttons">
-            <template v-if="authStore.can(permissionKey)">
+          <td>
+            <div class="financial-cell">
+              <div class="row">
+                <span class="label">Deuda Total:</span>
+                <span class="amount debt">{{ formatCurrency(provider.current_balance) }}</span>
+              </div>
+              <div class="row">
+                <span class="label">Disponible:</span>
+                <span :class="['amount', provider.available_balance < 0 ? 'negative' : 'positive']">
+                  {{ formatCurrency(provider.available_balance) }}
+                </span>
+              </div>
+            </div>
+          </td>
 
-              <button @click="openBalanceModal(provider)" class="btn-icon add-funds" title="Agregar Saldo">
+          <td>
+            <div class="contact-info">
+              <span v-if="provider.phone">{{ provider.phone }}</span>
+              <span v-if="provider.contact_person" class="contact-person">
+                <FontAwesomeIcon icon="fa-solid fa-user-tag" /> {{ provider.contact_person }}
+              </span>
+            </div>
+          </td>
+
+          <td>
+            <span :class="['status-badge', provider.is_active ? 'active' : 'inactive']">
+              {{ provider.is_active ? 'Activo' : 'Inactivo' }}
+            </span>
+          </td>
+
+          <td class="actions-cell">
+            <template v-if="authStore.can(permissionKey)">
+              <button @click="openBalanceModal(provider)" class="btn-icon money" title="Gestionar Saldo">
                 <FontAwesomeIcon icon="fa-solid fa-wallet" />
               </button>
 
-              <button @click="openEditModal(provider.id)" class="btn-icon edit">
-                <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
+              <button @click="openEditModal(provider.id)" class="btn-icon edit" title="Editar">
+                <FontAwesomeIcon icon="fa-solid fa-pen" />
               </button>
-              <button @click="deleteProvider(provider.id, provider.name)" class="btn-icon delete">
+
+              <button @click="deleteProvider(provider.id, provider.name)" class="btn-icon delete" title="Eliminar">
                 <FontAwesomeIcon icon="fa-solid fa-trash" />
               </button>
             </template>
-            <span v-else class="no-actions">No autorizado</span>
           </td>
+
         </tr>
       </BaseTable>
 
@@ -158,42 +170,118 @@ onMounted(() => {
     </BaseCard>
 
     <ProviderFormModal :show="showProviderModal" :provider-id="providerIdToEdit" @close="showProviderModal = false"
-      @saved="fetchProviders(pagination.current_page || 1)" />
+      @saved="fetchProviders(pagination.current_page)" />
 
     <BalanceFormModal :show="showBalanceModal" resource="providers" :entity-id="selectedProvider?.id"
-      :entity-name="selectedProvider?.name" @close="showBalanceModal = false"
-      @saved="fetchProviders(pagination.current_page || 1)" />
+      :entity-name="selectedProvider?.name" :available-balance="selectedProvider?.available_balance"
+      @close="showBalanceModal = false" @saved="fetchProviders(pagination.current_page)" />
   </div>
 </template>
 
 <style scoped>
-/* Estilos reutilizados de ClientList.vue */
 .header-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
-}
-
-.header-actions h1 {
-  font-size: 1.6rem;
+  margin-bottom: 20px;
 }
 
 .btn-primary {
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
+  background: var(--color-primary);
+  color: #000;
   padding: 10px 15px;
   border-radius: 6px;
-  text-decoration: none;
   font-weight: bold;
-  transition: background-color 0.2s;
+  border: none;
+  cursor: pointer;
 }
 
-.btn-primary:hover {
-  background-color: #ffc424;
+/* Estilos de Celdas */
+.provider-info {
+  display: flex;
+  flex-direction: column;
 }
 
-.action-buttons {
+.provider-info .name {
+  font-weight: bold;
+  color: #fff;
+}
+
+.provider-info .email {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+}
+
+.contact-person {
+  color: #888;
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+
+/* 🔥 ESTILOS FINANCIEROS 🔥 */
+.financial-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.financial-cell .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.financial-cell .label {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.financial-cell .debt {
+  color: #ccc;
+  font-weight: bold;
+}
+
+/* Deuda en Gris/Blanco */
+.financial-cell .positive {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+/* Disponible Verde */
+.financial-cell .negative {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+/* Disponible Rojo */
+
+/* Badges */
+.status-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.status-badge.active {
+  background: rgba(39, 174, 96, 0.2);
+  color: #27ae60;
+}
+
+.status-badge.inactive {
+  background: rgba(192, 57, 43, 0.2);
+  color: #c0392b;
+}
+
+/* Botones */
+.actions-cell {
   display: flex;
   gap: 8px;
 }
@@ -204,37 +292,25 @@ onMounted(() => {
   cursor: pointer;
   font-size: 1rem;
   padding: 5px;
-  transition: color 0.2s;
+  transition: 0.2s;
+}
+
+.btn-icon.money {
+  color: #f1c40f;
+}
+
+/* Amarillo dinero */
+.btn-icon.money:hover {
+  color: #f39c12;
+  background: rgba(241, 196, 15, 0.1);
+  border-radius: 4px;
 }
 
 .btn-icon.edit {
   color: #3498db;
 }
 
-.btn-icon.edit:hover {
-  color: #2980b9;
-}
-
 .btn-icon.delete {
-  color: var(--color-danger);
-}
-
-.btn-icon.delete:hover {
-  color: #c0392b;
-}
-
-.btn-icon.add-funds {
-  color: #27ae60;
-}
-
-.btn-icon.add-funds:hover {
-  color: #219150;
-  background-color: #e8f8f5;
-  border-radius: 4px;
-}
-
-.no-actions {
-  font-size: 0.85rem;
-  opacity: 0.5;
+  color: #e74c3c;
 }
 </style>

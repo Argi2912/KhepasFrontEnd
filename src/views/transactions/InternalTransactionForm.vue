@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import api from '@/services/api'
+import notify from '@/services/notify'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -15,7 +16,7 @@ const { errors, handleAxiosError } = useFormValidation()
 
 const isSubmitting = ref(false)
 
-// Listas de datos (Se llenarán individualmente)
+// Listas de datos
 const lists = reactive({
   employees: [],
   clients: [],
@@ -24,7 +25,7 @@ const lists = reactive({
   platforms: []
 })
 
-// Opciones para el primer selector (Mapeo al Backend)
+// Opciones para el primer selector
 const entityTypes = [
   { id: 'App\\Models\\Employee', name: 'Gestión de Nóminas (Empleados)' },
   { id: 'App\\Models\\Client', name: 'Clientes' },
@@ -44,7 +45,7 @@ const form = reactive({
   entity_type: '',
   entity_id: '',
 
-  // Campos de texto (se llenan auto o manual)
+  // Campos de texto
   dueño: '',
   person_name: '',
 
@@ -54,7 +55,7 @@ const form = reactive({
 })
 
 // =========================================================================
-// CARGA DE DATOS ROBUSTA (Si uno falla, los demás cargan igual)
+// CARGA DE DATOS
 // =========================================================================
 onMounted(async () => {
   await transactionStore.fetchAllSupportData()
@@ -63,60 +64,37 @@ onMounted(async () => {
   try {
     const { data } = await api.get('/clients?per_page=100')
     lists.clients = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
-  } catch (e) {
-    console.error("⚠️ Error cargando Clientes:", e.message)
-  }
+  } catch (e) { console.error(e) }
 
   // 2. Proveedores
   try {
     const { data } = await api.get('/providers?per_page=100')
     lists.providers = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
-  } catch (e) {
-    console.error("⚠️ Error cargando Proveedores:", e.message)
-  }
+  } catch (e) { console.error(e) }
 
-  // 3. Corredores (Brokers)
+  // 3. Corredores
   try {
     const { data } = await api.get('/brokers?per_page=100')
     lists.brokers = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
-  } catch (e) {
-    // Si da error 403 es permiso, si da 404 es ruta mal escrita
-    console.error("⚠️ Error cargando Corredores:", e.message)
-  }
-
+  } catch (e) { console.error(e) }
 
   // 4. Plataformas
   try {
     const response = await api.get('/platforms?per_page=100')
-
-    // CORRECCIÓN: Detectamos si la respuesta es un Array directo o viene paginada
     const records = Array.isArray(response.data) ? response.data : (response.data.data || [])
+    lists.platforms = records.map(x => ({ id: x.id, name: x.name }))
+  } catch (e) { console.error(e) }
 
-    lists.platforms = records.map(x => ({
-      id: x.id,
-      name: x.name // "Zelle", "Binance Pay", etc.
-    }))
-
-    console.log("Plataformas cargadas:", lists.platforms) // Para verificar en consola
-  } catch (e) {
-    console.error("⚠️ Error cargando Plataformas:", e.message)
-  }
-
-  // 5. Empleados (Nómina)
+  // 5. Empleados
   try {
-    // Si aún no tienes la ruta en el backend, esto fallará pero NO romperá el resto
     const { data } = await api.get('/employees?per_page=100')
     lists.employees = data.data.map(x => ({ id: x.id, name: x.name }))
-  } catch (e) {
-    console.warn("⚠️ No se pudo cargar Empleados (Verificar ruta /employees en api.php)")
-  }
+  } catch (e) { console.warn("No se pudo cargar Empleados") }
 })
 
 // =========================================================================
 // LÓGICA REACTIVA
 // =========================================================================
-
-// Determina qué lista mostrar en el segundo selector
 const entityOptions = computed(() => {
   switch (form.entity_type) {
     case 'App\\Models\\Employee': return lists.employees
@@ -128,38 +106,67 @@ const entityOptions = computed(() => {
   }
 })
 
-// Resetear ID si cambia el Tipo
 watch(() => form.entity_type, () => {
   form.entity_id = ''
   form.person_name = ''
 })
 
-// Auto-rellenar nombres cuando se elige una persona de la lista
 watch(() => form.entity_id, (newId) => {
   if (!newId || form.entity_type === 'manual') return
-
   const selected = entityOptions.value.find(item => item.id === newId)
   if (selected) {
     form.person_name = selected.name
-    // Asignamos el nombre del grupo como "Dueño" referencial
     const typeName = entityTypes.find(t => t.id === form.entity_type)?.name
     form.dueño = typeName || 'Registrado'
   }
 })
 
+// =========================================================================
+// 🔥 FUNCIÓN DE ENVÍO SIN ALERTA AMARILLA 🔥
+// =========================================================================
 const handleSubmit = async () => {
   isSubmitting.value = true
+
+  // Limpiamos errores previos en la UI (el texto rojo antiguo)
+  Object.keys(errors).forEach(key => errors[key] = '')
+
   try {
-    // Limpieza para modo manual
-    if (form.entity_type === 'manual') {
-      form.entity_type = null
-      form.entity_id = null
+    // 1. Preparar Payload
+    const payload = {
+      ...form,
+      source_type: 'account'
     }
 
-    await transactionStore.createInternalTransaction(form)
+    if (payload.entity_type === 'manual') {
+      payload.entity_type = null
+      payload.entity_id = null
+    }
+
+    // 2. Enviar Petición
+    await api.post('/transactions/internal', payload)
+
+    // 3. Éxito
+    notify.success('Transacción registrada exitosamente')
     router.back()
+
   } catch (error) {
+    console.error("Error al guardar:", error)
+
+    // 🔥 AQUÍ ESTÁ EL CAMBIO PARA BORRAR LA ALERTA AMARILLA 🔥
+    // Verificamos si es el error de saldo o cualquier error que venga con "message" desde el backend
+    if (error.response && error.response.data && error.response.data.message) {
+
+      // Asignamos el mensaje directamente al campo amount para que salga rojo
+      errors.amount = error.response.data.message
+
+      // ¡IMPORTANTE! Aquí hacemos return. NO llamamos a handleAxiosError.
+      // Al no llamarlo, la alerta amarilla nunca se genera.
+      return
+    }
+
+    // Solo si NO es un error de saldo (ej. error 500, o de red), llamamos al genérico
     handleAxiosError(error)
+
   } finally {
     isSubmitting.value = false
   }
