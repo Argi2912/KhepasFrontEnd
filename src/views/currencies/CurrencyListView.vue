@@ -5,20 +5,22 @@ import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import alert from '@/services/alert'
 import notify from '@/services/notify'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
+// Componentes
 import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
+import BaseButton from '@/components/shared/BaseButton.vue'
 import CurrencyFormModal from '@/views/currencies/CurrencyFormModal.vue'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const authStore = useAuthStore()
-const permissionKey = 'manage_exchanges' // Permiso para manejar divisas y tasas
+const permissionKey = 'manage_exchanges'
 
 // Estado del Modal
 const showCurrencyModal = ref(false)
-const currencyCodeToEdit = ref(null)
+const currencyIdToEdit = ref(null)
 
 // Estado de la Lista
 const currencies = ref([])
@@ -52,38 +54,34 @@ const fetchCurrencies = async (page = 1) => {
 }
 
 const openCreateModal = () => {
-  currencyCodeToEdit.value = null
+  currencyIdToEdit.value = null
   showCurrencyModal.value = true
 }
 
-const openEditModal = (code) => {
-  currencyCodeToEdit.value = code
+const openEditModal = (id) => {
+  currencyIdToEdit.value = id
   showCurrencyModal.value = true
 }
 
 /**
  * Confirma y elimina una divisa.
  */
-const deleteCurrency = async (code, name) => {
+const deleteCurrency = async (id, name) => {
   if (!authStore.can(permissionKey)) {
     notify.error('No tienes permiso para eliminar divisas.')
     return
   }
 
-  const confirmed = await alert.confirm(
-    `¿Eliminar divisa ${code} - ${name}?`,
-    'Confirmar Eliminación',
-  )
+  const confirmed = await alert.confirm(`¿Eliminar divisa ${name}?`, 'Confirmar Eliminación')
 
   if (confirmed) {
     try {
-      // Usamos el código de divisa como identificador para la API
-      await api.delete(`/currencies/${code}`)
+      await api.delete(`/currencies/${id}`)
       notify.success('Divisa eliminada correctamente.')
       fetchCurrencies(pagination.value.current_page)
     } catch (error) {
       console.error('Error deleting currency:', error)
-      notify.error('No se pudo eliminar: Asegúrese de que no esté en uso por cuentas o tasas.')
+      notify.error('No se pudo eliminar: Asegúrese de que no esté en uso.')
     }
   }
 }
@@ -98,9 +96,9 @@ onMounted(() => {
   <div class="currency-list">
     <div class="header-actions">
       <h1>Gestión de Divisas</h1>
-      <button v-if="authStore.can(permissionKey)" @click="openCreateModal" class="btn-primary">
+      <BaseButton v-if="authStore.can(permissionKey)" @click="openCreateModal" variant="primary">
         <FontAwesomeIcon icon="fa-solid fa-plus-circle" /> Crear Divisa
-      </button>
+      </BaseButton>
     </div>
 
     <FilterBar @update:filters="filters = $event" placeholder="Buscar por código o nombre..." />
@@ -108,18 +106,29 @@ onMounted(() => {
     <BaseCard title="Divisas Registradas">
       <template v-if="currencies && currencies.length > 0">
         <BaseTable :headers="tableHeaders" :data="currencies" :is-loading="isLoading">
-          <tr v-for="currency in currencies" :key="currency.code">
+          <tr v-for="currency in currencies" :key="currency.id">
             <td>{{ currency.code }}</td>
             <td>{{ currency.name }}</td>
             <td>{{ new Date(currency.created_at).toLocaleDateString() }}</td>
             <td class="action-buttons">
               <template v-if="authStore.can(permissionKey)">
-                <BaseButton @click="openModal(currency)" icon="fa-pen" class="btn-sm btn-primary" />
                 <BaseButton
-                  @click="deleteCurrency(currency.id)"
-                  icon="fa-trash"
-                  class="btn-sm btn-danger"
-                />
+                  @click="openEditModal(currency.id)"
+                  variant="primary"
+                  class="btn-sm"
+                  title="Editar"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
+                </BaseButton>
+
+                <BaseButton
+                  @click="deleteCurrency(currency.id, currency.name)"
+                  variant="danger"
+                  class="btn-sm"
+                  title="Eliminar"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-trash" />
+                </BaseButton>
               </template>
               <span v-else class="no-actions">No autorizado</span>
             </td>
@@ -142,7 +151,7 @@ onMounted(() => {
 
     <CurrencyFormModal
       :show="showCurrencyModal"
-      :currency-code="currencyCodeToEdit"
+      :currency-id="currencyIdToEdit"
       @close="showCurrencyModal = false"
       @saved="fetchCurrencies(pagination.current_page || 1)"
     />
@@ -150,7 +159,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Estilos necesarios para la vista */
 .header-actions {
   display: flex;
   justify-content: space-between;
@@ -160,33 +168,18 @@ onMounted(() => {
 .header-actions h1 {
   font-size: 1.6rem;
 }
-.btn-primary {
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
-  padding: 10px 15px;
-  border-radius: 6px;
-  text-decoration: none;
-  font-weight: bold;
-  transition: background-color 0.2s;
-}
+
 .action-buttons {
   display: flex;
   gap: 8px;
 }
-.btn-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 5px;
-  transition: color 0.2s;
+
+/* Reducir el tamaño de los botones dentro de la tabla */
+:deep(.btn-sm) {
+  padding: 6px 10px !important;
+  font-size: 0.9rem !important;
 }
-.btn-icon.edit {
-  color: #3498db;
-}
-.btn-icon.delete {
-  color: var(--color-danger);
-}
+
 .no-actions {
   font-size: 0.85rem;
   opacity: 0.5;

@@ -1,50 +1,39 @@
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
-
+import { ref, reactive, computed, watch } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 import { useFormValidation } from '@/utils/useFormValidation'
-
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 
 const props = defineProps({
   show: Boolean,
-  currencyCode: [String, null], // Código de la divisa a editar (es la PK)
+  currencyId: [Number, String, null], // CAMBIO: Recibe ID numérico
 })
 
 const emit = defineEmits(['close', 'saved'])
-
 const { errors, handleAxiosError, getError, clearError } = useFormValidation()
 
-const initialForm = {
-  code: '',
-  name: '',
-}
+const initialForm = { code: '', name: '' }
 const form = reactive({ ...initialForm })
-
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 
-const isEditing = computed(() => !!props.currencyCode)
-const modalTitle = computed(() =>
-  isEditing.value ? `Editar Divisa: ${props.currencyCode}` : 'Crear Nueva Divisa',
-)
+const isEditing = computed(() => !!props.currencyId)
+const modalTitle = computed(() => (isEditing.value ? 'Editar Divisa' : 'Crear Nueva Divisa'))
 
 const resetForm = () => {
   Object.assign(form, initialForm)
   clearError()
 }
 
-/**
- * Carga los datos de la divisa a editar.
- */
-const fetchCurrency = async (code) => {
-  if (!code) return
-
+// Carga datos por ID
+const fetchCurrency = async (id) => {
+  if (!id) return
   isLoading.value = true
   try {
-    const response = await api.get(`/currencies/${code}`)
+    // CAMBIO: GET por ID
+    const response = await api.get(`/currencies/${id}`)
     Object.assign(form, response.data)
   } catch (error) {
     notify.error('No se pudo cargar la divisa para edición.')
@@ -54,23 +43,17 @@ const fetchCurrency = async (code) => {
   }
 }
 
-/**
- * Envía el formulario (Crear o Actualizar).
- */
 const handleSubmit = async () => {
   isSubmitting.value = true
-
   try {
     if (isEditing.value) {
-      // Solo se permite actualizar el nombre
-      await api.put(`/currencies/${props.currencyCode}`, { name: form.name })
+      // CAMBIO: PUT por ID
+      await api.put(`/currencies/${props.currencyId}`, { name: form.name })
       notify.success(`Divisa "${form.name}" actualizada.`)
     } else {
-      // Creación: se envían ambos campos
       await api.post('/currencies', form)
-      notify.success(`Divisa "${form.name}" (${form.code}) creada exitosamente.`)
+      notify.success(`Divisa "${form.name}" creada exitosamente.`)
     }
-
     emit('saved')
     emit('close')
   } catch (error) {
@@ -81,12 +64,10 @@ const handleSubmit = async () => {
 }
 
 watch(
-  () => props.currencyCode,
-  (newCode) => {
+  () => props.currencyId,
+  (newId) => {
     resetForm()
-    if (newCode) {
-      fetchCurrency(newCode)
-    }
+    if (newId) fetchCurrency(newId)
   },
   { immediate: true },
 )
@@ -94,9 +75,7 @@ watch(
 watch(
   () => props.show,
   (newVal) => {
-    if (!newVal) {
-      resetForm()
-    }
+    if (!newVal) resetForm()
   },
 )
 </script>
@@ -106,7 +85,7 @@ watch(
     <form class="modal-form" @submit.prevent="handleSubmit">
       <BaseInput
         v-model="form.code"
-        label="Código ISO (3 letras: USD, VES, EUR)"
+        label="Código ISO"
         name="code"
         :error="getError('code')"
         placeholder="Ej: USD"
@@ -143,7 +122,7 @@ watch(
 </template>
 
 <style scoped>
-/* Estilos reutilizados */
+/* (Mismos estilos que tenías) */
 .btn-cancel-modal {
   background: none;
   border: none;
