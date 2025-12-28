@@ -58,10 +58,23 @@ const headers = [
 
 // --- HELPERS VISUALES ---
 const formatMoney = (amount, currency = 'USD') => {
-  return Number(amount).toLocaleString('en-US', {
-    style: 'currency',
-    currency: currency,
-  })
+  // Intentamos formatear con el estándar. Si falla (como con USDT), lo hacemos manual.
+  try {
+    return Number(amount).toLocaleString('en-US', {
+      style: 'currency',
+      currency: currency,
+    })
+  } catch (error) {
+    // Fallback para monedas no estándar (USDT, BTC, etc.)
+    return (
+      Number(amount).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) +
+      ' ' +
+      currency
+    )
+  }
 }
 
 // --- CARGA DE DATOS ---
