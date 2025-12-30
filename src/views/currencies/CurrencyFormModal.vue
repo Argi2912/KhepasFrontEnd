@@ -48,7 +48,7 @@ const handleSubmit = async () => {
   try {
     if (isEditing.value) {
       // CAMBIO: PUT por ID
-      await api.put(`/currencies/${props.currencyId}`, { name: form.name })
+      await api.put(`/currencies/${props.currencyId}`, { name: form.name, code: form.code })
       notify.success(`Divisa "${form.name}" actualizada.`)
     } else {
       await api.post('/currencies', form)
