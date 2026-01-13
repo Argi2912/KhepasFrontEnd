@@ -35,9 +35,10 @@ const form = reactive({
 const headers = [
   { key: 'status', label: 'Estado' },
   { key: 'name', label: 'Negocio / Tenant' },
-  { key: 'users', label: 'Usuarios' }, // Nueva columna
+  { key: 'users', label: 'Usuarios' },
   { key: 'admin', label: 'Admin Responsable' },
   { key: 'created_at', label: 'Registro' },
+  { key: 'actions', label: 'Acciones' }, // Etiqueta explícita para la columna final
 ]
 
 // --- API ---
@@ -122,9 +123,44 @@ const toggleTenant = async (tenant) => {
       await api.patch(`/superadmin/tenants/${tenant.id}/toggle`)
       notify.success(`Tenant ${action.toLowerCase()}do correctamente`)
       fetchTenants(pagination.value.current_page)
-      fetchStats() // Actualizar contadores
+      fetchStats()
     } catch (e) {
       notify.error('Error al cambiar estado')
+    }
+  }
+}
+
+// 5. NUEVA FUNCIÓN: Eliminar Tenant
+const deleteTenant = async (tenant) => {
+  const result = await Swal.fire({
+    title: `¿Eliminar "${tenant.name}"?`,
+    text: "¡Cuidado! Esta acción borrará la empresa, todos sus usuarios y sus datos financieros. NO se puede deshacer.",
+    icon: 'error', // Icono rojo de error/peligro
+    showCancelButton: true,
+    confirmButtonText: 'Sí, Eliminar Definitivamente',
+    confirmButtonColor: '#d33',
+    cancelButtonText: 'Cancelar',
+    focusCancel: true
+  })
+
+  if (result.isConfirmed) {
+    try {
+      await api.delete(`/superadmin/tenants/${tenant.id}`)
+
+      notify.success('Tenant eliminado correctamente')
+
+      // Lógica para recargar página correcta si borramos el último item
+      if (tenants.value.length === 1 && pagination.value.current_page > 1) {
+        fetchTenants(pagination.value.current_page - 1)
+      } else {
+        fetchTenants(pagination.value.current_page)
+      }
+      fetchStats()
+    } catch (e) {
+      console.error(e)
+      // Mensaje específico si el backend lo envía (ej: "No puedes borrar el demo")
+      const msg = e.response?.data?.message || 'Error al eliminar. Puede tener datos protegidos.'
+      notify.error(msg)
     }
   }
 }
@@ -148,7 +184,9 @@ onMounted(() => refreshAll())
 
     <div class="kpi-grid">
       <div class="kpi-card total">
-        <div class="icon"><FontAwesomeIcon icon="fa-solid fa-building" /></div>
+        <div class="icon">
+          <FontAwesomeIcon icon="fa-solid fa-building" />
+        </div>
         <div class="data">
           <h3>{{ stats.total_tenants }}</h3>
           <p>Tenants Registrados</p>
@@ -156,7 +194,9 @@ onMounted(() => refreshAll())
       </div>
 
       <div class="kpi-card active">
-        <div class="icon"><FontAwesomeIcon icon="fa-solid fa-check-circle" /></div>
+        <div class="icon">
+          <FontAwesomeIcon icon="fa-solid fa-check-circle" />
+        </div>
         <div class="data">
           <h3>{{ stats.active_tenants }}</h3>
           <p>Negocios Activos</p>
@@ -164,7 +204,9 @@ onMounted(() => refreshAll())
       </div>
 
       <div class="kpi-card inactive">
-        <div class="icon"><FontAwesomeIcon icon="fa-solid fa-ban" /></div>
+        <div class="icon">
+          <FontAwesomeIcon icon="fa-solid fa-ban" />
+        </div>
         <div class="data">
           <h3>{{ stats.inactive_tenants }}</h3>
           <p>Suspendidos</p>
@@ -172,7 +214,9 @@ onMounted(() => refreshAll())
       </div>
 
       <div class="kpi-card users">
-        <div class="icon"><FontAwesomeIcon icon="fa-solid fa-users" /></div>
+        <div class="icon">
+          <FontAwesomeIcon icon="fa-solid fa-users" />
+        </div>
         <div class="data">
           <h3>{{ stats.total_users }}</h3>
           <p>Usuarios Totales</p>
@@ -209,16 +253,18 @@ onMounted(() => refreshAll())
           <td>{{ row.created_fmt }}</td>
 
           <td class="actions-cell">
-            <button
-              @click="toggleTenant(row)"
-              class="btn-icon"
-              :class="row.is_active ? 'btn-disable' : 'btn-enable'"
-              :title="row.is_active ? 'Suspender Tenant' : 'Reactivar Tenant'"
-            >
-              <FontAwesomeIcon
-                :icon="row.is_active ? 'fa-solid fa-power-off' : 'fa-solid fa-play'"
-              />
-            </button>
+            <div class="actions-flex">
+
+              <button @click="toggleTenant(row)" class="btn-icon" :class="row.is_active ? 'btn-disable' : 'btn-enable'"
+                :title="row.is_active ? 'Suspendr Tenant' : 'Reactivar Tenant'">
+                <FontAwesomeIcon :icon="row.is_active ? 'fa-solid fa-power-off' : 'fa-solid fa-play'" />
+              </button>
+
+              <button @click="deleteTenant(row)" class="btn-icon btn-delete" title="Eliminar Permanentemente">
+                <FontAwesomeIcon icon="fa-solid fa-trash" />
+              </button>
+
+            </div>
           </td>
         </tr>
       </BaseTable>
@@ -228,12 +274,8 @@ onMounted(() => refreshAll())
     <BaseModal :show="showModal" title="Registrar Nuevo Negocio" @close="showModal = false">
       <form @submit.prevent="createTenant" class="modal-form">
         <div class="section-title">Datos de la Empresa</div>
-        <BaseInput
-          label="Nombre del Tenant (Negocio)"
-          v-model="form.name"
-          placeholder="Ej: Cambio Seguro C.A."
-          required
-        />
+        <BaseInput label="Nombre del Tenant (Negocio)" v-model="form.name" placeholder="Ej: Cambio Seguro C.A."
+          required />
 
         <div class="section-title mt-4">Datos del Administrador</div>
         <BaseInput label="Nombre Completo" v-model="form.admin_name" required />
@@ -268,6 +310,7 @@ onMounted(() => refreshAll())
   align-items: center;
   margin-bottom: 25px;
 }
+
 .page-header h1 {
   color: var(--color-primary);
   font-size: 1.8rem;
@@ -280,6 +323,7 @@ onMounted(() => refreshAll())
   gap: 20px;
   margin-bottom: 30px;
 }
+
 .kpi-card {
   background: var(--color-secondary);
   border: 1px solid var(--color-border);
@@ -290,19 +334,23 @@ onMounted(() => refreshAll())
   gap: 15px;
   transition: transform 0.2s;
 }
+
 .kpi-card:hover {
   transform: translateY(-3px);
   border-color: var(--color-primary);
 }
+
 .kpi-card .icon {
   font-size: 2rem;
   opacity: 0.8;
 }
+
 .kpi-card h3 {
   font-size: 1.8rem;
   margin: 0;
   font-weight: bold;
 }
+
 .kpi-card p {
   margin: 0;
   font-size: 0.85rem;
@@ -312,12 +360,15 @@ onMounted(() => refreshAll())
 .kpi-card.total .icon {
   color: #3498db;
 }
+
 .kpi-card.active .icon {
   color: #0ecb81;
 }
+
 .kpi-card.inactive .icon {
   color: #e74c3c;
 }
+
 .kpi-card.users .icon {
   color: #f1c40f;
 }
@@ -329,6 +380,7 @@ onMounted(() => refreshAll())
   padding: 20px;
   border: 1px solid var(--color-border);
 }
+
 .row-inactive {
   opacity: 0.6;
   background: rgba(255, 0, 0, 0.05);
@@ -339,6 +391,7 @@ onMounted(() => refreshAll())
   font-size: 1.05rem;
   color: #fff;
 }
+
 .id-ref {
   font-size: 0.75rem;
   color: #666;
@@ -360,6 +413,7 @@ onMounted(() => refreshAll())
   display: flex;
   flex-direction: column;
 }
+
 .admin-info small {
   opacity: 0.7;
 }
@@ -371,10 +425,12 @@ onMounted(() => refreshAll())
   font-size: 0.75rem;
   font-weight: bold;
 }
+
 .bg-success {
   background: rgba(14, 203, 129, 0.2);
   color: #0ecb81;
 }
+
 .bg-danger {
   background: rgba(231, 76, 60, 0.2);
   color: #e74c3c;
@@ -393,13 +449,23 @@ onMounted(() => refreshAll())
   gap: 8px;
   align-items: center;
 }
+
 .btn-primary:hover {
   background: #d4a000;
 }
 
+/* Acciones */
 .actions-cell {
   text-align: right;
 }
+
+.actions-flex {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  /* Separación entre botones */
+}
+
 .btn-icon {
   background: #222;
   border: 1px solid #444;
@@ -412,9 +478,12 @@ onMounted(() => refreshAll())
   align-items: center;
   justify-content: center;
 }
+
+/* Botón Activar/Desactivar */
 .btn-disable {
   color: #e74c3c;
 }
+
 .btn-disable:hover {
   background: #e74c3c;
   color: #fff;
@@ -423,9 +492,23 @@ onMounted(() => refreshAll())
 .btn-enable {
   color: #0ecb81;
 }
+
 .btn-enable:hover {
   background: #0ecb81;
   color: #fff;
+}
+
+/* Botón Eliminar (NUEVO) */
+.btn-delete {
+  color: #e74c3c;
+  border-color: #522;
+  /* Borde sutil rojo oscuro */
+}
+
+.btn-delete:hover {
+  background: #e74c3c;
+  color: white;
+  transform: scale(1.1);
 }
 
 /* Modal */
@@ -437,20 +520,24 @@ onMounted(() => refreshAll())
   border-bottom: 1px solid #333;
   padding-bottom: 5px;
 }
+
 .mt-4 {
   margin-top: 20px;
 }
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 15px;
 }
+
 .modal-footer {
   margin-top: 25px;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
 }
+
 .btn-secondary {
   background: transparent;
   border: 1px solid #666;
