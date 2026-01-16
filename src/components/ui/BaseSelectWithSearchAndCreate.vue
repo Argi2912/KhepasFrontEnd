@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed, watch, reactive, onBeforeUnmount, nextTick } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import BaseInput from './BaseInput.vue' // Reutilizamos BaseInput para el campo de búsqueda
-import BaseModal from './BaseModal.vue' // Reutilizamos BaseModal para la creación
+import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 
 const props = defineProps({
-  // Props de Select (de la store)
+  // Props de Select
   modelValue: [String, Number],
   label: String,
   options: { type: Array, required: true },
@@ -20,13 +20,12 @@ const props = defineProps({
 
   // Props de Creación Rápida
   createLabel: { type: String, default: 'Crear Nuevo' },
-  // URL para el POST de creación (Ej: '/clients')
   createEndpoint: { type: String, required: true },
-  // Campos del formulario de creación (Ej: { name: '', email: '' })
   createFields: { type: Object, required: true },
 })
 
-const emit = defineEmits(['update:modelValue', 'change', 'record-created'])
+// 1. CORRECCIÓN: Emitir 'saved' para que coincida con tus formularios
+const emit = defineEmits(['update:modelValue', 'change', 'saved'])
 
 // --- ESTADO LOCAL ---
 const searchTerm = ref('')
@@ -63,12 +62,14 @@ const selectOption = (value) => {
   emit('update:modelValue', value)
   emit('change', value)
   isDropdownOpen.value = false
-  searchTerm.value = '' // Limpiar búsqueda al seleccionar
+  // No limpiamos searchTerm aquí para mantener el nombre visible
 }
 
 function updateDropdownPosition() {
   if (!wrapperRef.value) return
   const rect = wrapperRef.value.getBoundingClientRect()
+
+  // Usamos coordenadas absolutas al documento (scrollX/Y) para el teleport
   teleStyle.left = rect.left + window.scrollX + 'px'
   teleStyle.top = rect.bottom + window.scrollY + 'px'
   teleStyle.width = rect.width + 'px'
@@ -106,7 +107,6 @@ onBeforeUnmount(() => {
 
 const handleCreation = async () => {
   isCreating.value = true
-  // Limpiar errores previos
   Object.keys(createErrors).forEach((key) => delete createErrors[key])
 
   try {
@@ -114,13 +114,13 @@ const handleCreation = async () => {
     const newRecord = response.data
     notify.success(`${props.createLabel} creado(a) exitosamente.`)
 
-    // 1. Notificar al padre que se ha creado un nuevo registro
-    emit('record-created', newRecord)
+    // 2. CORRECCIÓN: Emitir 'saved' aquí
+    emit('saved', newRecord)
 
-    // 2. Seleccionar automáticamente el nuevo registro
+    // Seleccionar automáticamente
     selectOption(newRecord[props.trackBy])
 
-    // 3. Cerrar y resetear
+    // Cerrar y resetear
     showCreateModal.value = false
     Object.keys(props.createFields).forEach((key) => (createForm[key] = props.createFields[key]))
   } catch (error) {
@@ -130,18 +130,18 @@ const handleCreation = async () => {
     } else {
       notify.error(error.response?.data?.message || 'Error al crear el registro.')
     }
-    console.error('Error de creación:', error)
   } finally {
     isCreating.value = false
   }
 }
 
-// Observar el valor del modelo para actualizar el campo de búsqueda visual
 watch(selectedOptionText, (newText) => {
-  searchTerm.value = newText
+  // Solo actualizamos el texto si no estamos buscando (o si hay un valor seleccionado válido)
+  if (!isDropdownOpen.value || newText) {
+    searchTerm.value = newText
+  }
 })
 
-// Inicializar el searchTerm con el valor actual al montar
 watch(
   () => props.modelValue,
   (newValue) => {
@@ -168,86 +168,60 @@ watch(
     <div class="custom-select-wrapper" ref="wrapperRef">
       <div :class="['input-wrapper', { open: isDropdownOpen }]" @click="isDropdownOpen = true">
         <FontAwesomeIcon icon="fa-solid fa-magnifying-glass" class="input-icon" />
-        <input
-          type="text"
-          v-model="searchTerm"
-          :placeholder="placeholder || 'Buscar o seleccionar...'"
-          @focus="isDropdownOpen = true"
-          class="search-input"
-          :aria-invalid="!!error"
-          autocomplete="off"
-        />
-        <FontAwesomeIcon
-          :icon="isDropdownOpen ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"
-          class="dropdown-icon"
-          @click.stop="isDropdownOpen = !isDropdownOpen"
-        />
+        <input type="text" v-model="searchTerm" :placeholder="placeholder || 'Buscar o seleccionar...'"
+          @focus="isDropdownOpen = true" class="search-input" :aria-invalid="!!error" autocomplete="off" />
+        <FontAwesomeIcon :icon="isDropdownOpen ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"
+          class="dropdown-icon" @click.stop="isDropdownOpen = !isDropdownOpen" />
       </div>
 
       <teleport to="body">
-        <div
-          v-show="isDropdownOpen"
-          ref="dropdownRef"
-          class="dropdown-options"
-          :style="{ left: teleStyle.left, top: teleStyle.top, width: teleStyle.width }"
-        >
-          <div
-            v-for="option in filteredOptions"
-            :key="option[trackBy]"
-            :class="[
-              'option-item',
-              {
-                selected: String(option[trackBy]) === String(modelValue),
-              },
-            ]"
-            @click="selectOption(option[trackBy])"
-          >
-            {{ option[labelBy] }}
-          </div>
-
-          <div v-if="filteredOptions.length === 0 && searchTerm">
-            <p class="no-results">No se encontraron resultados para "{{ searchTerm }}".</p>
-          </div>
-
+        <div v-show="isDropdownOpen" ref="dropdownRef" class="dropdown-options"
+          :style="{ left: teleStyle.left, top: teleStyle.top, width: teleStyle.width }">
           <div class="create-quick-add" @click="showCreateModal = true">
             <FontAwesomeIcon icon="fa-solid fa-plus-circle" />
             <span>{{ createLabel }}</span>
+          </div>
+
+          <div v-for="option in filteredOptions" :key="option[trackBy]" :class="[
+            'option-item',
+            {
+              selected: String(option[trackBy]) === String(modelValue),
+            },
+          ]" @click="selectOption(option[trackBy])">
+            {{ option[labelBy] }}
+          </div>
+
+          <div v-if="filteredOptions.length === 0 && searchTerm" class="no-results">
+            <p>No se encontraron resultados para "{{ searchTerm }}".</p>
           </div>
         </div>
       </teleport>
     </div>
 
     <p v-if="error" class="error-message">{{ error }}</p>
-    <BaseModal
-      :show="showCreateModal"
-      :title="`Crear Nuevo ${createLabel}`"
-      @close="showCreateModal = false"
-    >
+
+    <BaseModal :show="showCreateModal" :title="`Crear Nuevo ${createLabel}`" @close="showCreateModal = false">
       <form :id="formId" @submit.prevent="handleCreation">
         <div v-for="(value, key) in createFields" :key="key">
-          <BaseInput
-            :label="key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')"
-            type="text"
-            v-model="createForm[key]"
-            :error="createErrors[key] ? createErrors[key][0] : null"
-            required
-          />
+          <BaseInput :label="key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')" type="text"
+            v-model="createForm[key]" :error="createErrors[key] ? createErrors[key][0] : null" required />
         </div>
       </form>
 
       <template #footer>
-        <button type="submit" class="btn btn-primary" :disabled="isCreating" :form="formId">
-          <FontAwesomeIcon v-if="isCreating" icon="fa-solid fa-spinner" spin />
-          {{ isCreating ? 'Creando...' : 'Guardar' }}
-        </button>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-cancel" @click="showCreateModal = false">Cancelar</button>
+          <button type="submit" class="btn btn-save" :disabled="isCreating" :form="formId">
+            <FontAwesomeIcon v-if="isCreating" icon="fa-solid fa-spinner" spin />
+            {{ isCreating ? 'Creando...' : 'Guardar' }}
+          </button>
+        </div>
       </template>
     </BaseModal>
   </div>
 </template>
 
 <style scoped>
-/* Estilos similares a BaseSelect, pero adaptados para el campo de búsqueda */
-
 .form-group {
   margin-bottom: 25px;
 }
@@ -281,9 +255,7 @@ label {
   border: 1px solid var(--color-border);
   background-color: var(--color-background);
   border-radius: 6px;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   cursor: pointer;
   padding: 0 12px;
 }
@@ -291,8 +263,6 @@ label {
 .input-wrapper.open {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 1px var(--color-primary);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
 }
 
 .input-icon {
@@ -310,64 +280,101 @@ label {
   min-height: 44px;
 }
 
+.search-input:focus {
+  outline: none;
+}
+
 .dropdown-icon {
   color: #555;
   transition: transform 0.2s;
 }
 
+/* Dropdown Flotante */
 .dropdown-options {
   position: absolute;
-  /* top/left/width se calculan en línea desde teleStyle */
-  background-color: var(--color-secondary);
+  /* Teleport maneja las coordenadas absolutas relativas al body */
+  background-color: #2b2f36;
+  /* Color sólido */
   border: 1px solid var(--color-primary);
-  border-bottom-left-radius: 6px;
-  border-bottom-right-radius: 6px;
-  z-index: 2147483647; /* máximo para evitar clipping por stacking contexts */
-  max-height: 350px; /* Más altura para mayor visibilidad */
+  border-radius: 6px;
+  z-index: 9999;
+  /* Z-index manejable */
+  max-height: 300px;
   overflow-y: auto;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  margin-top: 5px;
 }
 
 .option-item {
-  padding: 10px 15px;
+  padding: 12px 15px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  color: var(--color-text-light);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .option-item:hover {
-  background-color: #333;
+  background-color: #3a3f47;
 }
 
 .option-item.selected {
-  background-color: var(--color-primary-dark);
-  color: #fff;
+  background-color: var(--color-primary);
+  color: #111;
+  font-weight: bold;
 }
 
 .no-results {
-  padding: 10px 15px;
+  padding: 15px;
   color: #999;
+  text-align: center;
   font-style: italic;
 }
 
+/* Botón Crear al principio */
 .create-quick-add {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 15px;
-  border-top: 1px solid #444;
+  gap: 10px;
+  padding: 12px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
   color: var(--color-success);
-  font-weight: 600;
-  background-color: #2a3d3a;
+  font-weight: bold;
+  background-color: rgba(14, 203, 129, 0.1);
   transition: background-color 0.2s;
-}
-.create-quick-add:hover {
-  background-color: #38504e;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(5px);
+  /* Efecto moderno */
 }
 
-/* Estilos para el Modal de creación */
+.create-quick-add:hover {
+  background-color: rgba(14, 203, 129, 0.2);
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
+  padding-top: 15px;
+  gap: 10px;
+}
+
+.btn-save {
+  padding: 10px 20px;
+  background-color: var(--color-success);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn-cancel {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid #666;
+  color: #ccc;
+  border-radius: 6px;
+  cursor: pointer;
 }
 </style>

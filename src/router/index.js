@@ -102,6 +102,7 @@ const router = createRouter({
           component: () => import('@/views/reports/BrokerReportView.vue'),
           meta: { label: 'Por Corredor', hiddenInMenu: true },
         },
+        
         {
           path: 'profit-matrix',
           name: 'reports.profit_matrix',

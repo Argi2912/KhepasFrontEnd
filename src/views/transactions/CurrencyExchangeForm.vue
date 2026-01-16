@@ -67,6 +67,11 @@ const form = reactive({
   delivered: true,
 })
 
+// --- FUNCIÓN DE RECARGA EN TIEMPO REAL ---
+const handleDataReload = async () => {
+  await transactionStore.fetchAllSupportData()
+}
+
 // --- HELPERS DE EDICIÓN ---
 const onEditSent = () => (lastEdited.value = 'sent')
 const onEditReceived = () => (lastEdited.value = 'received')
@@ -102,10 +107,7 @@ const selectedBroker = computed(() =>
 const sourceName = computed(() => {
   if (form.capital_type === 'investor') {
     if (!selectedInvestor.value) return 'Seleccione Inversionista'
-
-    // 👇 ÚNICA MODIFICACIÓN AQUÍ: CAMBIAR .balance POR .current_balance
     const balance = parseFloat(selectedInvestor.value.current_balance || 0)
-
     return `${selectedInvestor.value.name} (Disp: $${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })})`
   }
   return fromAccount.value?.name || ''
@@ -131,10 +133,7 @@ const hasSufficientBalance = computed(() => {
   }
   if (form.capital_type === 'investor') {
     if (!selectedInvestor.value || !form.amount_sent) return true
-
-    // 👇 ÚNICA MODIFICACIÓN AQUÍ TAMBIÉN: current_balance
     const investorBal = parseFloat(selectedInvestor.value.current_balance || 0)
-
     const amountToSend = parseFloat(form.amount_sent)
     return investorBal >= amountToSend
   }
@@ -503,22 +502,13 @@ const handleConfirm = async () => {
           <p class="subtitle">Paso {{ currentStep }} / {{ totalSteps }}</p>
         </div>
         <div class="type-switcher">
-          <button
-            :class="{ active: operationType === 'purchase' }"
-            @click="operationType = 'purchase'"
-          >
+          <button :class="{ active: operationType === 'purchase' }" @click="operationType = 'purchase'">
             Compra
           </button>
-          <button
-            :class="{ active: operationType === 'exchange' }"
-            @click="operationType = 'exchange'"
-          >
+          <button :class="{ active: operationType === 'exchange' }" @click="operationType = 'exchange'">
             Intercambio
           </button>
-          <button
-            :class="{ active: operationType === 'currency_change' }"
-            @click="operationType = 'currency_change'"
-          >
+          <button :class="{ active: operationType === 'currency_change' }" @click="operationType = 'currency_change'">
             Cambio Divisa
           </button>
         </div>
@@ -529,103 +519,57 @@ const handleConfirm = async () => {
       <div class="form-body">
         <div v-if="currentStep === 1" class="step-content fade-in">
           <div class="grid-2">
-            <BaseSelectWithSearchAndCreate
-              label="Cliente *"
-              :options="transactionStore.getClients"
-              v-model="form.client_id"
-              required
-              create-endpoint="/clients"
-              :create-fields="{ name: '' }"
-              create-label="Cliente"
-            />
+
+            <BaseSelectWithSearchAndCreate label="Cliente *" :options="transactionStore.getClients"
+              v-model="form.client_id" required create-endpoint="/clients" :create-fields="{ name: '' }"
+              create-label="Cliente" @saved="handleDataReload" />
 
             <div class="col-span-2">
               <label class="small-label">Fuente de Fondos</label>
               <div class="type-switcher" style="margin-top: 8px">
-                <button
-                  :class="{ active: form.capital_type === 'own' }"
-                  @click="form.capital_type = 'own'"
-                >
+                <button :class="{ active: form.capital_type === 'own' }" @click="form.capital_type = 'own'">
                   Propio
                 </button>
-                <button
-                  :class="{ active: form.capital_type === 'investor' }"
-                  @click="form.capital_type = 'investor'"
-                >
+                <button :class="{ active: form.capital_type === 'investor' }" @click="form.capital_type = 'investor'">
                   Inversionista
                 </button>
               </div>
             </div>
 
             <div v-if="form.capital_type === 'investor'" class="col-span-2">
-              <BaseSelectWithSearchAndCreate
-                label="Inversionista *"
-                :options="transactionStore.getInvestors"
-                v-model="form.investor_id"
-                required
-                create-endpoint="/investors"
-                :create-fields="{ name: '' }"
-                create-label="Inversionista"
-              />
+              <BaseSelectWithSearchAndCreate label="Inversionista *" :options="transactionStore.getInvestors"
+                v-model="form.investor_id" required create-endpoint="/investors" :create-fields="{ name: '' }"
+                create-label="Inversionista" @saved="handleDataReload" />
             </div>
 
             <div v-if="operationType === 'exchange'">
-              <BaseSelectWithSearchAndCreate
-                label="Admin (Plataforma) *"
-                :options="transactionStore.getPlatforms"
-                v-model="form.platform_id"
-                required
-                create-endpoint="/platforms"
-                :create-fields="{ name: '' }"
-                create-label="Plataforma"
-              />
+              <BaseSelectWithSearchAndCreate label="Admin (Plataforma) *" :options="transactionStore.getPlatforms"
+                v-model="form.platform_id" required create-endpoint="/platforms" :create-fields="{ name: '' }"
+                create-label="Plataforma" @saved="handleDataReload" />
             </div>
 
             <template v-if="operationType !== 'exchange'">
-              <BaseSelectWithSearchAndCreate
-                label="Corredor (Opcional)"
-                :options="transactionStore.getBrokers"
-                v-model="form.broker_id"
-                create-endpoint="/brokers"
-                :create-fields="{ name: '' }"
-                create-label="Corredor"
-              />
+              <BaseSelectWithSearchAndCreate label="Corredor (Opcional)" :options="transactionStore.getBrokers"
+                v-model="form.broker_id" create-endpoint="/brokers" :create-fields="{ name: '' }"
+                create-label="Corredor" @saved="handleDataReload" />
 
               <div class="grid-2-nested col-span-2">
-                <BaseSelectWithSearchAndCreate
-                  label="Proveedor (Liquidez)"
-                  :options="transactionStore.getProviders"
-                  v-model="form.provider_id"
-                  :required="isComplexExchange"
-                  create-endpoint="/providers"
-                  :create-fields="{ name: '' }"
-                  create-label="Proveedor"
-                />
+                <BaseSelectWithSearchAndCreate label="Proveedor (Liquidez)" :options="transactionStore.getProviders"
+                  v-model="form.provider_id" :required="isComplexExchange" create-endpoint="/providers"
+                  :create-fields="{ name: '' }" create-label="Proveedor" @saved="handleDataReload" />
 
-                <BaseSelectWithSearchAndCreate
-                  v-if="isComplexExchange"
-                  label="Plataforma / Admin"
-                  :options="transactionStore.getPlatforms"
-                  v-model="form.platform_id"
-                  :required="isComplexExchange"
-                  create-endpoint="/platforms"
-                  :create-fields="{ name: '' }"
-                  create-label="Plataforma"
-                />
+                <BaseSelectWithSearchAndCreate v-if="isComplexExchange" label="Plataforma / Admin"
+                  :options="transactionStore.getPlatforms" v-model="form.platform_id" :required="isComplexExchange"
+                  create-endpoint="/platforms" :create-fields="{ name: '' }" create-label="Plataforma"
+                  @saved="handleDataReload" />
               </div>
               <div class="divider col-span-2"></div>
             </template>
 
             <template v-if="form.capital_type === 'own'">
-              <BaseSelectWithSearchAndCreate
-                label="Cuenta Origen (Sale) *"
-                :options="sourceAccounts"
-                v-model="form.from_account_id"
-                required
-                create-endpoint="/accounts"
-                :create-fields="{ name: '' }"
-                create-label="Cuenta"
-              />
+              <BaseSelectWithSearchAndCreate label="Cuenta Origen (Sale) *" :options="sourceAccounts"
+                v-model="form.from_account_id" required create-endpoint="/accounts" :create-fields="{ name: '' }"
+                create-label="Cuenta" @saved="handleDataReload" />
             </template>
             <template v-else>
               <div class="input-group">
@@ -634,15 +578,9 @@ const handleConfirm = async () => {
               </div>
             </template>
 
-            <BaseSelectWithSearchAndCreate
-              label="Cuenta Destino (Entra) *"
-              :options="destinationAccounts"
-              v-model="form.to_account_id"
-              required
-              create-endpoint="/accounts"
-              :create-fields="{ name: '' }"
-              create-label="Cuenta"
-            />
+            <BaseSelectWithSearchAndCreate label="Cuenta Destino (Entra) *" :options="destinationAccounts"
+              v-model="form.to_account_id" required create-endpoint="/accounts" :create-fields="{ name: '' }"
+              create-label="Cuenta" @saved="handleDataReload" />
           </div>
         </div>
 
@@ -650,39 +588,22 @@ const handleConfirm = async () => {
           <div class="calc-panel">
             <div class="calc-row">
               <div class="input-group">
-                <label v-if="operationType === 'purchase' || isComplexExchange"
-                  >Monto Recibido (USD)</label
-                >
+                <label v-if="operationType === 'purchase' || isComplexExchange">Monto Recibido (USD)</label>
                 <label v-else>Monto Enviado ({{ sourceCurrency }})</label>
 
-                <input
-                  v-if="operationType === 'purchase' || isComplexExchange"
-                  type="number"
-                  v-model="form.amount_received"
-                  @input="onEditReceived"
-                  placeholder="0.00"
-                  class="big-input"
-                />
+                <input v-if="operationType === 'purchase' || isComplexExchange" type="number"
+                  v-model="form.amount_received" @input="onEditReceived" placeholder="0.00" class="big-input" />
 
-                <input
-                  v-else
-                  type="number"
-                  v-model="form.amount_sent"
-                  @input="onEditSent"
-                  placeholder="0.00"
-                  class="big-input"
-                />
+                <input v-else type="number" v-model="form.amount_sent" @input="onEditSent" placeholder="0.00"
+                  class="big-input" />
               </div>
 
               <div class="operator">
-                <span
-                  v-if="
-                    operationType === 'exchange' &&
-                    sourceCurrency === 'VES' &&
-                    toAccount?.currency_code === 'USD'
-                  "
-                  >÷</span
-                >
+                <span v-if="
+                  operationType === 'exchange' &&
+                  sourceCurrency === 'VES' &&
+                  toAccount?.currency_code === 'USD'
+                ">÷</span>
                 <span v-else-if="operationType === 'exchange'">×</span>
                 <span v-else>×</span>
               </div>
@@ -695,61 +616,34 @@ const handleConfirm = async () => {
                 <div v-if="operationType === 'purchase'" class="grid-2-rates">
                   <div class="input-group">
                     <label>Tasa Compra (Costo)</label>
-                    <input
-                      type="number"
-                      v-model="form.buy_rate"
-                      placeholder="250"
-                      class="big-input rate-input"
-                    />
+                    <input type="number" v-model="form.buy_rate" placeholder="250" class="big-input rate-input" />
                   </div>
                   <div class="input-group">
                     <label>Tasa Mercado Real</label>
-                    <input
-                      type="number"
-                      v-model="form.received_rate"
-                      placeholder="300"
-                      class="big-input rate-input"
-                    />
+                    <input type="number" v-model="form.received_rate" placeholder="300" class="big-input rate-input" />
                   </div>
                 </div>
 
-                <div
-                  v-else-if="operationType === 'exchange'"
-                  class="input-group full-width-rate"
-                  style="position: relative"
-                >
+                <div v-else-if="operationType === 'exchange'" class="input-group full-width-rate"
+                  style="position: relative">
                   <label>Tasa (Opcional)</label>
-                  <input
-                    type="number"
-                    v-model="form.exchange_rate"
-                    @input="onEditRate"
-                    placeholder="Auto"
-                    class="big-input rate-input"
-                  />
+                  <input type="number" v-model="form.exchange_rate" @input="onEditRate" placeholder="Auto"
+                    class="big-input rate-input" />
 
-                  <div
-                    v-if="form.amount_sent > 0 && form.amount_received > 0"
-                    style="
+                  <div v-if="form.amount_sent > 0 && form.amount_received > 0" style="
                       position: absolute;
                       right: 0;
                       top: 0;
                       font-size: 0.75rem;
                       font-weight: bold;
-                    "
-                    :style="{ color: parseFloat(exchangePercentage) >= 0 ? '#0ecb81' : '#f6465d' }"
-                  >
+                    " :style="{ color: parseFloat(exchangePercentage) >= 0 ? '#0ecb81' : '#f6465d' }">
                     {{ exchangePercentage }}%
                   </div>
                 </div>
 
                 <div v-else class="input-group full-width-rate">
                   <label>Tasa</label>
-                  <input
-                    type="number"
-                    v-model="form.exchange_rate"
-                    placeholder="1.00"
-                    class="big-input rate-input"
-                  />
+                  <input type="number" v-model="form.exchange_rate" placeholder="1.00" class="big-input rate-input" />
                 </div>
               </div>
 
@@ -759,32 +653,13 @@ const handleConfirm = async () => {
                 <label v-if="operationType === 'purchase'">Monto Enviado (BS)</label>
                 <label v-else>Monto Recibido</label>
 
-                <input
-                  v-if="operationType === 'purchase'"
-                  type="number"
-                  v-model="form.amount_sent"
-                  placeholder="0.00"
-                  class="big-input"
-                  readonly
-                  style="background: #1e2023; color: #ccc"
-                />
+                <input v-if="operationType === 'purchase'" type="number" v-model="form.amount_sent" placeholder="0.00"
+                  class="big-input" readonly style="background: #1e2023; color: #ccc" />
 
-                <input
-                  v-else-if="operationType === 'exchange'"
-                  type="number"
-                  v-model="form.amount_received"
-                  @input="onEditReceived"
-                  placeholder="0.00"
-                  class="big-input"
-                />
+                <input v-else-if="operationType === 'exchange'" type="number" v-model="form.amount_received"
+                  @input="onEditReceived" placeholder="0.00" class="big-input" />
 
-                <input
-                  v-else
-                  type="text"
-                  :value="form.amount_received"
-                  readonly
-                  class="big-input readonly"
-                />
+                <input v-else type="text" :value="form.amount_received" readonly class="big-input readonly" />
               </div>
             </div>
 
@@ -820,7 +695,7 @@ const handleConfirm = async () => {
               <div class="comm-card income">
                 <label>{{
                   operationType === 'purchase' ? 'Ganancia Bruta (%)' : 'Comisión (%)'
-                }}</label>
+                  }}</label>
                 <div class="pct-input-wrapper">
                   <input type="number" v-model="form.commission_charged_pct" placeholder="0" />
                   <span>%</span>
@@ -867,9 +742,7 @@ const handleConfirm = async () => {
 
             <div class="total-profit-bar">
               <span>Utilidad Real (Neta):</span>
-              <strong
-                :class="form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'"
-              >
+              <strong :class="form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'">
                 {{ form.commission_net_after_investor }} {{ commissionCurrency }}
               </strong>
             </div>
@@ -888,7 +761,7 @@ const handleConfirm = async () => {
                 <span>Cliente</span>
                 <strong>{{
                   transactionStore.getClients.find((c) => c.id == form.client_id)?.name
-                }}</strong>
+                  }}</strong>
               </div>
 
               <div class="row" v-if="form.platform_id">
@@ -900,7 +773,7 @@ const handleConfirm = async () => {
                 <span>Corredor</span>
                 <span>{{
                   transactionStore.getBrokers.find((b) => b.id == form.broker_id)?.name
-                }}</span>
+                  }}</span>
               </div>
 
               <div class="row" v-if="form.provider_id">
@@ -917,9 +790,7 @@ const handleConfirm = async () => {
 
               <div class="row highlight">
                 <span>Monto Recibido ({{ toAccount?.name }})</span>
-                <span class="text-success"
-                  >+ {{ form.amount_received }} {{ toAccount?.currency_code }}</span
-                >
+                <span class="text-success">+ {{ form.amount_received }} {{ toAccount?.currency_code }}</span>
               </div>
 
               <div v-if="operationType === 'purchase'" class="row">
@@ -952,11 +823,8 @@ const handleConfirm = async () => {
 
                 <div class="row total">
                   <span>Utilidad Real</span>
-                  <span
-                    :class="
-                      form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'
-                    "
-                  >
+                  <span :class="form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'
+                    ">
                     {{ form.commission_net_after_investor }} {{ commissionCurrency }}
                   </span>
                 </div>
@@ -976,12 +844,7 @@ const handleConfirm = async () => {
           Siguiente
           <FontAwesomeIcon icon="fa-solid fa-arrow-right" />
         </button>
-        <button
-          v-if="currentStep === totalSteps"
-          @click="handleConfirm"
-          class="btn-success"
-          :disabled="isSubmitting"
-        >
+        <button v-if="currentStep === totalSteps" @click="handleConfirm" class="btn-success" :disabled="isSubmitting">
           {{ isSubmitting ? 'Procesando...' : 'Confirmar' }}
         </button>
       </div>
@@ -1340,12 +1203,12 @@ const handleConfirm = async () => {
   transition: 0.2s;
 }
 
-.checkbox-wrapper input:checked ~ .checkmark {
+.checkbox-wrapper input:checked~.checkmark {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
 }
 
-.checkbox-wrapper input:checked ~ .checkmark::after {
+.checkbox-wrapper input:checked~.checkmark::after {
   content: '';
   position: absolute;
   left: 8px;

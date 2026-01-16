@@ -11,7 +11,7 @@
           <span class="label">Volumen Total Recibido</span>
           <span class="value text-emerald-400">{{
             formatCompact(summary.total_volume_received)
-          }}</span>
+            }}</span>
         </div>
         <div class="summary-card">
           <span class="label">Ganancia Neta</span>
@@ -68,7 +68,7 @@
                 <span class="label">Recibido</span>
                 <span class="value text-emerald-400">{{
                   formatCompact(item.volume_received)
-                }}</span>
+                  }}</span>
               </div>
               <div class="metric">
                 <span class="label">Ganancia</span>
@@ -102,13 +102,8 @@
                   <div class="account-name">{{ source.name }}</div>
                   <div class="currency">{{ source.currency_code }}</div>
                 </th>
-                <td
-                  v-for="dest in uniqueDestinations"
-                  :key="dest.id"
-                  class="flow-cell"
-                  :style="getCellStyle(source.id, dest.id)"
-                  @click="showDetail(source.id, dest.id)"
-                >
+                <td v-for="dest in uniqueDestinations" :key="dest.id" class="flow-cell"
+                  :style="getCellStyle(source.id, dest.id)" @click="showDetail(source.id, dest.id)">
                   <div v-if="getCellData(source.id, dest.id)" class="cell-content">
                     <div class="received">
                       <i class="fa-solid fa-arrow-down text-emerald-400"></i>
@@ -349,6 +344,7 @@ onMounted(() => {
   color: #e2e8f0;
   padding: 1.5rem;
 }
+
 .header-summary {
   display: flex;
   justify-content: space-between;
@@ -357,32 +353,38 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 1rem;
 }
+
 .title {
   font-size: 2.2rem;
   font-weight: 800;
   color: #fff;
   margin: 0;
 }
+
 .subtitle {
   color: #94a3b8;
   font-size: 0.95rem;
 }
+
 .summary-cards {
   display: flex;
   gap: 1.5rem;
   flex-wrap: wrap;
 }
+
 .summary-card {
   background: rgba(55, 65, 81, 0.3);
   padding: 1rem 1.5rem;
   border-radius: 12px;
   border: 1px solid #374151;
 }
+
 .summary-card .label {
   font-size: 0.8rem;
   color: #94a3b8;
   display: block;
 }
+
 .summary-card .value {
   font-size: 1.5rem;
   font-weight: 700;
@@ -396,9 +398,11 @@ onMounted(() => {
   margin-bottom: 2rem;
   flex-wrap: wrap;
 }
+
 .date-input-wrapper {
   position: relative;
 }
+
 .date-input {
   background: #111;
   border: 1px solid #374151;
@@ -406,6 +410,7 @@ onMounted(() => {
   padding: 0.75rem 1rem;
   color: #fff;
 }
+
 .date-label {
   position: absolute;
   top: -8px;
@@ -415,6 +420,7 @@ onMounted(() => {
   color: #94a3b8;
   padding: 0 6px;
 }
+
 .btn-primary {
   background: #6366f1;
   color: white;
@@ -433,6 +439,7 @@ onMounted(() => {
   grid-template-columns: 1fr 2fr;
   gap: 2rem;
 }
+
 @media (max-width: 1400px) {
   .grid-container {
     grid-template-columns: 1fr;
@@ -446,6 +453,7 @@ onMounted(() => {
   border-radius: 16px;
   overflow: hidden;
 }
+
 .card-title {
   background: rgba(79, 70, 229, 0.3);
   padding: 1.2rem 1.5rem;
@@ -457,11 +465,13 @@ onMounted(() => {
   gap: 0.5rem;
   border-bottom: 1px solid #374151;
 }
+
 .top-list {
   padding: 1rem;
   max-height: 800px;
   overflow-y: auto;
 }
+
 .route-item {
   background: rgba(55, 65, 81, 0.25);
   border-radius: 12px;
@@ -473,10 +483,12 @@ onMounted(() => {
   position: relative;
   transition: all 0.2s;
 }
+
 .route-item:hover {
   background: rgba(55, 65, 81, 0.45);
   transform: translateY(-2px);
 }
+
 .rank-badge {
   width: 40px;
   height: 40px;
@@ -488,22 +500,27 @@ onMounted(() => {
   font-size: 1.1rem;
   flex-shrink: 0;
 }
+
 .rank-1 {
   background: #fbbf24;
   color: #000;
 }
+
 .rank-2 {
   background: #94a3b8;
   color: #000;
 }
+
 .rank-3 {
   background: #f97316;
   color: #fff;
 }
+
 .rank-badge {
   background: #374151;
   color: #e2e8f0;
 }
+
 .route-flow {
   flex: 1;
   display: flex;
@@ -511,39 +528,47 @@ onMounted(() => {
   gap: 1rem;
   font-size: 0.95rem;
 }
+
 .from,
 .to {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
+
 .dot {
   width: 12px;
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
 }
+
 .dot.out {
   background: #ef4444;
 }
+
 .dot.in {
   background: #34d399;
 }
+
 .arrow {
   font-size: 1.5rem;
   color: #6366f1;
   font-weight: bold;
 }
+
 .metrics {
   display: flex;
   gap: 1.5rem;
   font-size: 0.9rem;
 }
+
 .metric .label {
   display: block;
   color: #94a3b8;
   font-size: 0.7rem;
 }
+
 .ops {
   color: #94a3b8;
 }
@@ -552,11 +577,13 @@ onMounted(() => {
   overflow: auto;
   max-height: 80vh;
 }
+
 .flow-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
 }
+
 .sticky-col {
   position: sticky;
   left: 0;
@@ -567,14 +594,17 @@ onMounted(() => {
   padding: 1rem;
   min-width: 180px;
 }
+
 .source-header .account-name {
   font-weight: 700;
   color: #fff;
 }
+
 .source-header .currency {
   font-size: 0.8rem;
   color: #60a5fa;
 }
+
 .dest-header {
   background: #1e1e1e;
   text-align: center;
@@ -582,6 +612,7 @@ onMounted(() => {
   border-bottom: 1px solid #374151;
   min-width: 140px;
 }
+
 .dest-header .currency {
   font-size: 0.8rem;
   color: #60a5fa;
@@ -591,6 +622,7 @@ onMounted(() => {
   margin-top: 4px;
   display: inline-block;
 }
+
 .flow-cell {
   text-align: center;
   padding: 1rem 0.5rem;
@@ -601,24 +633,29 @@ onMounted(() => {
   height: 100px;
   vertical-align: middle;
 }
+
 .flow-cell:hover {
   transform: scale(1.05);
   z-index: 5;
 }
+
 .cell-content {
   display: flex;
   flex-direction: column;
   justify-content: center;
   height: 100%;
 }
+
 .received {
   font-weight: 700;
   font-size: 1.1rem;
   color: #34d399;
 }
+
 .profit {
   margin-top: 4px;
 }
+
 .empty {
   color: #374151;
   font-size: 1.5rem;
@@ -724,6 +761,7 @@ onMounted(() => {
 .account-box.out {
   border-left: 4px solid #ef4444;
 }
+
 .account-box.in {
   border-left: 4px solid #34d399;
 }
@@ -738,6 +776,7 @@ onMounted(() => {
 .account-box.out .dot {
   background: #ef4444;
 }
+
 .account-box.in .dot {
   background: #34d399;
 }
@@ -747,6 +786,7 @@ onMounted(() => {
   font-size: 1.1rem;
   color: #fff;
 }
+
 .currency {
   font-size: 0.9rem;
   color: #60a5fa;
@@ -849,6 +889,7 @@ onMounted(() => {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -859,6 +900,7 @@ onMounted(() => {
     transform: translateY(50px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;

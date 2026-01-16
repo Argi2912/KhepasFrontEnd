@@ -182,11 +182,7 @@ onMounted(() => fetchExchanges())
       <Pagination :pagination="pagination" @change-page="fetchExchanges" />
     </div>
 
-    <BaseModal
-      :show="showDetailModal"
-      title="Detalle de Transacción"
-      @close="showDetailModal = false"
-    >
+    <BaseModal :show="showDetailModal" title="Detalle de Transacción" @close="showDetailModal = false">
       <div v-if="isLoadingDetail" class="loading-modal">
         <FontAwesomeIcon icon="fa-solid fa-spinner" spin size="2x" />
         <p>Recuperando datos...</p>
@@ -288,12 +284,14 @@ onMounted(() => fetchExchanges())
   margin: 0 auto;
   color: var(--color-text-light);
 }
+
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
+
 .list-header h1 {
   font-size: 1.6rem;
   color: var(--color-primary);
@@ -313,6 +311,7 @@ onMounted(() => fetchExchanges())
   gap: 8px;
   transition: 0.2s;
 }
+
 .btn-new:hover {
   background: #d4a000;
 }
@@ -325,6 +324,7 @@ onMounted(() => fetchExchanges())
   font-size: 1.1rem;
   transition: 0.2s;
 }
+
 .view-btn:hover {
   color: var(--color-primary);
 }
@@ -336,11 +336,13 @@ onMounted(() => fetchExchanges())
   padding: 20px;
   border: 1px solid var(--color-border);
 }
+
 .ref-text {
   font-family: monospace;
   font-weight: bold;
   color: #aaa;
 }
+
 .font-mono {
   font-family: monospace;
   letter-spacing: -0.5px;
@@ -354,26 +356,31 @@ onMounted(() => fetchExchanges())
   font-weight: bold;
   text-transform: uppercase;
 }
+
 .b-blue {
   background: rgba(52, 152, 219, 0.2);
   color: #3498db;
   border: 1px solid #3498db;
 }
+
 .b-purple {
   background: rgba(155, 89, 182, 0.2);
   color: #9b59b6;
   border: 1px solid #9b59b6;
 }
+
 .badge {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: bold;
 }
+
 .bg-success {
   background: rgba(14, 203, 129, 0.2);
   color: #0ecb81;
 }
+
 .bg-warning {
   background: rgba(243, 156, 18, 0.2);
   color: #f39c12;
@@ -385,6 +392,7 @@ onMounted(() => fetchExchanges())
   padding: 40px;
   color: #888;
 }
+
 .modal-top-bar {
   display: flex;
   justify-content: space-between;
@@ -393,15 +401,18 @@ onMounted(() => fetchExchanges())
   padding-bottom: 15px;
   border-bottom: 1px solid #333;
 }
+
 .ref-group h3 {
   margin: 0;
   color: var(--color-primary);
   font-size: 1.5rem;
 }
+
 .ref-group .date {
   font-size: 0.85rem;
   color: #777;
 }
+
 .badge-lg {
   padding: 6px 12px;
   border-radius: 6px;
@@ -421,21 +432,25 @@ onMounted(() => fetchExchanges())
   position: relative;
   overflow: hidden;
 }
+
 .flow-card {
   display: flex;
   flex-direction: column;
   z-index: 2;
   position: relative;
 }
+
 .flow-card.in {
   text-align: right;
 }
+
 .label {
   font-size: 0.7rem;
   color: #777;
   margin-bottom: 5px;
   text-transform: uppercase;
 }
+
 .amount {
   font-size: 1.3rem;
   font-weight: bold;
@@ -453,6 +468,7 @@ onMounted(() => fetchExchanges())
   justify-content: center;
   pointer-events: none;
 }
+
 .arrow-line {
   position: absolute;
   width: 60%;
@@ -461,6 +477,7 @@ onMounted(() => fetchExchanges())
   top: 50%;
   z-index: 1;
 }
+
 .flow-arrow svg {
   font-size: 1.5rem;
   color: var(--color-primary);
@@ -468,6 +485,7 @@ onMounted(() => fetchExchanges())
   z-index: 2;
   padding: 0 10px;
 }
+
 .rate-pill {
   margin-top: 35px;
   background: #222;
@@ -486,6 +504,7 @@ onMounted(() => fetchExchanges())
   gap: 15px;
   margin-bottom: 20px;
 }
+
 .info-item label {
   font-size: 0.7rem;
   color: #666;
@@ -493,6 +512,7 @@ onMounted(() => fetchExchanges())
   display: block;
   margin-bottom: 4px;
 }
+
 .info-item p {
   margin: 0;
   font-weight: 600;
@@ -506,6 +526,7 @@ onMounted(() => fetchExchanges())
   border-radius: 8px;
   border: 1px solid #333;
 }
+
 .financial-box h4 {
   margin: 0 0 15px 0;
   font-size: 0.95rem;
@@ -513,12 +534,14 @@ onMounted(() => fetchExchanges())
   border-bottom: 1px dashed #333;
   padding-bottom: 8px;
 }
+
 .fin-row {
   display: flex;
   justify-content: space-between;
   font-size: 0.95rem;
   margin-bottom: 6px;
 }
+
 .fin-row.total {
   border-top: 1px solid #444;
   padding-top: 12px;
@@ -529,9 +552,11 @@ onMounted(() => fetchExchanges())
 .text-danger {
   color: var(--color-danger);
 }
+
 .text-success {
   color: var(--color-success);
 }
+
 .btn-close {
   width: 100%;
   background: transparent;
@@ -542,6 +567,7 @@ onMounted(() => fetchExchanges())
   cursor: pointer;
   transition: 0.2s;
 }
+
 .btn-close:hover {
   background: #333;
   color: #fff;

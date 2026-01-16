@@ -203,24 +203,11 @@ const formatCurrency = (value, currency) => {
       <template #step-0>
         <h2 class="step-title">1. Partes Involucradas</h2>
         <div class="form-grid">
-          <BaseSelect
-            v-model="form.client_id"
-            label="Cliente"
-            :options="transactionStore.getClients"
-            required
-          />
-          <BaseSelect
-            v-model="form.broker_id"
-            label="Corredor (Broker)"
-            :options="transactionStore.getBrokers"
-            placeholder="Opcional"
-          />
-          <BaseSelect
-            v-model="form.provider_id"
-            label="Proveedor"
-            :options="transactionStore.getProviders"
-            placeholder="Opcional"
-          />
+          <BaseSelect v-model="form.client_id" label="Cliente" :options="transactionStore.getClients" required />
+          <BaseSelect v-model="form.broker_id" label="Corredor (Broker)" :options="transactionStore.getBrokers"
+            placeholder="Opcional" />
+          <BaseSelect v-model="form.provider_id" label="Proveedor" :options="transactionStore.getProviders"
+            placeholder="Opcional" />
         </div>
       </template>
 
@@ -228,30 +215,16 @@ const formatCurrency = (value, currency) => {
         <h2 class="step-title">2. Operación y Resumen</h2>
 
         <div class="form-grid-col2 section-title">
-          <BaseSelect
-            v-model="form.from_account_id"
-            :label="`Cuenta Destino (Plataforma Recibe ${localCurrencyCode})`"
-            :options="fromAccountOptions"
-            required
-          />
-          <BaseSelect
-            v-model="form.platform_account_id"
-            label="Cuenta Origen (Plataforma Paga Divisa)"
-            :options="platformAccountOptions"
-            required
-            :error="platformAccountError"
-          />
+          <BaseSelect v-model="form.from_account_id" :label="`Cuenta Destino (Plataforma Recibe ${localCurrencyCode})`"
+            :options="fromAccountOptions" required />
+          <BaseSelect v-model="form.platform_account_id" label="Cuenta Origen (Plataforma Paga Divisa)"
+            :options="platformAccountOptions" required :error="platformAccountError" />
         </div>
 
         <h2 class="step-title section-title">Cálculos</h2>
         <div class="form-grid-col3">
-          <BaseInput
-            v-model.number="form.amount_to_deliver"
-            :label="`Monto a Comprar (${deliverCurrency || 'Divisa'})`"
-            type="number"
-            step="0.01"
-            required
-          />
+          <BaseInput v-model.number="form.amount_to_deliver" :label="`Monto a Comprar (${deliverCurrency || 'Divisa'})`"
+            type="number" step="0.01" required />
           <div class="info-box rate-box">
             <p>Tasa de Compra (Costo)</p>
             <h3 :class="{ 'rate-found': form.buy_rate }">
@@ -268,18 +241,10 @@ const formatCurrency = (value, currency) => {
 
         <h2 class="step-title section-title">Comisiones (Sobre Monto a Comprar)</h2>
         <div class="form-grid-col2">
-          <BaseInput
-            v-model.number="form.commission_charged_pct"
-            label="Comisión Empresa (%)"
-            type="number"
-            step="0.01"
-          />
-          <BaseInput
-            v-model.number="form.commission_provider_pct"
-            label="Comisión Proveedor (%)"
-            type="number"
-            step="0.01"
-          />
+          <BaseInput v-model.number="form.commission_charged_pct" label="Comisión Empresa (%)" type="number"
+            step="0.01" />
+          <BaseInput v-model.number="form.commission_provider_pct" label="Comisión Proveedor (%)" type="number"
+            step="0.01" />
         </div>
 
         <!-- NUEVO CHECKBOX -->
@@ -299,7 +264,9 @@ const formatCurrency = (value, currency) => {
           <h2 class="step-title section-title">Resumen Final (Calculado)</h2>
           <div class="summary-grid">
             <div class="summary-card">
-              <h4><FontAwesomeIcon icon="fa-solid fa-arrow-up" /> Plataforma Recibe (VES)</h4>
+              <h4>
+                <FontAwesomeIcon icon="fa-solid fa-arrow-up" /> Plataforma Recibe (VES)
+              </h4>
               <div class="summary-line">
                 <span>Monto Base (VES):</span>
                 <strong>{{ formatCurrency(baseAmountInVes, localCurrencyCode) }}</strong>
@@ -318,7 +285,9 @@ const formatCurrency = (value, currency) => {
               </div>
             </div>
             <div class="summary-card">
-              <h4><FontAwesomeIcon icon="fa-solid fa-arrow-down" /> Plataforma Paga (Divisa)</h4>
+              <h4>
+                <FontAwesomeIcon icon="fa-solid fa-arrow-down" /> Plataforma Paga (Divisa)
+              </h4>
               <div class="summary-line">
                 <span>Monto Cliente:</span>
                 <strong>{{ formatCurrency(form.amount_to_deliver, deliverCurrency) }}</strong>
@@ -343,24 +312,14 @@ const formatCurrency = (value, currency) => {
 
       <template #footer>
         <div class="wizard-nav">
-          <button
-            type="button"
-            @click="currentStep--"
-            :disabled="currentStep === 0"
-            class="btn-prev"
-          >
+          <button type="button" @click="currentStep--" :disabled="currentStep === 0" class="btn-prev">
             Anterior
           </button>
           <button type="button" @click="goToNextStep" v-if="currentStep < 1" class="btn-next">
             Siguiente
           </button>
-          <button
-            type="button"
-            @click="handleSubmit"
-            v-if="currentStep === 1"
-            :disabled="isSubmitting || generalAmountError"
-            class="btn-finish"
-          >
+          <button type="button" @click="handleSubmit" v-if="currentStep === 1"
+            :disabled="isSubmitting || generalAmountError" class="btn-finish">
             {{ isSubmitting ? 'Procesando...' : 'Finalizar Compra' }}
           </button>
         </div>
@@ -407,44 +366,53 @@ const formatCurrency = (value, currency) => {
   font-size: 1.3rem;
   color: var(--color-text-light);
 }
+
 .section-title {
   margin-top: 30px;
   margin-bottom: 15px;
 }
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 20px;
 }
+
 .form-grid-col2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px 30px;
 }
+
 .form-grid-col3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 20px;
 }
+
 .summary-box {
   margin-top: 20px;
 }
+
 .summary-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
+
 .summary-card {
   background-color: var(--color-background);
   padding: 20px;
   border-radius: 8px;
 }
+
 .summary-card h4 {
   font-size: 1.1rem;
   color: var(--color-primary);
   margin-top: 0;
   margin-bottom: 15px;
 }
+
 .summary-line {
   display: flex;
   justify-content: space-between;
@@ -452,10 +420,12 @@ const formatCurrency = (value, currency) => {
   margin-bottom: 8px;
   opacity: 0.8;
 }
+
 .summary-line.com-line {
   font-size: 0.9rem;
   opacity: 0.6;
 }
+
 .summary-total {
   display: flex;
   justify-content: space-between;
@@ -464,12 +434,15 @@ const formatCurrency = (value, currency) => {
   padding-top: 10px;
   border-top: 1px solid var(--color-border);
 }
+
 .summary-total.debit strong {
   color: var(--color-danger);
 }
+
 .summary-total.credit strong {
   color: var(--color-success);
 }
+
 .error-box {
   margin-top: 20px;
   padding: 15px;
@@ -480,47 +453,58 @@ const formatCurrency = (value, currency) => {
   text-align: center;
   font-weight: 500;
 }
+
 .info-box {
   background-color: var(--color-background);
   padding: 15px;
   border-radius: 8px;
 }
+
 .info-box p {
   margin: 0 0 5px 0;
   font-size: 0.9rem;
   opacity: 0.7;
 }
+
 .info-box h3 {
   font-size: 1.5rem;
   font-weight: bold;
   color: var(--color-danger);
 }
+
 .info-box h3.rate-found {
   color: var(--color-success);
 }
+
 .rate-box {
   margin-top: 30px;
 }
+
 .form-grid-col3 .info-box {
   margin-top: 0;
 }
+
 .form-grid-col3 .rate-box {
   margin-top: 0;
 }
-.form-grid-col3 > *:not(h2) {
+
+.form-grid-col3>*:not(h2) {
   height: 100%;
 }
+
 .form-grid-col3 .info-box {
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
+
 .wizard-nav {
   display: flex;
   justify-content: flex-end;
   width: 100%;
   gap: 10px;
 }
+
 .wizard-nav button {
   padding: 10px 20px;
   border: none;
@@ -528,18 +512,22 @@ const formatCurrency = (value, currency) => {
   font-weight: bold;
   cursor: pointer;
 }
+
 .btn-prev {
   background-color: var(--color-hover);
   color: var(--color-text-light);
 }
+
 .btn-next {
   background-color: var(--color-primary);
   color: var(--color-secondary);
 }
+
 .btn-finish {
   background-color: var(--color-success);
   color: var(--color-secondary);
 }
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

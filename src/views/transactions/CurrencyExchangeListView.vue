@@ -15,6 +15,7 @@ const transactionStore = useTransactionStore()
 // --- ESTADO ---
 const exchanges = ref([])
 const isLoading = ref(false)
+const isDownloading = ref(false) // <--- NUEVO ESTADO PARA DESCARGA
 const pagination = ref({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 })
 
 // --- ESTADO DEL MODAL ---
@@ -39,6 +40,34 @@ const canApprove = computed(() => {
   const allowedRoles = ['admin', 'cajero', 'superadmin', 'admin_tenant']
   return user.roles.some((r) => allowedRoles.includes(r.name))
 })
+
+// --- LÓGICA DE DESCARGA (NUEVA) ---
+const downloadReport = async (format) => {
+  isDownloading.value = true
+  try {
+    const response = await api.get('/reports/download', {
+      params: {
+        report_type: 'operations', // Tipo de reporte para esta vista
+        format: format
+      },
+      responseType: 'blob'
+    })
+
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `Operaciones_${new Date().toISOString().slice(0, 10)}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error("Error descargando:", error)
+    Swal.fire('Error', 'No se pudo generar el reporte', 'error')
+  } finally {
+    isDownloading.value = false
+  }
+}
 
 const handleDeliver = async (row) => {
   const result = await Swal.fire({
@@ -76,7 +105,6 @@ const parseLaravelDate = (dateString) => {
   return new Date(isoString)
 }
 
-// 🚨 FUNCIÓN NORMALIZADORA (CORREGIDA) 🚨
 const normalizeTransactionData = (data) => {
   const client = data.client || {}
   const broker = data.broker || {}
@@ -95,17 +123,10 @@ const normalizeTransactionData = (data) => {
   const adminShare = parseFloat(data.commission_admin_amount || 0)  // Costo Admin
   const brokerShare = parseFloat(data.commission_broker_amount || 0)// Costo Broker
 
-  // Utilidad Neta Real
   const netProfit = charged - cost - adminShare - brokerShare
-
-  // Montos Base
   const amountBaseSent = parseFloat(data.amount_sent || 0)
   const amountBaseReceived = parseFloat(data.amount_received || 0)
-
-  // ⚠️ CAMBIO AQUÍ: No sumamos la ganancia (charged).
-  // Mostramos exactamente lo que se recibió (ej: $100).
   const amountTotalIn = amountBaseReceived
-
   const rawDate = parseLaravelDate(data.created_at)
 
   return {
@@ -114,29 +135,21 @@ const normalizeTransactionData = (data) => {
     status: data.status,
     created_at: rawDate?.toLocaleString('es-VE') || 'N/A',
     date_fmt: rawDate?.toLocaleDateString() || 'N/A',
-
     type_label: isPurchase ? 'COMPRA' : 'INTERCAMBIO',
     is_purchase: isPurchase,
-
     client_name: client.name || 'Cliente Eliminado',
     broker_name: broker.name || 'N/A',
     provider_name: provider.name || 'N/A',
     admin_name: admin.name || 'Sistema',
-
     from_acc_name: fromAcc.name || 'Cuenta Origen',
     from_currency: fromAcc.currency_code || '---',
     amount_sent: amountBaseSent,
-
     to_acc_name: toAcc.name || 'Cuenta Destino',
     to_currency: toAcc.currency_code || '---',
-
-    // Ambos campos reflejan el monto base puro
     amount_received: amountBaseReceived,
     amount_total_in: amountTotalIn,
-
     rate_used: isPurchase ? buyRate : exRate,
     rate_label: isPurchase ? 'Tasa Compra' : 'Tasa Cambio',
-
     comm_charged: charged,
     comm_cost: cost,
     comm_admin: adminShare,
@@ -155,7 +168,6 @@ const fetchExchanges = async (page = 1) => {
       return {
         ...tx,
         ...normalized,
-        // Usamos amount_total_in que ahora es igual al base (100)
         amount_out_fmt: formatMoney(normalized.amount_sent, normalized.from_currency),
         amount_in_fmt: formatMoney(normalized.amount_total_in, normalized.to_currency),
       }
@@ -191,9 +203,20 @@ onMounted(() => fetchExchanges())
   <div class="list-view">
     <div class="list-header">
       <h1>Historial de Operaciones</h1>
-      <router-link :to="{ name: 'transaction_exchange_create' }" class="btn-new">
-        <FontAwesomeIcon icon="fa-solid fa-plus" /> Nueva Operación
-      </router-link>
+      <div class="header-actions">
+        <button @click="downloadReport('excel')" :disabled="isDownloading" class="btn-export btn-excel"
+          title="Exportar a Excel">
+          <FontAwesomeIcon icon="fa-solid fa-file-excel" />
+        </button>
+        <button @click="downloadReport('pdf')" :disabled="isDownloading" class="btn-export btn-pdf"
+          title="Exportar a PDF">
+          <FontAwesomeIcon icon="fa-solid fa-file-pdf" />
+        </button>
+
+        <router-link :to="{ name: 'transaction_exchange_create' }" class="btn-new">
+          <FontAwesomeIcon icon="fa-solid fa-plus" /> Nueva Operación
+        </router-link>
+      </div>
     </div>
 
     <div class="table-card">
@@ -288,7 +311,6 @@ onMounted(() => fetchExchanges())
 
         <div class="financial-box">
           <h4>Desglose Financiero</h4>
-
           <div class="fin-row">
             <span>Comisión Cobrada (Bruto):</span>
             <strong class="text-success">+ {{ formatMoney(selectedTx.comm_charged) }}</strong>
@@ -305,7 +327,6 @@ onMounted(() => fetchExchanges())
             <span>Comisión Corredor:</span>
             <strong class="text-danger">- {{ formatMoney(selectedTx.comm_broker) }}</strong>
           </div>
-
           <div class="fin-row total">
             <span>Utilidad Neta Real:</span>
             <strong :class="selectedTx.net_profit >= 0 ? 'text-success' : 'text-danger'">
@@ -348,7 +369,43 @@ onMounted(() => fetchExchanges())
   margin: 0;
 }
 
-/* Botones */
+/* GRUPO DE ACCIONES DE CABECERA */
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Botones Exportar */
+.btn-export {
+  background: #333;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+}
+
+.btn-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-excel:hover {
+  background: #198754;
+  /* Verde Excel */
+  border-color: #198754;
+}
+
+.btn-pdf:hover {
+  background: #dc3545;
+  /* Rojo PDF */
+  border-color: #dc3545;
+}
+
+/* Botones Existentes */
 .btn-new {
   background: var(--color-primary);
   color: #000;
