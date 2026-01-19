@@ -34,20 +34,34 @@ const tableHeaders = [
 ]
 
 /**
- * Formatea un número a moneda (con corrección USDT).
+ * Formatea un número a moneda (con corrección USDT y soporte BS).
  */
 const formatCurrency = (value, currency = 'USD') => {
   if (value === null || value === undefined) value = 0
 
-  // 🚨 CORRECCIÓN USDT: Usar USD para el formato si es USDT, ya que Intl.NumberFormat no lo soporta.
-  const currencyCode = currency === 'USDT' ? 'USD' : currency
+  // 1. Corrección de código
+  let currencyCode = currency === 'USDT' ? 'USD' : currency
 
-  return new Intl.NumberFormat('es-VE', {
-    style: 'currency',
-    currency: currencyCode,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  // 2. 🚨 CORRECCIÓN CLAVE: Soporte manual para 'BS'
+  if (currencyCode === 'BS') {
+    return `Bs. ${new Intl.NumberFormat('es-VE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value)}`
+  }
+
+  // 3. Intento estándar (try/catch por seguridad)
+  try {
+    return new Intl.NumberFormat('es-VE', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  } catch (e) {
+    console.warn('Moneda inválida:', currencyCode)
+    return `${currencyCode} ${Number(value).toFixed(2)}`
+  }
 }
 
 /**
@@ -128,26 +142,17 @@ onMounted(() => {
           <tr v-for="account in accounts" :key="account.id">
             <td>{{ account.name }}</td>
             <td>{{ account.currency_code }}</td>
-            <td
-              :class="{ 'text-danger': account.balance < 0, 'text-success': account.balance >= 0 }"
-            >
+            <td :class="{ 'text-danger': account.balance < 0, 'text-success': account.balance >= 0 }">
               {{ formatCurrency(account.balance, account.currency_code) }}
             </td>
             <td>{{ account.details || 'N/A' }}</td>
             <td class="action-buttons">
               <template v-if="authStore.can(permissionKey)">
-                <button
-                  @click="openEditModal(account.id)"
-                  class="btn-icon edit"
-                  title="Editar Nombre/Detalles"
-                >
+                <button @click="openEditModal(account.id)" class="btn-icon edit" title="Editar Nombre/Detalles">
                   <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
                 </button>
-                <button
-                  @click="deleteAccount(account.id, account.name)"
-                  class="btn-icon delete"
-                  title="Eliminar cuenta (solo si saldo = 0)"
-                >
+                <button @click="deleteAccount(account.id, account.name)" class="btn-icon delete"
+                  title="Eliminar cuenta (solo si saldo = 0)">
                   <FontAwesomeIcon icon="fa-solid fa-trash" />
                 </button>
               </template>
@@ -170,12 +175,8 @@ onMounted(() => {
       </template>
     </BaseCard>
 
-    <AccountFormModal
-      :show="showAccountModal"
-      :account-id="accountIdToEdit"
-      @close="showAccountModal = false"
-      @saved="fetchAccounts(pagination.current_page || 1)"
-    />
+    <AccountFormModal :show="showAccountModal" :account-id="accountIdToEdit" @close="showAccountModal = false"
+      @saved="fetchAccounts(pagination.current_page || 1)" />
   </div>
 </template>
 
@@ -187,9 +188,11 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 25px;
 }
+
 .header-actions h1 {
   font-size: 1.6rem;
 }
+
 .btn-primary {
   background-color: var(--color-primary);
   color: var(--color-secondary);
@@ -199,13 +202,16 @@ onMounted(() => {
   font-weight: bold;
   transition: background-color 0.2s;
 }
+
 .btn-primary:hover {
   background-color: #ffc424;
 }
+
 .action-buttons {
   display: flex;
   gap: 8px;
 }
+
 .btn-icon {
   background: none;
   border: none;
@@ -214,30 +220,38 @@ onMounted(() => {
   padding: 5px;
   transition: color 0.2s;
 }
+
 .btn-icon.edit {
   color: #3498db;
 }
+
 .btn-icon.edit:hover {
   color: #2980b9;
 }
+
 .btn-icon.delete {
   color: var(--color-danger);
 }
+
 .btn-icon.delete:hover {
   color: #c0392b;
 }
+
 .no-actions {
   font-size: 0.85rem;
   opacity: 0.5;
 }
+
 .text-danger {
   color: var(--color-danger);
   font-weight: 600;
 }
+
 .text-success {
   color: var(--color-success);
   font-weight: 600;
 }
+
 .no-data-message,
 .loading-state {
   text-align: center;

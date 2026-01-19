@@ -98,59 +98,24 @@ onMounted(() => {
     <h2>{{ pageTitle }}</h2>
 
     <form @submit.prevent="handleSubmit" class="form-card">
-      <BaseInput
-        v-model="form.name"
-        label="Nombre de la Cuenta"
-        name="name"
-        :error="errors.name ? errors.name[0] : ''"
-        placeholder="Ej: Banesco Dólares, Caja General"
-        required
-      />
+      <BaseInput v-model="form.name" label="Nombre de la Cuenta" name="name" :error="errors.name ? errors.name[0] : ''"
+        placeholder="Ej: Banesco Dólares, Caja General" required />
 
-      <BaseSelect
-        v-model="form.type"
-        label="Tipo"
-        name="type"
-        :options="accountTypeOptions"
-        track-by="id"
-        label-by="name"
-        :error="errors.type ? errors.type[0] : ''"
-        placeholder="Seleccione el tipo de cuenta"
-        required
-      />
+      <BaseSelect v-model="form.type" label="Tipo" name="type" :options="accountTypeOptions" track-by="id"
+        label-by="name" :error="errors.type ? errors.type[0] : ''" placeholder="Seleccione el tipo de cuenta"
+        required />
 
-      <BaseSelect
-        v-model="form.currency_code"
-        label="Moneda"
-        name="currency_code"
-        :options="currencyOptions"
-        track-by="code"
-        label-by="name"
-        :error="errors.currency_code ? errors.currency_code[0] : ''"
-        placeholder="USD, EUR, VED..."
-        :disabled="isEditing"
-        required
-      />
+      <BaseSelect v-model="form.currency_code" label="Moneda" name="currency_code" :options="currencyOptions"
+        track-by="code" label-by="name" :error="errors.currency_code ? errors.currency_code[0] : ''"
+        placeholder="USD, EUR, VED..." :disabled="isEditing" required />
 
-      <BaseInput
-        v-model="form.initial_balance"
-        label="Balance Inicial"
-        name="initial_balance"
-        type="number"
-        step="0.01"
-        :disabled="isEditing"
-        :error="errors.initial_balance ? errors.initial_balance[0] : ''"
-        required
-      />
+      <BaseInput v-model="form.initial_balance" label="Balance Inicial" name="initial_balance" type="number" step="0.01"
+        :disabled="isEditing" :error="errors.initial_balance ? errors.initial_balance[0] : ''" required />
 
       <div class="form-group">
         <label for="details">Detalles / Notas</label>
-        <textarea
-          id="details"
-          v-model="form.details"
-          rows="3"
-          placeholder="Información adicional (Ej: Banco, Nro. de cuenta)"
-        ></textarea>
+        <textarea id="details" v-model="form.details" rows="3"
+          placeholder="Información adicional (Ej: Banco, Nro. de cuenta)"></textarea>
       </div>
 
       <div class="form-actions">
@@ -172,6 +137,7 @@ onMounted(() => {
   max-width: 600px;
   margin-top: 20px;
 }
+
 /* Estilos adicionales para textarea si no está en BaseInput */
 textarea {
   width: 100%;
@@ -182,15 +148,18 @@ textarea {
   border-radius: 4px;
   resize: vertical;
 }
+
 .form-group {
   margin-bottom: 18px;
 }
+
 .form-actions {
   margin-top: 30px;
   display: flex;
   gap: 15px;
   align-items: center;
 }
+
 .submit-btn {
   padding: 12px 20px;
   background-color: var(--color-primary);
@@ -203,15 +172,18 @@ textarea {
     background-color 0.2s,
     opacity 0.2s;
 }
+
 .submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .btn-cancel {
   color: var(--color-text-light);
   text-decoration: none;
   opacity: 0.8;
 }
+
 .btn-cancel:hover {
   opacity: 1;
 }

@@ -65,6 +65,7 @@ const form = reactive({
 
   reference_id: '',
   delivered: true,
+  paid: true, // <--- NUEVO CAMPO (Pago Inmediato)
 })
 
 // --- FUNCIÓN DE RECARGA EN TIEMPO REAL ---
@@ -126,6 +127,9 @@ const commissionCurrency = computed(() => {
 })
 
 const hasSufficientBalance = computed(() => {
+  // Si NO está marcado como pagado, no validamos saldo porque es una deuda a futuro
+  if (!form.paid && form.capital_type === 'own') return true
+
   if (form.capital_type === 'own') {
     if (!fromAccount.value || !form.amount_sent) return true
     const rawAccount = transactionStore.rawAccounts?.find((a) => a.id == form.from_account_id)
@@ -429,6 +433,7 @@ const handleConfirm = async () => {
       payload.buy_rate = null
       payload.received_rate = null
       payload.delivered = form.delivered
+      payload.paid = form.paid
     } else if (operationType.value === 'exchange') {
       // INTERCAMBIO: Lógica para evitar error 422
       payload.operation_type = 'exchange'
@@ -465,6 +470,7 @@ const handleConfirm = async () => {
       payload.commission_admin_pct = 0
       payload.commission_admin_amount = 0
       payload.delivered = form.delivered
+      payload.paid = form.paid // <--- ENVÍO DEL ESTADO DE PAGO
     }
 
     if (!payload.broker_id) {
@@ -530,9 +536,7 @@ const handleConfirm = async () => {
                 <button :class="{ active: form.capital_type === 'own' }" @click="form.capital_type = 'own'">
                   Propio
                 </button>
-                <button :class="{ active: form.capital_type === 'investor' }" @click="form.capital_type = 'investor'">
-                  Inversionista
-                </button>
+
               </div>
             </div>
 
@@ -669,14 +673,30 @@ const handleConfirm = async () => {
               <span v-else-if="form.capital_type === 'investor'">{{ selectedInvestor?.name }}</span>
             </p>
 
-            <div v-if="operationType === 'purchase' || isComplexExchange" class="delivery-check">
-              <label class="checkbox-wrapper">
-                <input type="checkbox" v-model="form.delivered" />
-                <span class="checkmark"></span>
-                <div class="check-text">
-                  <span class="title">Entregar Inmediatamente</span>
-                </div>
-              </label>
+            <div v-if="operationType === 'purchase' || isComplexExchange" class="delivery-check-group">
+
+              <div class="check-item">
+                <label class="checkbox-wrapper">
+                  <input type="checkbox" v-model="form.delivered" />
+                  <span class="checkmark"></span>
+                  <div class="check-text">
+                    <span class="title">Entregar Inmediatamente</span>
+                    <small v-if="!form.delivered" class="text-warning">Estado: POR COBRAR</small>
+                  </div>
+                </label>
+              </div>
+
+              <div class="check-item">
+                <label class="checkbox-wrapper">
+                  <input type="checkbox" v-model="form.paid" />
+                  <span class="checkmark"></span>
+                  <div class="check-text">
+                    <span class="title">Pagado Inmediatamente</span>
+                    <small v-if="!form.paid" class="text-danger">Estado: POR PAGAR</small>
+                  </div>
+                </label>
+              </div>
+
             </div>
           </div>
 
@@ -1173,11 +1193,19 @@ const handleConfirm = async () => {
   padding-top: 10px;
 }
 
-/* Estilos para el Checkbox de Entrega */
-.delivery-check {
+/* Estilos para el Grupo de Checkboxes (Entrega y Pago) */
+.delivery-check-group {
   margin-top: 20px;
   padding-top: 15px;
   border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.check-item {
+  flex: 1;
+  min-width: 200px;
 }
 
 .checkbox-wrapper {
@@ -1190,7 +1218,6 @@ const handleConfirm = async () => {
 
 .checkbox-wrapper input {
   display: none;
-  /* Ocultar el checkbox nativo */
 }
 
 .checkmark {
@@ -1234,10 +1261,15 @@ const handleConfirm = async () => {
 .check-text small {
   color: #888;
   font-size: 0.8rem;
+  margin-top: 2px;
+  font-weight: bold;
 }
 
 .text-warning {
   color: #f39c12;
-  font-weight: bold;
+}
+
+.text-danger {
+  color: #e74c3c;
 }
 </style>

@@ -3,28 +3,44 @@ import { ref, onMounted } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-// import DashboardCard from '@/components/shared/DashboardCard.vue' // (Opcional si usas componentes separados)
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 const summary = ref(null)
-const isLoading = ref(true)
+const isLoading = ref(false)
 
 /**
- * Formatea un número a moneda (con corrección USDT).
+ * Formatea un número a moneda (con corrección USDT y soporte para BS).
  */
 const formatCurrency = (value, currency = 'USD') => {
-  if (value === null || value === undefined) return formatCurrency(0, currency)
+  if (value === null || value === undefined) value = 0
 
-  // 🚨 CORRECCIÓN USDT: Usar USD para el formato si es USDT.
-  const currencyCode = currency === 'USDT' ? 'USD' : currency
+  // 1. Normalizar código (USDT -> USD)
+  let currencyCode = currency === 'USDT' ? 'USD' : currency
 
-  return new Intl.NumberFormat('es-VE', {
-    style: 'currency',
-    currency: currencyCode,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  // 2. 🚨 CORRECCIÓN PARA 'BS': 
+  // 'BS' no es un código ISO válido para Intl (el oficial es VES).
+  // Lo formateamos manualmente para evitar el crash.
+  if (currencyCode === 'BS') {
+    return `Bs. ${new Intl.NumberFormat('es-VE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value)}`
+  }
+
+  // 3. Intento estándar con protección de errores
+  try {
+    return new Intl.NumberFormat('es-VE', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  } catch (error) {
+    // Fallback por si llega otro código raro
+    console.warn('Moneda desconocida:', currencyCode)
+    return `${currencyCode} ${Number(value).toFixed(2)}`
+  }
 }
 
 /**
@@ -44,10 +60,8 @@ const fetchSummary = async () => {
 }
 
 onMounted(() => {
-  // Solo intenta cargar si el usuario está logueado
-  if (authStore.isLoggedIn) {
-    fetchSummary()
-  }
+  // Ejecutamos siempre para evitar que se quede "Cargando..." si el store tarda en iniciar
+  fetchSummary()
 })
 </script>
 
@@ -101,11 +115,7 @@ onMounted(() => {
       <div class="box-detail-wrapper">
         <h2>💰 Caja por Moneda</h2>
         <div class="cash-grid">
-          <div
-            v-for="account in summary.caja_general_por_moneda"
-            :key="account.currency_code"
-            class="cash-card"
-          >
+          <div v-for="account in summary.caja_general_por_moneda" :key="account.currency_code" class="cash-card">
             <p class="cash-title">{{ account.currency_code }}</p>
             <h4 class="cash-value">
               {{ formatCurrency(account.total_balance, account.currency_code) }}
@@ -129,10 +139,12 @@ onMounted(() => {
   padding-left: 15px;
   margin-bottom: 30px;
 }
+
 .page-header h1 {
   font-size: 1.8rem;
   margin-bottom: 5px;
 }
+
 .subtitle {
   opacity: 0.6;
   font-size: 0.95rem;
@@ -145,6 +157,7 @@ onMounted(() => {
   gap: 25px;
   margin-bottom: 50px;
 }
+
 .kpi-card {
   background-color: var(--color-secondary);
   padding: 25px;
@@ -154,6 +167,7 @@ onMounted(() => {
   overflow: hidden;
   border-bottom: 3px solid transparent;
 }
+
 .kpi-icon {
   position: absolute;
   bottom: -10px;
@@ -162,8 +176,10 @@ onMounted(() => {
   opacity: 0.08;
   color: var(--color-text-light);
   transform: rotate(-10deg);
-  z-index: 0; /* Al fondo */
+  z-index: 0;
+  /* Al fondo */
 }
+
 .kpi-title {
   font-size: 1rem;
   opacity: 0.7;
@@ -171,6 +187,7 @@ onMounted(() => {
   position: relative;
   z-index: 1;
 }
+
 .kpi-value {
   font-size: 2.2rem;
   font-weight: 700;
@@ -183,18 +200,23 @@ onMounted(() => {
 .balance-neto {
   border-color: var(--color-primary);
 }
+
 .por-cobrar {
   border-color: var(--color-success);
 }
+
 .por-pagar {
   border-color: var(--color-danger);
 }
+
 .balance-neto .kpi-value {
   color: var(--color-primary);
 }
+
 .por-cobrar .kpi-value {
   color: var(--color-success);
 }
+
 .por-pagar .kpi-value {
   color: var(--color-danger);
 }
@@ -219,7 +241,8 @@ onMounted(() => {
 }
 
 .break-row.highlight {
-  color: var(--color-warning, #f39c12); /* Color naranja para resaltar */
+  color: var(--color-warning, #f39c12);
+  /* Color naranja para resaltar */
   font-weight: bold;
   opacity: 1;
 }
@@ -230,11 +253,13 @@ onMounted(() => {
   margin-bottom: 20px;
   color: var(--color-text-light);
 }
+
 .cash-grid {
   display: flex;
   gap: 20px;
   flex-wrap: wrap;
 }
+
 .cash-card {
   background-color: var(--color-secondary);
   padding: 20px;
@@ -243,16 +268,19 @@ onMounted(() => {
   flex-grow: 1;
   border-left: 3px solid #3498db;
 }
+
 .cash-title {
   font-size: 0.85rem;
   color: var(--color-primary);
   margin-bottom: 5px;
 }
+
 .cash-value {
   font-size: 1.6rem;
   font-weight: 600;
   margin-bottom: 5px;
 }
+
 .cash-note {
   font-size: 0.8rem;
   opacity: 0.5;
@@ -264,6 +292,7 @@ onMounted(() => {
   padding: 50px;
   color: var(--color-primary);
 }
+
 .loading-icon {
   font-size: 2rem;
   margin-bottom: 10px;
