@@ -2,14 +2,22 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
+import Swal from 'sweetalert2' // <--- 1. NUEVO: Importar SweetAlert
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome' // <--- 2. NUEVO: Iconos
 
 const props = defineProps({
   title: String,
   endpoint: String,
+  // --- 3. NUEVO: Prop para saber qué reporte descargar (por defecto Matriz) ---
+  exportType: {
+    type: String,
+    default: 'profit_matrix'
+  }
 })
 
 const route = useRoute()
 const isLoading = ref(true)
+const isDownloading = ref(false) // <--- 4. NUEVO: Estado de descarga
 
 // Fechas por defecto
 const startDate = ref(new Date().getFullYear() + '-01-01')
@@ -33,6 +41,46 @@ const loadData = async () => {
     reports.value = []
   } finally {
     isLoading.value = false
+  }
+}
+
+// --- 5. NUEVO: Función de descarga ---
+const downloadReport = async (format) => {
+  isDownloading.value = true
+  try {
+    const params = {
+      report_type: props.exportType, // Usa el tipo definido en el prop
+      format: format,
+      start_date: startDate.value,
+      end_date: endDate.value,
+      entity_id: route.query.entity_id || undefined
+    }
+
+    const response = await api.get('/reports/download', {
+      params,
+      responseType: 'blob'
+    })
+
+    if (response.data.type === 'application/json') {
+      const errorText = await response.data.text()
+      throw new Error(JSON.parse(errorText).message || 'Error generando reporte')
+    }
+
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `${props.exportType}_${startDate.value}_${endDate.value}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+    console.error("Error descargando:", error)
+    Swal.fire('Error', error.message || 'No se pudo generar el reporte.', 'error')
+  } finally {
+    isDownloading.value = false
   }
 }
 
@@ -65,15 +113,29 @@ onMounted(loadData)
   <div class="entity-report">
     <div class="header">
       <h1 class="page-title">{{ props.title }}</h1>
-      <div class="date-picker-group">
-        <div class="date-input-wrapper">
-          <label>Desde</label>
-          <input type="date" v-model="startDate" />
+
+      <div class="header-controls">
+        <div class="date-picker-group">
+          <div class="date-input-wrapper">
+            <label>Desde</label>
+            <input type="date" v-model="startDate" />
+          </div>
+          <span class="arrow">→</span>
+          <div class="date-input-wrapper">
+            <label>Hasta</label>
+            <input type="date" v-model="endDate" />
+          </div>
         </div>
-        <span class="arrow">→</span>
-        <div class="date-input-wrapper">
-          <label>Hasta</label>
-          <input type="date" v-model="endDate" />
+
+        <div class="export-buttons">
+          <button @click="downloadReport('excel')" :disabled="isDownloading" class="btn-export btn-excel"
+            title="Exportar a Excel">
+            <FontAwesomeIcon icon="fa-solid fa-file-excel" />
+          </button>
+          <button @click="downloadReport('pdf')" :disabled="isDownloading" class="btn-export btn-pdf"
+            title="Exportar a PDF">
+            <FontAwesomeIcon icon="fa-solid fa-file-pdf" />
+          </button>
         </div>
       </div>
     </div>
@@ -143,19 +205,29 @@ onMounted(loadData)
 <style scoped>
 /* --- Variables de Color (Dark Mode Theme) --- */
 :root {
-  --bg-dark: #18181b; /* Zinc 950 */
-  --card-bg: #27272a; /* Zinc 800 */
-  --border-color: #3f3f46; /* Zinc 700 */
-  --text-primary: #f4f4f5; /* Zinc 100 */
-  --text-secondary: #a1a1aa; /* Zinc 400 */
-  --brand-yellow: #fbbf24; /* Amber 400 (Kephas Color) */
-  --success-green: #34d399; /* Emerald 400 */
-  --info-blue: #60a5fa; /* Blue 400 */
-  --warning-orange: #fb923c; /* Orange 400 */
+  --bg-dark: #18181b;
+  /* Zinc 950 */
+  --card-bg: #27272a;
+  /* Zinc 800 */
+  --border-color: #3f3f46;
+  /* Zinc 700 */
+  --text-primary: #f4f4f5;
+  /* Zinc 100 */
+  --text-secondary: #a1a1aa;
+  /* Zinc 400 */
+  --brand-yellow: #fbbf24;
+  /* Amber 400 (Kephas Color) */
+  --success-green: #34d399;
+  /* Emerald 400 */
+  --info-blue: #60a5fa;
+  /* Blue 400 */
+  --warning-orange: #fb923c;
+  /* Orange 400 */
 }
 
 .entity-report {
-  color: #e4e4e7; /* Zinc-200 */
+  color: #e4e4e7;
+  /* Zinc-200 */
   font-family: 'Inter', system-ui, sans-serif;
 }
 
@@ -174,9 +246,18 @@ onMounted(loadData)
 .page-title {
   font-size: 1.8rem;
   font-weight: 700;
-  color: #fbbf24; /* Color Amarillo Kephas */
+  color: #fbbf24;
+  /* Color Amarillo Kephas */
   margin: 0;
   letter-spacing: -0.5px;
+}
+
+/* 8. NUEVO: Contenedor para agrupar controles a la derecha */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .date-picker-group {
@@ -188,6 +269,45 @@ onMounted(loadData)
   border-radius: 8px;
   border: 1px solid #3f3f46;
 }
+
+/* 9. NUEVO: Estilos de Botones */
+.export-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-export {
+  background: #27272a;
+  color: #fff;
+  border: 1px solid #3f3f46;
+  width: 42px;
+  /* Cuadrado para coincidir con altura visual */
+  height: 42px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+}
+
+.btn-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-excel:hover {
+  background: #198754;
+  border-color: #198754;
+}
+
+.btn-pdf:hover {
+  background: #dc3545;
+  border-color: #dc3545;
+}
+
+/* ------------------------------- */
 
 .date-input-wrapper {
   display: flex;
@@ -207,7 +327,8 @@ onMounted(loadData)
   font-family: inherit;
   font-size: 0.95rem;
   outline: none;
-  color-scheme: dark; /* Importante para el icono del calendario nativo */
+  color-scheme: dark;
+  /* Importante para el icono del calendario nativo */
   cursor: pointer;
 }
 
@@ -225,7 +346,8 @@ onMounted(loadData)
 }
 
 .card {
-  background: #27272a; /* Fondo oscuro */
+  background: #27272a;
+  /* Fondo oscuro */
   border: 1px solid #3f3f46;
   padding: 1.5rem;
   border-radius: 12px;
@@ -276,20 +398,26 @@ onMounted(loadData)
 .text-success {
   color: #34d399;
 }
+
 .text-info {
   color: #e4e4e7;
 }
+
 .text-warning {
   color: #fbbf24;
-} /* Amarillo Admin */
+}
+
+/* Amarillo Admin */
 
 /* Bordes inferiores de las tarjetas */
 .card-profit {
   border-bottom: 4px solid #34d399;
 }
+
 .card-moved {
   border-bottom: 4px solid #60a5fa;
 }
+
 .card-paid {
   border-bottom: 4px solid #fbbf24;
 }
@@ -310,8 +438,10 @@ onMounted(loadData)
 }
 
 .custom-table th {
-  background: #18181b; /* Header más oscuro */
-  color: #fbbf24; /* Texto Amarillo */
+  background: #18181b;
+  /* Header más oscuro */
+  color: #fbbf24;
+  /* Texto Amarillo */
   padding: 1.2rem 1.5rem;
   font-size: 0.85rem;
   font-weight: 600;
@@ -329,19 +459,23 @@ onMounted(loadData)
 
 /* Hover en filas */
 .custom-table tbody tr:hover {
-  background-color: #3f3f46; /* Ligeramente más claro al pasar mouse */
+  background-color: #3f3f46;
+  /* Ligeramente más claro al pasar mouse */
 }
 
 /* Utilidades de texto en tabla */
 .text-left {
   text-align: left;
 }
+
 .text-right {
   text-align: right;
 }
+
 .text-center {
   text-align: center;
 }
+
 .font-mono {
   font-family: 'Courier New', Courier, monospace;
   letter-spacing: -0.5px;
@@ -362,7 +496,8 @@ onMounted(loadData)
 .loading-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(24, 24, 27, 0.8); /* Fondo oscuro semitransparente */
+  background: rgba(24, 24, 27, 0.8);
+  /* Fondo oscuro semitransparente */
   backdrop-filter: blur(4px);
   display: flex;
   flex-direction: column;
@@ -376,7 +511,8 @@ onMounted(loadData)
   width: 50px;
   height: 50px;
   border: 4px solid #3f3f46;
-  border-top: 4px solid #fbbf24; /* Spinner Amarillo */
+  border-top: 4px solid #fbbf24;
+  /* Spinner Amarillo */
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 1rem;

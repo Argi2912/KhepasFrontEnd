@@ -5,10 +5,12 @@ import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import Swal from 'sweetalert2'
 
 // --- ESTADO ---
 const transactions = ref([])
 const isLoading = ref(false)
+const isDownloading = ref(false)
 const pagination = ref({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 })
 
 // --- ESTADO DEL MODAL ---
@@ -106,6 +108,46 @@ const formatMoney = (amount, currency = '') => {
   return currency ? `${val} ${currency}` : val
 }
 
+const downloadReport = async (format) => {
+  isDownloading.value = true
+  try {
+    // Definimos "Hoy" y el "Inicio de los tiempos"
+    const today = new Date().toISOString().slice(0, 10);
+    const startOfTime = '2020-01-01'; // <--- TRUCO: Fecha muy antigua para traer todo
+
+    const response = await api.get('/reports/download', {
+      params: {
+        report_type: 'internal',
+        format: format,
+        start_date: startOfTime, // <--- AHORA SÍ ENVIAMOS LAS FECHAS
+        end_date: today
+      },
+      responseType: 'blob'
+    })
+
+    // Verificación de seguridad: si el backend devuelve error JSON en vez de PDF
+    if (response.data.type === 'application/json') {
+      const errorText = await response.data.text();
+      throw new Error(JSON.parse(errorText).message || 'Error generando reporte');
+    }
+
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `Caja_Historial_${today}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+    console.error("Error descargando:", error)
+    Swal.fire('Error', error.message || 'No se pudo generar el reporte.', 'error')
+  } finally {
+    isDownloading.value = false
+  }
+}
+
 // --- FETCH LISTA ---
 const fetchTransactions = async (page = 1) => {
   isLoading.value = true
@@ -161,9 +203,19 @@ onMounted(() => fetchTransactions())
   <div class="list-view">
     <div class="list-header">
       <h1>Movimientos de Caja y Gastos</h1>
-      <router-link :to="{ name: 'transaction_internal_create' }" class="btn-new">
-        <FontAwesomeIcon icon="fa-solid fa-plus" /> Registrar Movimiento
-      </router-link>
+      <div class="header-actions">
+        <button @click="downloadReport('excel')" :disabled="isDownloading" class="btn-export btn-excel"
+          title="Exportar a Excel">
+          <FontAwesomeIcon icon="fa-solid fa-file-excel" />
+        </button>
+        <button @click="downloadReport('pdf')" :disabled="isDownloading" class="btn-export btn-pdf"
+          title="Exportar a PDF">
+          <FontAwesomeIcon icon="fa-solid fa-file-pdf" />
+        </button>
+        <router-link :to="{ name: 'transaction_internal_create' }" class="btn-new">
+          <FontAwesomeIcon icon="fa-solid fa-plus" /> Registrar Movimiento
+        </router-link>
+      </div>
     </div>
 
     <div class="table-card">

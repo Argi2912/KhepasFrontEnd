@@ -129,29 +129,18 @@ const getPrimaryRole = (roles) => {
             <td>{{ user.email }}</td>
             <td>
               <!-- 🚨 Muestra el rol principal usando la data del UserResource -->
-              <span
-                :class="`role-tag role-${getPrimaryRole(user.roles).toLowerCase()}`"
-                :title="`ID: ${user.id}`"
-              >
+              <span :class="`role-tag role-${getPrimaryRole(user.roles).toLowerCase()}`" :title="`ID: ${user.id}`">
                 {{ getPrimaryRole(user.roles) }}
               </span>
             </td>
             <td>{{ new Date(user.created_at).toLocaleDateString() }}</td>
             <td class="action-buttons">
               <template v-if="authStore.can(permissionKey)">
-                <button
-                  @click="openEditModal(user.id)"
-                  class="btn-icon edit"
-                  title="Editar Usuario y Rol"
-                >
+                <button @click="openEditModal(user.id)" class="btn-icon edit" title="Editar Usuario y Rol">
                   <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
                 </button>
-                <button
-                  @click="deleteUser(user.id, user.name)"
-                  class="btn-icon delete"
-                  title="Eliminar usuario"
-                  :disabled="user.id === authStore.authUser?.id"
-                >
+                <button @click="deleteUser(user.id, user.name)" class="btn-icon delete" title="Eliminar usuario"
+                  :disabled="user.id === authStore.authUser?.id">
                   <FontAwesomeIcon icon="fa-solid fa-trash" />
                 </button>
               </template>
@@ -174,12 +163,8 @@ const getPrimaryRole = (roles) => {
       </template>
     </BaseCard>
 
-    <UserFormModal
-      :show="showUserModal"
-      :user-id="userIdToEdit"
-      @close="showUserModal = false"
-      @saved="fetchUsers(pagination.current_page || 1)"
-    />
+    <UserFormModal :show="showUserModal" :user-id="userIdToEdit" @close="showUserModal = false"
+      @saved="fetchUsers(pagination.current_page || 1)" />
   </div>
 </template>
 
@@ -191,9 +176,11 @@ const getPrimaryRole = (roles) => {
   align-items: center;
   margin-bottom: 25px;
 }
+
 .header-actions h1 {
   font-size: 1.6rem;
 }
+
 .btn-primary {
   background-color: var(--color-primary);
   color: var(--color-secondary);
@@ -203,10 +190,12 @@ const getPrimaryRole = (roles) => {
   font-weight: bold;
   transition: background-color 0.2s;
 }
+
 .action-buttons {
   display: flex;
   gap: 8px;
 }
+
 .btn-icon {
   background: none;
   border: none;
@@ -215,20 +204,25 @@ const getPrimaryRole = (roles) => {
   padding: 5px;
   transition: color 0.2s;
 }
+
 .btn-icon.edit {
   color: #3498db;
 }
+
 .btn-icon.delete {
   color: var(--color-danger);
 }
+
 .btn-icon:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
 .no-actions {
   font-size: 0.85rem;
   opacity: 0.5;
 }
+
 /* Estilos para los roles según el seeder */
 .role-tag {
   padding: 4px 8px;
@@ -237,21 +231,32 @@ const getPrimaryRole = (roles) => {
   font-weight: 700;
   color: white;
 }
+
 .role-admin_tenant {
-  background-color: #f7a600; /* Primary */
+  background-color: #f7a600;
+  /* Primary */
 }
+
 .role-cajero {
-  background-color: #2ecc71; /* Success */
+  background-color: #2ecc71;
+  /* Success */
 }
+
 .role-analista {
-  background-color: #3498db; /* Info */
+  background-color: #3498db;
+  /* Info */
 }
+
 .role-corredor {
-  background-color: #9b59b6; /* Purple */
+  background-color: #9b59b6;
+  /* Purple */
 }
+
 .role-none {
-  background-color: #7f8c8d; /* Gray */
+  background-color: #7f8c8d;
+  /* Gray */
 }
+
 .no-data-message,
 .loading-state {
   text-align: center;

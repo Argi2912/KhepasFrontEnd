@@ -8,6 +8,7 @@ import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 import 'vue-select/dist/vue-select.css'
 import '@/assets/css/global.css'
+import './assets/css/responsive.css'
 
 // --- Font Awesome ---
 import { library } from '@fortawesome/fontawesome-svg-core'

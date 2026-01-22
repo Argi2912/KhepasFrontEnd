@@ -1,7 +1,6 @@
 <script setup>
 import { useAuthStore } from '@/stores/auth'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import notify from '@/services/notify'
 import alert from '@/services/alert'
 
 const authStore = useAuthStore()
@@ -17,7 +16,6 @@ const confirmLogout = async () => {
   )
 
   if (confirmed) {
-    // Llama a logout, que maneja la limpieza y redirección
     authStore.logout()
   }
 }
@@ -25,11 +23,13 @@ const confirmLogout = async () => {
 
 <template>
   <header class="navbar">
-    <button @click="emit('toggle-sidebar')" class="toggle-btn">
-      <FontAwesomeIcon icon="fa-solid fa-bars" />
-    </button>
+    <div class="nav-left">
+      <button @click="emit('toggle-sidebar')" class="toggle-btn">
+        <FontAwesomeIcon icon="fa-solid fa-bars" />
+      </button>
 
-    <span class="page-title">{{ $route.meta.label || 'Sistema Kephas' }}</span>
+      <span class="page-title">{{ $route.meta.label || 'Sistema Kephas' }}</span>
+    </div>
 
     <div class="user-profile">
       <div class="user-info">
@@ -37,7 +37,7 @@ const confirmLogout = async () => {
         <span class="user-role">{{ userRole.toUpperCase() }}</span>
       </div>
 
-      <button @click="confirmLogout" class="logout-btn">
+      <button @click="confirmLogout" class="logout-btn" title="Cerrar Sesión">
         <FontAwesomeIcon icon="fa-solid fa-right-from-bracket" />
       </button>
     </div>
@@ -55,7 +55,17 @@ const confirmLogout = async () => {
   padding: 0 25px;
   position: sticky;
   top: 0;
-  z-index: 999;
+  z-index: 900;
+  /* Menor que el sidebar (1000) */
+  transition: padding 0.3s ease;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  /* Permite que el texto se trunque si es necesario */
 }
 
 .toggle-btn {
@@ -65,7 +75,9 @@ const confirmLogout = async () => {
   font-size: 1.4rem;
   cursor: pointer;
   transition: color 0.2s;
-  margin-right: 20px;
+  margin-right: 15px;
+  padding: 5px;
+  /* Área de toque más grande */
 }
 
 .toggle-btn:hover {
@@ -73,16 +85,21 @@ const confirmLogout = async () => {
 }
 
 .page-title {
-  flex-grow: 1;
   font-size: 1.1rem;
   font-weight: 500;
   color: var(--color-text-light);
   opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Puntos suspensivos si es muy largo */
 }
 
 .user-profile {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+  /* Evita que se aplaste */
 }
 
 .user-info {
@@ -112,12 +129,38 @@ const confirmLogout = async () => {
   height: 40px;
   border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
 }
 
 .logout-btn:hover {
   background-color: var(--color-danger);
-  color: var(--color-text-light);
+  color: white;
   border-color: var(--color-danger);
+  transform: scale(1.05);
+}
+
+/* === RESPONSIVIDAD (MÓVIL) === */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 15px;
+    /* Menos padding en los bordes */
+  }
+
+  /* Ocultar nombre y rol en móvil para ahorrar espacio */
+  .user-info {
+    display: none;
+  }
+
+  .page-title {
+    font-size: 1rem;
+  }
+
+  .toggle-btn {
+    font-size: 1.3rem;
+    margin-right: 10px;
+  }
 }
 </style>

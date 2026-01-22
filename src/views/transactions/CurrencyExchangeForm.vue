@@ -8,14 +8,12 @@ import Swal from 'sweetalert2'
 
 // COMPONENTES
 import BaseInput from '@/components/ui/BaseInput.vue'
-// Asegúrate de que este componente exista o cámbialo a BaseSelect si es el estándar
 import BaseSelectWithSearchAndCreate from '@/components/ui/BaseSelectWithSearchAndCreate.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const transactionStore = useTransactionStore()
-// 1. CORRECCIÓN: Extraemos getError y clearError para usarlos en el template
 const { errors, handleAxiosError, getError, clearError } = useFormValidation()
 
 // --- ESTADO ---
@@ -352,7 +350,6 @@ watch(operationType, () => {
   form.commission_provider_pct = 0
   form.commission_admin_pct = 0
   form.commission_broker_pct = 0
-  // Limpiamos errores al cambiar de pestaña
   Object.keys(errors.value).forEach(key => clearError(key))
   resetCommissions()
 })
@@ -401,14 +398,9 @@ const handleConfirm = async () => {
   try {
     let payload = { ...form }
 
-    // Limpieza según tipo de capital
     if (form.capital_type === 'investor') {
       payload.from_account_id = null
     }
-
-    // 2. CORRECCIÓN CRÍTICA: Eliminadas las líneas que forzaban la comisión de proveedor a 0
-    // payload.commission_provider_amount = 0  <-- ELIMINADO
-    // payload.commission_provider_pct = 0     <-- ELIMINADO
 
     if (operationType.value === 'currency_change') {
       payload.operation_type = 'exchange'
@@ -421,7 +413,6 @@ const handleConfirm = async () => {
       payload.delivered = form.delivered
       payload.paid = form.paid
     } else if (operationType.value === 'exchange') {
-      // INTERCAMBIO: Lógica para evitar error 422
       payload.operation_type = 'exchange'
       payload.buy_rate = null
       payload.received_rate = null
@@ -444,7 +435,7 @@ const handleConfirm = async () => {
           payload.exchange_rate = (received / sent).toFixed(8)
         }
       } else {
-        payload.exchange_rate = 1 // Fallback
+        payload.exchange_rate = 1
       }
     } else {
       payload.operation_type = 'purchase'
@@ -471,7 +462,6 @@ const handleConfirm = async () => {
     router.push({ name: 'transaction_exchange_list' })
   } catch (error) {
     handleAxiosError(error)
-    // Si hay error, regresamos al paso 1 para que el usuario vea los campos rojos
     currentStep.value = 1
   } finally {
     isSubmitting.value = false
@@ -491,16 +481,18 @@ const handleConfirm = async () => {
           <h2>Nueva Operación</h2>
           <p class="subtitle">Paso {{ currentStep }} / {{ totalSteps }}</p>
         </div>
-        <div class="type-switcher">
-          <button :class="{ active: operationType === 'purchase' }" @click="operationType = 'purchase'">
-            Compra
-          </button>
-          <button :class="{ active: operationType === 'exchange' }" @click="operationType = 'exchange'">
-            Intercambio
-          </button>
-          <button :class="{ active: operationType === 'currency_change' }" @click="operationType = 'currency_change'">
-            Cambio Divisa
-          </button>
+        <div class="type-switcher-container">
+          <div class="type-switcher">
+            <button :class="{ active: operationType === 'purchase' }" @click="operationType = 'purchase'">
+              Compra
+            </button>
+            <button :class="{ active: operationType === 'exchange' }" @click="operationType = 'exchange'">
+              Intercambio
+            </button>
+            <button :class="{ active: operationType === 'currency_change' }" @click="operationType = 'currency_change'">
+              Divisa
+            </button>
+          </div>
         </div>
       </div>
 
@@ -863,7 +855,6 @@ const handleConfirm = async () => {
 </template>
 
 <style scoped>
-/* (Tus estilos se mantienen intactos) */
 .page-wrapper {
   max-width: 850px;
   margin: 0 auto;
@@ -920,6 +911,9 @@ const handleConfirm = async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  /* Permite wrap en móvil */
+  gap: 15px;
 }
 
 .type-switcher {
@@ -928,6 +922,8 @@ const handleConfirm = async () => {
   padding: 4px;
   border-radius: 8px;
   gap: 5px;
+  flex-wrap: wrap;
+  /* Wrap en botones si es necesario */
 }
 
 .type-switcher button {
@@ -939,6 +935,8 @@ const handleConfirm = async () => {
   font-weight: bold;
   border-radius: 6px;
   transition: 0.3s;
+  white-space: nowrap;
+  /* Evita que el texto del botón se parta */
 }
 
 .type-switcher button.active {
@@ -1025,6 +1023,8 @@ const handleConfirm = async () => {
   border-radius: 6px;
   width: 100%;
   font-weight: bold;
+  box-sizing: border-box;
+  /* Importante para que padding no rompa width */
 }
 
 .readonly {
@@ -1037,6 +1037,7 @@ const handleConfirm = async () => {
   font-size: 1.5rem;
   padding-bottom: 8px;
   color: #555;
+  text-align: center;
 }
 
 .error-txt {
@@ -1247,5 +1248,109 @@ const handleConfirm = async () => {
 
 .text-danger {
   color: #e74c3c;
+}
+
+/* ==========================================================================
+   MEDIA QUERIES PARA MÓVILES (<768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+
+  /* 1. Reducir padding lateral para ganar espacio */
+  .page-wrapper {
+    padding: 10px;
+  }
+
+  .form-card {
+    min-height: auto;
+    /* Altura automática en móvil */
+  }
+
+  .form-header {
+    flex-direction: column;
+    /* Título arriba, botones abajo */
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .type-switcher-container {
+    width: 100%;
+    overflow-x: auto;
+    /* Permitir scroll si los botones no caben */
+  }
+
+  .type-switcher {
+    width: 100%;
+    justify-content: space-between;
+    /* Botones ocupan todo el ancho */
+  }
+
+  .type-switcher button {
+    flex: 1;
+    /* Distribución equitativa */
+    padding: 10px 5px;
+    /* Más área táctil */
+    font-size: 0.85rem;
+  }
+
+  /* 2. Colapsar Grillas a 1 Columna */
+  .grid-2,
+  .grid-2-nested,
+  .grid-3 {
+    grid-template-columns: 1fr !important;
+    /* Fuerza 1 sola columna */
+    gap: 15px;
+  }
+
+  .col-span-2 {
+    grid-column: span 1 !important;
+    /* Ya no expande 2 columnas porque solo hay 1 */
+  }
+
+  /* 3. Panel de Calculadora en Columna */
+  .calc-row {
+    flex-direction: column;
+    /* Apilar inputs verticalmente */
+    align-items: stretch;
+    /* Estirar inputs al 100% */
+    gap: 10px;
+  }
+
+  .operator {
+    display: none;
+    /* Ocultar operadores matemáticos en móvil para limpiar la vista */
+  }
+
+  /* Ajustar grid interno de tasas */
+  .grid-2-rates {
+    grid-template-columns: 1fr;
+    /* Tasas una debajo de otra */
+  }
+
+  .big-input {
+    font-size: 1.1rem;
+    /* Texto un poco más pequeño */
+    padding: 10px;
+  }
+
+  /* 4. Footer de Botones */
+  .form-footer {
+    padding: 15px;
+    flex-direction: column-reverse;
+    /* Botón 'Siguiente' arriba */
+    gap: 10px;
+  }
+
+  .form-footer button {
+    width: 100%;
+    /* Botones ancho completo */
+    justify-content: center;
+    padding: 12px;
+  }
+
+  /* Ajuste de checks */
+  .delivery-check-group {
+    flex-direction: column;
+    gap: 15px;
+  }
 }
 </style>

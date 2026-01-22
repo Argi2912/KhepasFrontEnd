@@ -143,6 +143,8 @@ onMounted(() => {
 .page-header h1 {
   font-size: 1.8rem;
   margin-bottom: 5px;
+  line-height: 1.2;
+  /* Mejor lectura si el título hace salto de línea */
 }
 
 .subtitle {
@@ -153,39 +155,48 @@ onMounted(() => {
 /* --- Grid de KPIs --- */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* En PC: mínimo 300px. En Móvil: 100% del ancho */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 25px;
-  margin-bottom: 50px;
+  margin-bottom: 40px;
 }
 
 .kpi-card {
   background-color: var(--color-secondary);
   padding: 25px;
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   position: relative;
   overflow: hidden;
-  border-bottom: 3px solid transparent;
+  border-bottom: 4px solid transparent;
+  /* Borde inferior más visible */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .kpi-icon {
   position: absolute;
-  bottom: -10px;
+  bottom: -15px;
   right: -10px;
-  font-size: 5rem;
-  opacity: 0.08;
+  font-size: 6rem;
+  opacity: 0.06;
   color: var(--color-text-light);
   transform: rotate(-10deg);
   z-index: 0;
-  /* Al fondo */
+  pointer-events: none;
+  /* Evita que interfiera con clicks */
 }
 
 .kpi-title {
   font-size: 1rem;
-  opacity: 0.7;
-  margin-bottom: 10px;
+  opacity: 0.8;
+  margin-bottom: 5px;
   position: relative;
   z-index: 1;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .kpi-value {
@@ -194,9 +205,12 @@ onMounted(() => {
   margin-top: 5px;
   position: relative;
   z-index: 1;
+  word-break: break-word;
+  /* Evita desbordamiento si el número es muy largo */
+  line-height: 1.1;
 }
 
-/* Colores de Borde Dinámicos */
+/* Colores de Borde y Texto Dinámicos */
 .balance-neto {
   border-color: var(--color-primary);
 }
@@ -224,12 +238,12 @@ onMounted(() => {
 /* --- Desglose (Breakdown) --- */
 .kpi-breakdown {
   margin-top: 15px;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   position: relative;
   z-index: 1;
 }
@@ -237,14 +251,20 @@ onMounted(() => {
 .break-row {
   display: flex;
   justify-content: space-between;
-  opacity: 0.8;
+  align-items: center;
+  opacity: 0.9;
 }
 
 .break-row.highlight {
-  color: var(--color-warning, #f39c12);
-  /* Color naranja para resaltar */
-  font-weight: bold;
-  opacity: 1;
+  color: #f39c12;
+  /* Naranja estático o usa var(--color-warning) */
+  font-weight: 600;
+  background: rgba(243, 156, 18, 0.1);
+  /* Fondo sutil para destacar */
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin: 0 -8px;
+  /* Compensar padding */
 }
 
 /* --- Detalle de Caja General --- */
@@ -252,49 +272,127 @@ onMounted(() => {
   font-size: 1.5rem;
   margin-bottom: 20px;
   color: var(--color-text-light);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 10px;
 }
 
 .cash-grid {
-  display: flex;
+  display: grid;
+  /* Adaptable: tarjetas más pequeñas para que quepan más */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 20px;
-  flex-wrap: wrap;
 }
 
 .cash-card {
   background-color: var(--color-secondary);
   padding: 20px;
-  border-radius: 8px;
-  min-width: 220px;
-  flex-grow: 1;
-  border-left: 3px solid #3498db;
+  border-radius: 10px;
+  border-left: 4px solid #3498db;
+  transition: transform 0.2s ease;
+}
+
+.cash-card:hover {
+  transform: translateY(-3px);
+  /* Efecto hover sutil */
 }
 
 .cash-title {
-  font-size: 0.85rem;
-  color: var(--color-primary);
+  font-size: 0.9rem;
+  color: #3498db;
+  /* Azul consistente con el borde */
+  font-weight: 700;
   margin-bottom: 5px;
 }
 
 .cash-value {
-  font-size: 1.6rem;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 700;
   margin-bottom: 5px;
+  color: var(--color-text-light);
 }
 
 .cash-note {
-  font-size: 0.8rem;
-  opacity: 0.5;
+  font-size: 0.75rem;
+  opacity: 0.6;
+  display: block;
 }
 
 /* --- ESTADOS DE CARGA --- */
-.loading-state {
+.loading-state,
+.error-state {
   text-align: center;
-  padding: 50px;
-  color: var(--color-primary);
+  padding: 60px 20px;
+  color: var(--color-text-light);
+  background: var(--color-secondary);
+  border-radius: 12px;
+  margin-top: 20px;
 }
 
 .loading-icon {
-  font-size: 2rem;
-  margin-bottom: 10px;
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  color: var(--color-primary);
+}
+
+/* === RESPONSIVIDAD MÓVIL === */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 0;
+    /* Aprovechar todo el ancho */
+  }
+
+  .page-header {
+    margin-bottom: 20px;
+    padding-left: 12px;
+  }
+
+  .page-header h1 {
+    font-size: 1.5rem;
+    /* Título más pequeño */
+  }
+
+  .kpi-grid {
+    gap: 15px;
+    /* Menos espacio entre tarjetas */
+    margin-bottom: 30px;
+  }
+
+  .kpi-card {
+    padding: 20px;
+    /* Padding interno reducido */
+  }
+
+  .kpi-value {
+    font-size: 1.8rem;
+    /* Números más pequeños para que no se corten */
+  }
+
+  .box-detail-wrapper h2 {
+    font-size: 1.3rem;
+  }
+
+  .cash-grid {
+    grid-template-columns: 1fr 1fr;
+    /* Forzar 2 columnas en móvil */
+    gap: 10px;
+  }
+
+  .cash-card {
+    padding: 15px;
+    min-width: 0;
+    /* Permitir que se encojan */
+  }
+
+  .cash-value {
+    font-size: 1.2rem;
+  }
+}
+
+/* Móviles muy pequeños (iPhone SE, etc) */
+@media (max-width: 480px) {
+  .cash-grid {
+    grid-template-columns: 1fr;
+    /* Volver a 1 columna si es muy estrecho */
+  }
 }
 </style>

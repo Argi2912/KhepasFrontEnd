@@ -9,11 +9,13 @@ import BaseModal from '@/components/shared/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import Swal from 'sweetalert2'
 
 const transactionStore = useTransactionStore()
 
 // --- ESTADO ---
 const loading = ref(false)
+const isDownloading = ref(false)
 const activeTab = ref('payable')
 const summary = ref({ payable_total: 0, receivable_total: 0 })
 const entries = ref([])
@@ -145,6 +147,56 @@ const fetchDashboard = async () => {
   }
 }
 
+// --- 3. FUNCIÓN DE DESCARGA (AHORA ESTÁ AFUERA Y VISIBLE) ---
+const downloadReport = async (format) => {
+  isDownloading.value = true
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+
+    // Mapeo: Si activeTab es 'payable' -> backend espera 'payables' (plural)
+    const reportType = activeTab.value === 'payable' ? 'payables' : 'receivables'
+
+    // Lógica de fechas: Si hay filtro úsalo, si no, trae todo el historial (2020)
+    const start = startDate.value || '2020-01-01'
+    const end = endDate.value || today
+
+    const response = await api.get('/reports/download', {
+      params: {
+        report_type: reportType,
+        format: format,
+        start_date: start,
+        end_date: end,
+        // Opcional: enviar búsqueda si quieres filtrar el reporte por texto
+        // search: searchQuery.value 
+      },
+      responseType: 'blob'
+    })
+
+    if (response.data.type === 'application/json') {
+      const errorText = await response.data.text()
+      throw new Error(JSON.parse(errorText).message || 'Error generando reporte')
+    }
+
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+
+    const title = activeTab.value === 'payable' ? 'Cuentas_Por_Pagar' : 'Cuentas_Por_Cobrar'
+    link.setAttribute('download', `${title}_${today}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+    console.error("Error descargando:", error)
+    Swal.fire('Error', error.message || 'No se pudo generar el reporte.', 'error')
+  } finally {
+    isDownloading.value = false
+  }
+}
+
 onMounted(() => {
   transactionStore.fetchAllSupportData()
   fetchDashboard()
@@ -213,11 +265,7 @@ const confirmPayment = async () => {
     <h1 class="page-title">Libro Mayor - Cuentas por Pagar / Cobrar</h1>
 
     <div class="summary-grid">
-      <div
-        class="summary-card payable"
-        :class="{ active: activeTab === 'payable' }"
-        @click="switchTab('payable')"
-      >
+      <div class="summary-card payable" :class="{ active: activeTab === 'payable' }" @click="switchTab('payable')">
         <div class="icon-box">
           <FontAwesomeIcon icon="fa-solid fa-arrow-up" />
         </div>
@@ -231,11 +279,8 @@ const confirmPayment = async () => {
         </div>
       </div>
 
-      <div
-        class="summary-card receivable"
-        :class="{ active: activeTab === 'receivable' }"
-        @click="switchTab('receivable')"
-      >
+      <div class="summary-card receivable" :class="{ active: activeTab === 'receivable' }"
+        @click="switchTab('receivable')">
         <div class="icon-box">
           <FontAwesomeIcon icon="fa-solid fa-arrow-down" />
         </div>
@@ -253,12 +298,8 @@ const confirmPayment = async () => {
     <div class="filters-bar">
       <div class="filters-flex">
         <div class="filter-item search-input">
-          <BaseInput
-            v-model="searchQuery"
-            label="Buscar"
-            placeholder="Descripción, entidad, referencia..."
-            icon="fa-solid fa-magnifying-glass"
-          />
+          <BaseInput v-model="searchQuery" label="Buscar" placeholder="Descripción, entidad, referencia..."
+            icon="fa-solid fa-magnifying-glass" />
         </div>
 
         <div class="filter-item date-input">
@@ -283,9 +324,20 @@ const confirmPayment = async () => {
     <div class="list-section">
       <div class="list-header">
         <h2>{{ activeTab === 'payable' ? 'Cuentas por Pagar' : 'Cuentas por Cobrar' }}</h2>
-        <button class="btn-refresh" @click="fetchDashboard">
-          <FontAwesomeIcon icon="fa-solid fa-sync" /> Actualizar
-        </button>
+        <div class="header-actions">
+          <button @click="downloadReport('excel')" :disabled="isDownloading" class="btn-export btn-excel"
+            title="Exportar a Excel">
+            <FontAwesomeIcon icon="fa-solid fa-file-excel" />
+          </button>
+
+          <button @click="downloadReport('pdf')" :disabled="isDownloading" class="btn-export btn-pdf"
+            title="Exportar a PDF">
+            <FontAwesomeIcon icon="fa-solid fa-file-pdf" />
+          </button>
+          <button class="btn-refresh" @click="fetchDashboard">
+            <FontAwesomeIcon icon="fa-solid fa-sync" /> Actualizar
+          </button>
+        </div>
       </div>
 
       <BaseTable :headers="headers" :data="entries" :isLoading="loading">
@@ -304,10 +356,7 @@ const confirmPayment = async () => {
             <span class="ref-tag">{{ entry.tx_number }}</span>
           </td>
           <td class="amount-cell">
-            <div
-              class="main-amount"
-              :class="activeTab === 'payable' ? 'text-danger' : 'text-success'"
-            >
+            <div class="main-amount" :class="activeTab === 'payable' ? 'text-danger' : 'text-success'">
               {{ formatMoney(entry.pending_amount, entry.currency_code) }}
             </div>
             <div class="sub-amount">
@@ -341,40 +390,23 @@ const confirmPayment = async () => {
           <div>
             <strong>{{ selectedEntry.entity_name }}</strong> ({{ selectedEntry.entity_type }})<br />
             {{ selectedEntry.description }}<br />
-            <strong
-              >Saldo pendiente:
-              {{ formatMoney(selectedEntry.pending_amount, selectedEntry.currency_code) }}</strong
-            >
+            <strong>Saldo pendiente:
+              {{ formatMoney(selectedEntry.pending_amount, selectedEntry.currency_code) }}</strong>
           </div>
         </div>
 
-        <BaseSelect
-          label="Cuenta para el movimiento"
-          :options="filteredAccounts"
-          v-model="paymentForm.account_id"
-          placeholder="Selecciona una cuenta"
-          required
-        />
+        <BaseSelect label="Cuenta para el movimiento" :options="filteredAccounts" v-model="paymentForm.account_id"
+          placeholder="Selecciona una cuenta" required />
 
         <p v-if="filteredAccounts.length === 0" class="text-danger text-sm mt-1">
           ⚠️ No tienes cuentas en {{ selectedEntry.currency_code }} para realizar este pago.
         </p>
 
-        <BaseInput
-          label="Monto a abonar"
-          type="number"
-          step="0.01"
-          v-model.number="paymentForm.amount"
-          placeholder="0.00"
-          required
-        />
+        <BaseInput label="Monto a abonar" type="number" step="0.01" v-model.number="paymentForm.amount"
+          placeholder="0.00" required />
 
-        <BaseInput
-          label="Descripción (opcional)"
-          type="text"
-          v-model="paymentForm.description"
-          placeholder="Ej: Abono parcial vía Zelle"
-        />
+        <BaseInput label="Descripción (opcional)" type="text" v-model="paymentForm.description"
+          placeholder="Ej: Abono parcial vía Zelle" />
       </div>
 
       <template #footer>
@@ -723,5 +755,44 @@ td {
   gap: 6px;
   height: 36px;
   /* Altura fija estándar para coincidir con inputs */
+}
+
+/* --- NUEVOS ESTILOS PARA BOTONES --- */
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-export {
+  background: #2c2c2c;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 0 15px;
+  /* Mismo padding que btn-refresh */
+  border-radius: 6px;
+  cursor: pointer;
+  height: 36px;
+  /* Misma altura que btn-refresh para alineación perfecta */
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-excel:hover {
+  background: #198754;
+  border-color: #198754;
+}
+
+.btn-pdf:hover {
+  background: #dc3545;
+  border-color: #dc3545;
 }
 </style>

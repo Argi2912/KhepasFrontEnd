@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
 
-// Helper para formatear moneda en el selector (Ej: "Zelle [1,500.00 USD]")
+// Helper for formatting currency
 const formatBalance = (amount, currency) => {
   try {
     return (
@@ -27,12 +27,11 @@ export const useTransactionStore = defineStore('transaction', () => {
   const brokers = ref([])
   const accounts = ref([])
   const currencies = ref([])
-  const platforms = ref([]) // 🚨 NUEVO: Estado para Plataformas
-  const investors = ref([]) // 🚨 NUEVO: Estado para Inversionistas
+  const platforms = ref([])
+  const investors = ref([])
   const isLoadingData = ref(false)
 
   // --- GETTERS ---
-
   const getClients = computed(() =>
     clients.value.map((c) => ({
       id: c.id,
@@ -55,7 +54,6 @@ export const useTransactionStore = defineStore('transaction', () => {
     })),
   )
 
-  // 🚨 NUEVO: Getter para Plataformas
   const getPlatforms = computed(() =>
     platforms.value.map((p) => ({
       id: p.id,
@@ -73,10 +71,9 @@ export const useTransactionStore = defineStore('transaction', () => {
   )
 
   const getInvestors = computed(() =>
-    // 🚨 NUEVO: Getter para Inversionistas
     investors.value.map((i) => ({
       id: i.id,
-      name: i.alias ? `${i.name} (${i.alias})` : i.name, // Usar alias si existe
+      name: i.alias ? `${i.name} (${i.alias})` : i.name,
     })),
   )
 
@@ -85,7 +82,6 @@ export const useTransactionStore = defineStore('transaction', () => {
   async function fetchAllSupportData() {
     isLoadingData.value = true
     try {
-      // 🚨 Agregamos la petición de '/platforms'
       const [
         clientsRes,
         providersRes,
@@ -100,7 +96,7 @@ export const useTransactionStore = defineStore('transaction', () => {
         api.get('/brokers?per_page=999'),
         api.get('/accounts?per_page=999'),
         api.get('/currencies?per_page=999'),
-        api.get('/platforms?per_page=999'), // Endpoint de plataformas
+        api.get('/platforms?per_page=999'),
         api.get('/investors?per_page=999'),
       ])
 
@@ -109,36 +105,34 @@ export const useTransactionStore = defineStore('transaction', () => {
       brokers.value = brokersRes.data.data || brokersRes.data
       accounts.value = accountsRes.data.data || accountsRes.data
       currencies.value = currenciesRes.data.data || currenciesRes.data
-      platforms.value = platformsRes.data.data || platformsRes.data // Asignar plataformas
-      investors.value = investorsRes.data.data || investorsRes.data // 🚨 Asignar Inversionistas
+      platforms.value = platformsRes.data.data || platformsRes.data
+      investors.value = investorsRes.data.data || investorsRes.data
     } catch (error) {
-      console.error('Error cargando datos:', error)
-      notify.error('Error de conexión al cargar datos necesarios')
+      console.error('Error loading data:', error)
+      notify.error('Connection error while loading necessary data')
     } finally {
       isLoadingData.value = false
     }
   }
 
+  // ✅ ADDED: Function to fetch the Profit Matrix
   async function fetchProfitMatrixReport(filters = {}) {
     try {
-      // Asumiendo que creaste la ruta en el backend como /reports/profit-matrix
       const response = await api.get('/reports/profit-matrix', { params: filters })
       return response.data
     } catch (error) {
-      console.error('Error cargando matriz:', error)
-      notify.error('Error al obtener el reporte de rentabilidad')
+      console.error('Error loading matrix:', error)
+      notify.error('Error fetching profit matrix report')
       throw error
     }
   }
 
-  // Crear Transacción Unificada
   async function createCurrencyExchange(payload) {
     const response = await api.post('/transactions/exchanges', payload)
     await fetchAllSupportData()
     return response.data
   }
 
-  // Crear Transacción Interna
   async function createInternalTransaction(payload) {
     const response = await api.post('/transactions/internal', payload)
     await fetchAllSupportData()
@@ -148,11 +142,11 @@ export const useTransactionStore = defineStore('transaction', () => {
   async function markAsDelivered(id) {
     try {
       const response = await api.patch(`/transactions/exchanges/${id}/deliver`)
-      notify.success('Entrega confirmada exitosamente')
+      notify.success('Delivery confirmed successfully')
       return response.data
     } catch (error) {
       console.error(error)
-      notify.error(error.response?.data?.message || 'Error al actualizar el estado')
+      notify.error(error.response?.data?.message || 'Error updating status')
       throw error
     }
   }
@@ -163,11 +157,12 @@ export const useTransactionStore = defineStore('transaction', () => {
     getClients,
     getProviders,
     getBrokers,
-    getPlatforms, // Exportar getter
+    getPlatforms,
     getInvestors,
     getAccounts,
     currencies,
     fetchAllSupportData,
+    fetchProfitMatrixReport, // 👈 Don't forget to export the function here
     createCurrencyExchange,
     createInternalTransaction,
     markAsDelivered,

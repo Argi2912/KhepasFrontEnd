@@ -3,5 +3,5 @@ import EntityReport from '@/components/reports/EntityReport.vue'
 </script>
 
 <template>
-  <EntityReport title="Reporte por Corredor" endpoint="/statistics/brokers" />
+  <EntityReport title="Reporte por Corredor" endpoint="/statistics/brokers" export-type="brokers_summary" />
 </template>

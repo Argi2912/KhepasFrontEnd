@@ -1,15 +1,17 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useRouter, useRoute, RouterLink } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const props = defineProps({ isOpen: Boolean })
+// 1. CAMBIO: Unificamos el nombre del evento a 'toggle-sidebar'
+const emit = defineEmits(['toggle-sidebar'])
+
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-// Grupos abiertos
 const openGroups = ref(new Set())
 
 watch(
@@ -28,48 +30,30 @@ const toggleGroup = (path) => {
   openGroups.value.has(path) ? openGroups.value.delete(path) : openGroups.value.add(path)
 }
 
-// MENÚ 100% AUTOMÁTICO
+// 2. LÓGICA: Cerrar menú al hacer clic en un enlace (solo en móvil)
+const handleItemClick = () => {
+  if (window.innerWidth < 768) {
+    emit('toggle-sidebar')
+  }
+}
+
+// MENÚ AUTOMÁTICO
 const menuItems = computed(() => {
   const items = []
-
-  // SuperAdmin → todo lo de /superadmin
   if (authStore.isSuperAdmin) {
-    router
-      .getRoutes()
+    router.getRoutes()
       .filter((r) => r.path.startsWith('/superadmin') && r.meta?.label && !r.meta?.hidden)
       .sort((a, b) => a.path.localeCompare(b.path))
-      .forEach((r) =>
-        items.push({ type: 'item', name: r.name, label: r.meta.label, icon: r.meta.icon }),
-      )
+      .forEach((r) => items.push({ type: 'item', name: r.name, label: r.meta.label, icon: r.meta.icon }))
     return items
   }
 
-  // Tenant: todas las rutas con label + icon + no ocultas
   const visibleRoutes = router.getRoutes().filter(
-    (r) =>
-      r.meta?.label &&
-      r.meta?.icon &&
-      !r.meta?.hidden &&
-      !r.meta?.hiddenInMenu && // ← ESTA LÍNEA NUEVA
-      r.path !== '/' &&
-      !r.path.includes('/:'),
+    (r) => r.meta?.label && r.meta?.icon && !r.meta?.hidden && !r.meta?.hiddenInMenu && r.path !== '/' && !r.path.includes('/:'),
   )
 
-  // Orden preferido
-  const order = [
-    '/dashboard',
-    '/reports',
-    '/users',
-    '/employees',
-    '/clients',
-    '/providers',
-    '/brokers',
-    '/admi-platforms',
-    '/financial-config',
-    '/transactions',
+  const order = ['/dashboard', '/reports', '/users', '/employees', '/clients', '/providers', '/brokers', '/admi-platforms', '/financial-config', '/transactions']
 
-
-  ]
   visibleRoutes.sort((a, b) => {
     const ia = order.indexOf(a.path)
     const ib = order.indexOf(b.path)
@@ -78,38 +62,25 @@ const menuItems = computed(() => {
 
   visibleRoutes.forEach((route) => {
     if (route.meta.permission && !authStore.can(route.meta.permission)) return
-
     if (route.children?.length) {
-      const visibleChildren = route.children.filter(
-        (c) =>
-          c.meta?.label &&
-          !c.meta?.hidden &&
-          (!c.meta.permission || authStore.can(c.meta.permission)),
-      )
+      const visibleChildren = route.children.filter((c) => c.meta?.label && !c.meta?.hidden && (!c.meta.permission || authStore.can(c.meta.permission)))
       if (visibleChildren.length > 0) {
         items.push({
-          type: 'group',
-          path: route.path,
-          label: route.meta.label,
-          icon: route.meta.icon,
+          type: 'group', path: route.path, label: route.meta.label, icon: route.meta.icon,
           children: visibleChildren.map((c) => ({ name: c.name, label: c.meta.label })),
         })
       }
     } else if (route.name) {
-      items.push({
-        type: 'item',
-        name: route.name,
-        label: route.meta.label,
-        icon: route.meta.icon,
-      })
+      items.push({ type: 'item', name: route.name, label: route.meta.label, icon: route.meta.icon })
     }
   })
-
   return items
 })
 </script>
 
 <template>
+  <div class="sidebar-overlay" :class="{ 'show': isOpen }" @click="$emit('toggle-sidebar')"></div>
+
   <aside :class="['sidebar', { 'is-closed': !isOpen }]">
     <div class="logo-section">
       <span v-if="isOpen" class="logo-text">TuConpay</span>
@@ -118,27 +89,26 @@ const menuItems = computed(() => {
 
     <nav class="menu">
       <template v-for="item in menuItems" :key="item.path || item.name">
-        <!-- GRUPO (Dropdown) -->
         <div v-if="item.type === 'group'" class="menu-group" :class="{ active: route.path.startsWith(item.path) }">
           <div class="menu-item menu-parent" @click="toggleGroup(item.path)">
             <FontAwesomeIcon :icon="item.icon" class="menu-icon" />
             <span v-if="isOpen" class="menu-label">{{ item.label }}</span>
-            <FontAwesomeIcon v-if="isOpen" :icon="openGroups.has(item.path) ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'
-              " class="chevron" />
+            <FontAwesomeIcon v-if="isOpen"
+              :icon="openGroups.has(item.path) ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"
+              class="chevron" />
           </div>
 
           <Transition name="slide-fade">
             <div v-if="isOpen && openGroups.has(item.path)" class="submenu">
               <router-link v-for="child in item.children" :key="child.name" :to="{ name: child.name }"
-                class="menu-sub-item" active-class="sub-active">
+                class="menu-sub-item" active-class="sub-active" @click="handleItemClick">
                 {{ child.label }}
               </router-link>
             </div>
           </Transition>
         </div>
 
-        <!-- ITEM SIMPLE -->
-        <router-link v-else :to="{ name: item.name }" class="menu-item" active-class="active">
+        <router-link v-else :to="{ name: item.name }" class="menu-item" active-class="active" @click="handleItemClick">
           <FontAwesomeIcon :icon="item.icon" class="menu-icon" />
           <span v-if="isOpen" class="menu-label">{{ item.label }}</span>
         </router-link>
@@ -151,25 +121,42 @@ const menuItems = computed(() => {
   </aside>
 </template>
 
-<!-- Tu <style scoped> se mantiene exactamente igual -->
 <style scoped>
-/* Las etiquetas <style> se mantienen igual */
-
-/* --- VARIABLES DE COLOR (Tema Oscuro Unificado) --- */
+/* (El CSS se mantiene igual que en tu versión responsiva anterior) */
 :root {
-  /* Fondo principal del sidebar y secundario */
   --color-dark-bg: #1f2937;
   --color-secondary: #1f2937;
-  /* Amarillo Kephas (Solo para Logo y Acentos de texto) */
   --color-primary: #fbbf24;
-  /* Gris Oscuro para Hover y Fondo Activo (Elimina el amarillo) */
   --color-active-bg: #374151;
   --color-hover: #374151;
-  /* Texto claro */
   --color-text-light: #e5e7eb;
   --color-border: #374151;
-  /* Fondo más oscuro para el submenú */
   --color-dropdown-bg: #111827;
+}
+
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (min-width: 769px) {
+  .sidebar-overlay {
+    display: none;
+  }
 }
 
 .sidebar {
@@ -180,14 +167,35 @@ const menuItems = computed(() => {
   left: 0;
   height: 100%;
   padding: 0;
-  transition: width 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
   display: flex;
   flex-direction: column;
+  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .is-closed {
   width: 80px;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 280px;
+    transform: translateX(0);
+  }
+
+  .is-closed {
+    width: 280px;
+    transform: translateX(-100%);
+  }
+
+  .logo-section {
+    justify-content: center;
+  }
+
+  .is-closed .menu-label {
+    display: block;
+  }
 }
 
 .logo-section {
@@ -215,6 +223,8 @@ const menuItems = computed(() => {
   padding: 10px 15px;
   flex-grow: 1;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
 }
 
 .menu-item {
@@ -227,9 +237,8 @@ const menuItems = computed(() => {
   border-radius: 6px;
   white-space: nowrap;
   opacity: 0.8;
-  transition:
-    background-color 0.2s,
-    opacity 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
+  cursor: pointer;
 }
 
 .menu-item:hover {
@@ -237,7 +246,6 @@ const menuItems = computed(() => {
   opacity: 1;
 }
 
-/* ESTILO ACTIVO (Ruta Individual): Fondo gris oscuro, texto amarillo */
 .active {
   background-color: var(--color-active-bg);
   color: var(--color-primary) !important;
@@ -252,43 +260,37 @@ const menuItems = computed(() => {
   margin-right: 15px;
 }
 
-.is-closed .menu-label {
-  display: none;
-}
+@media (min-width: 769px) {
 
-.is-closed .menu-icon {
-  margin-right: 0;
-}
+  .is-closed .menu-label,
+  .is-closed .chevron,
+  .is-closed .tenant-name {
+    display: none;
+  }
 
-.is-closed .menu-item {
-  justify-content: center;
-  padding: 12px 0;
+  .is-closed .menu-icon {
+    margin-right: 0;
+  }
+
+  .is-closed .menu-item {
+    justify-content: center;
+    padding: 12px 0;
+  }
 }
 
 .menu-group {
   margin-bottom: 10px;
 }
 
-/* Estilo para el elemento padre del dropdown */
 .menu-parent {
-  cursor: pointer;
   opacity: 0.9;
-  color: var(--color-text-light);
-  padding-left: 0;
   margin-bottom: 5px;
   font-weight: bold;
 }
 
-.menu-parent:hover {
-  background-color: var(--color-hover);
-}
-
-/* Estilo para el padre cuando una de sus rutas hijas está activa */
 .menu-group.active .menu-parent {
   background: var(--color-active-bg);
-  /* Mismo fondo gris oscuro */
   color: var(--color-primary);
-  /* Texto amarillo como acento */
   border-radius: 8px;
 }
 
@@ -298,9 +300,7 @@ const menuItems = computed(() => {
   opacity: 0.6;
 }
 
-/* Submenú: Fondo más oscuro para destacarse */
 .submenu {
-  /* Animación de apertura y cierre */
   background-color: var(--color-dropdown-bg);
   border-radius: 0 0 8px 8px;
   padding-left: 50px;
@@ -322,7 +322,6 @@ const menuItems = computed(() => {
   transition: all 0.2s;
 }
 
-/* Estilo para el elemento hijo activo/hover */
 .menu-sub-item:hover,
 .sub-active {
   color: var(--color-primary);
@@ -335,6 +334,7 @@ const menuItems = computed(() => {
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
   text-align: center;
+  background: var(--color-secondary);
 }
 
 .tenant-name {
@@ -342,7 +342,6 @@ const menuItems = computed(() => {
   color: #aaa;
 }
 
-/* Transición para el dropdown */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
   transition: all 0.3s ease-out;
@@ -353,14 +352,10 @@ const menuItems = computed(() => {
 .slide-fade-leave-to {
   max-height: 0;
   opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
 }
 
-/* Solo para controlar la altura máxima durante la transición */
 .slide-fade-enter-to,
 .slide-fade-leave-from {
   max-height: 500px;
-  /* Asegura que la altura máxima sea suficiente */
 }
 </style>

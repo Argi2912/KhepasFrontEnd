@@ -1,0 +1,106 @@
+/* src/assets/css/responsive.css */
+
+/* === 1. GRILLAS Y DASHBOARD === */
+/* Convierte cualquier grid de 2+ columnas en 1 sola columna en móvil */
+@media (max-width: 992px) {
+  .grid-container,
+  .dashboard-grid,
+  .cards-container {
+    display: grid !important;
+    grid-template-columns: 1fr !important; /* Fuerza 1 columna */
+    gap: 1.5rem !important;
+  }
+  
+  /* Ajuste para tarjetas de resumen (KPIs) */
+  .summary-cards, 
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+  }
+}
+
+/* === 2. TABLAS RESPONSIVAS (Scrolleables) === */
+/* Envuelve tus tablas para que no rompan el layout */
+.table-responsive,
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto; /* Scroll horizontal vital */
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+table {
+  min-width: 600px; /* Fuerza scroll si la pantalla es menor a 600px */
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* En móviles muy pequeños, compactar celdas */
+@media (max-width: 768px) {
+  th, td {
+    padding: 0.75rem 0.5rem !important;
+    font-size: 0.85rem !important;
+  }
+  
+  /* Ocultar columnas menos importantes si tienen la clase .optional */
+  .col-optional {
+    display: none;
+  }
+}
+
+/* === 3. FORMULARIOS APILADOS === */
+/* Hace que los inputs se pongan uno debajo del otro en móvil */
+@media (max-width: 768px) {
+  .form-row,
+  .input-group-row,
+  .modal-body .grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+
+  .form-col,
+  .input-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  /* Botones grandes para dedos */
+  button, .btn {
+    min-height: 44px; /* Tamaño mínimo táctil */
+  }
+  
+  /* Filtros en columna */
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  
+  .filters-bar > * {
+    width: 100%;
+    margin-right: 0 !important;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* === 4. MODALES FULL SCREEN EN MÓVIL === */
+@media (max-width: 768px) {
+  .modal-content, 
+  .base-modal {
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 90vh !important;
+    margin: 10px auto;
+  }
+  
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  
+  .modal-footer button {
+    width: 100%;
+  }
+}
