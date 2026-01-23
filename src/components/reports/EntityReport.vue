@@ -206,29 +206,22 @@ onMounted(loadData)
 /* --- Variables de Color (Dark Mode Theme) --- */
 :root {
   --bg-dark: #18181b;
-  /* Zinc 950 */
   --card-bg: #27272a;
-  /* Zinc 800 */
   --border-color: #3f3f46;
-  /* Zinc 700 */
   --text-primary: #f4f4f5;
-  /* Zinc 100 */
   --text-secondary: #a1a1aa;
-  /* Zinc 400 */
   --brand-yellow: #fbbf24;
-  /* Amber 400 (Kephas Color) */
   --success-green: #34d399;
-  /* Emerald 400 */
   --info-blue: #60a5fa;
-  /* Blue 400 */
   --warning-orange: #fb923c;
-  /* Orange 400 */
 }
 
 .entity-report {
   color: #e4e4e7;
-  /* Zinc-200 */
   font-family: 'Inter', system-ui, sans-serif;
+  /* IMPORTANTE: Evita scroll horizontal en la página entera */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* --- Header & Date Picker --- */
@@ -238,6 +231,7 @@ onMounted(loadData)
   align-items: center;
   margin-bottom: 2rem;
   flex-wrap: wrap;
+  /* Permite que caiga en móvil */
   gap: 1.5rem;
   border-bottom: 1px solid #3f3f46;
   padding-bottom: 1.5rem;
@@ -247,12 +241,11 @@ onMounted(loadData)
   font-size: 1.8rem;
   font-weight: 700;
   color: #fbbf24;
-  /* Color Amarillo Kephas */
   margin: 0;
   letter-spacing: -0.5px;
+  line-height: 1.2;
 }
 
-/* 8. NUEVO: Contenedor para agrupar controles a la derecha */
 .header-controls {
   display: flex;
   align-items: center;
@@ -270,7 +263,34 @@ onMounted(loadData)
   border: 1px solid #3f3f46;
 }
 
-/* 9. NUEVO: Estilos de Botones */
+.date-input-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.date-input-wrapper label {
+  font-size: 0.7rem;
+  color: #a1a1aa;
+  margin-bottom: 2px;
+}
+
+.date-picker-group input[type='date'] {
+  background: transparent;
+  border: none;
+  color: white;
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.arrow {
+  color: #fbbf24;
+  font-weight: bold;
+}
+
+/* Botones Exportar */
 .export-buttons {
   display: flex;
   gap: 8px;
@@ -281,7 +301,6 @@ onMounted(loadData)
   color: #fff;
   border: 1px solid #3f3f46;
   width: 42px;
-  /* Cuadrado para coincidir con altura visual */
   height: 42px;
   border-radius: 8px;
   cursor: pointer;
@@ -307,39 +326,10 @@ onMounted(loadData)
   border-color: #dc3545;
 }
 
-/* ------------------------------- */
-
-.date-input-wrapper {
-  display: flex;
-  flex-direction: column;
-}
-
-.date-input-wrapper label {
-  font-size: 0.7rem;
-  color: #a1a1aa;
-  margin-bottom: 2px;
-}
-
-.date-picker-group input[type='date'] {
-  background: transparent;
-  border: none;
-  color: white;
-  font-family: inherit;
-  font-size: 0.95rem;
-  outline: none;
-  color-scheme: dark;
-  /* Importante para el icono del calendario nativo */
-  cursor: pointer;
-}
-
-.arrow {
-  color: #fbbf24;
-  font-weight: bold;
-}
-
 /* --- Cards (KPIs) --- */
 .cards {
   display: grid;
+  /* Responsive automático: mínimo 280px o 100% */
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2.5rem;
@@ -347,16 +337,15 @@ onMounted(loadData)
 
 .card {
   background: #27272a;
-  /* Fondo oscuro */
   border: 1px solid #3f3f46;
   padding: 1.5rem;
   border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 1rem;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+  /* Evita que el contenido se rompa */
+  min-width: 0;
 }
 
 .card:hover {
@@ -374,10 +363,14 @@ onMounted(loadData)
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  flex-shrink: 0;
+  /* No encoger icono */
 }
 
 .card-content {
   flex: 1;
+  min-width: 0;
+  /* Permite truncar texto si es necesario */
 }
 
 .card .label {
@@ -386,15 +379,18 @@ onMounted(loadData)
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 0.25rem;
+  white-space: nowrap;
 }
 
 .card .amount {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.2;
+  word-break: break-word;
+  /* Romper números largos */
 }
 
-/* Colores de texto específicos */
+/* Colores */
 .text-success {
   color: #34d399;
 }
@@ -407,9 +403,6 @@ onMounted(loadData)
   color: #fbbf24;
 }
 
-/* Amarillo Admin */
-
-/* Bordes inferiores de las tarjetas */
 .card-profit {
   border-bottom: 4px solid #34d399;
 }
@@ -427,27 +420,32 @@ onMounted(loadData)
   background: #27272a;
   border-radius: 12px;
   border: 1px solid #3f3f46;
+  /* CLAVE PARA RESPONSIVE: Scroll horizontal */
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  margin-bottom: 20px;
 }
 
 .custom-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  /* Ancho mínimo para forzar scroll en móviles */
+  min-width: 700px;
 }
 
 .custom-table th {
   background: #18181b;
-  /* Header más oscuro */
   color: #fbbf24;
-  /* Texto Amarillo */
   padding: 1.2rem 1.5rem;
   font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 1px solid #3f3f46;
+  white-space: nowrap;
+  /* Evitar saltos de línea feos */
 }
 
 .custom-table td {
@@ -455,15 +453,13 @@ onMounted(loadData)
   border-bottom: 1px solid #3f3f46;
   color: #e4e4e7;
   font-size: 0.95rem;
+  white-space: nowrap;
 }
 
-/* Hover en filas */
 .custom-table tbody tr:hover {
   background-color: #3f3f46;
-  /* Ligeramente más claro al pasar mouse */
 }
 
-/* Utilidades de texto en tabla */
 .text-left {
   text-align: left;
 }
@@ -494,17 +490,19 @@ onMounted(loadData)
 
 /* --- Loading Overlay --- */
 .loading-overlay {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  /* Mejor fixed para cubrir pantalla si es necesario */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(24, 24, 27, 0.8);
-  /* Fondo oscuro semitransparente */
   backdrop-filter: blur(4px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 50;
-  border-radius: 12px;
+  z-index: 9999;
 }
 
 .spinner {
@@ -512,7 +510,6 @@ onMounted(loadData)
   height: 50px;
   border: 4px solid #3f3f46;
   border-top: 4px solid #fbbf24;
-  /* Spinner Amarillo */
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 1rem;
@@ -521,6 +518,62 @@ onMounted(loadData)
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   MEDIA QUERIES (RESPONSIVE)
+   ========================================================================== */
+@media (max-width: 768px) {
+
+  /* 1. Header en columna */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .header-controls {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    /* Estirar controles */
+  }
+
+  .date-picker-group {
+    width: 100%;
+    justify-content: space-between;
+    box-sizing: border-box;
+  }
+
+  /* Botones de exportar anchos */
+  .export-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .btn-export {
+    flex: 1;
+    /* Botones ocupan espacio igual */
+  }
+
+  /* 2. Tarjetas ajustadas */
+  .cards {
+    grid-template-columns: 1fr;
+    /* Una columna */
+    gap: 1rem;
+  }
+
+  .card .amount {
+    font-size: 1.5rem;
+    /* Fuente un poco más pequeña */
+  }
+
+  /* 3. Tabla (Ya tiene scroll, solo ajustamos padding) */
+  .custom-table th,
+  .custom-table td {
+    padding: 1rem 1rem;
+    /* Menos padding */
   }
 }
 </style>

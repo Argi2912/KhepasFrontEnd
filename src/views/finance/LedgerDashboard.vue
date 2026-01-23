@@ -8,6 +8,9 @@ import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+// 👇 1. IMPORTAR PAGINACIÓN
+import Pagination from '@/components/ui/Pagination.vue'
+
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import Swal from 'sweetalert2'
 
@@ -19,6 +22,8 @@ const isDownloading = ref(false)
 const activeTab = ref('payable')
 const summary = ref({ payable_total: 0, receivable_total: 0 })
 const entries = ref([])
+// 👇 2. NUEVA VARIABLE PARA DATA DE PAGINACIÓN
+const paginationData = ref({})
 
 // --- FILTROS ---
 const searchQuery = ref('')
@@ -79,14 +84,23 @@ const formatMoney = (amount, currency = 'USD') => {
   }
 }
 
+// [NUEVO] Helper para identificar filas de interés
+const isInterestRow = (description) => {
+  if (!description) return false
+  const lower = description.toLowerCase()
+  return lower.includes('rendimiento') || lower.includes('interés') || lower.includes('interes') || lower.includes('compuesto')
+}
+
 // --- CARGA DE DATOS ---
-const fetchDashboard = async () => {
+// 👇 3. ACEPTAR PARÁMETRO PAGE
+const fetchDashboard = async (page = 1) => {
   loading.value = true
   try {
     const { data: summaryData } = await api.get('/ledger/summary')
     summary.value = summaryData
 
     const params = {
+      page: page, // 👇 4. ENVIAR LA PÁGINA
       type: activeTab.value,
       search: searchQuery.value.trim() || undefined,
       start_date: startDate.value || undefined,
@@ -95,6 +109,9 @@ const fetchDashboard = async () => {
     }
 
     const { data: response } = await api.get('/ledger', { params })
+
+    // 👇 5. GUARDAR DATOS DE PAGINACIÓN (META/LINKS)
+    paginationData.value = response
 
     entries.value = response.data.map((item) => {
       const amount = parseFloat(item.amount || 0)
@@ -205,7 +222,7 @@ onMounted(() => {
 watch(
   [activeTab, searchQuery, startDate, endDate],
   () => {
-    fetchDashboard()
+    fetchDashboard() // Al cambiar filtros vuelve a pag 1 por defecto
   },
   { debounce: 600 },
 )
@@ -349,9 +366,15 @@ const confirmPayment = async () => {
               <span class="entity-badge">{{ entry.entity_type }}</span>
             </div>
           </td>
+
           <td class="desc-cell">
-            <span :title="entry.description">{{ entry.description }}</span>
+            <div v-if="isInterestRow(entry.description)" style="display: flex; align-items: center; gap: 6px;">
+              <span class="interest-badge">📈 Interés</span>
+              <span :title="entry.description">{{ entry.description }}</span>
+            </div>
+            <span v-else :title="entry.description">{{ entry.description }}</span>
           </td>
+
           <td>
             <span class="ref-tag">{{ entry.tx_number }}</span>
           </td>
@@ -381,6 +404,11 @@ const confirmPayment = async () => {
           </td>
         </tr>
       </BaseTable>
+
+      <div class="pagination-wrapper" v-if="paginationData && paginationData.total > 0">
+        <Pagination :pagination="paginationData" @change-page="fetchDashboard" />
+      </div>
+
     </div>
 
     <BaseModal :show="showPayModal" title="Registrar Abono" @close="showPayModal = false">
@@ -698,7 +726,6 @@ td {
   color: #ff5252 !important;
 }
 
-/* --- MODAL --- */
 .modal-alert {
   background: rgba(240, 185, 11, 0.1);
   padding: 15px;
@@ -742,22 +769,6 @@ td {
   cursor: not-allowed;
 }
 
-.btn-refresh {
-  background: #2c2c2c;
-  color: #ccc;
-  padding: 0 15px;
-  /* Padding lateral */
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  /* Altura fija estándar para coincidir con inputs */
-}
-
-/* --- NUEVOS ESTILOS PARA BOTONES --- */
 .header-actions {
   display: flex;
   gap: 10px;
@@ -769,11 +780,9 @@ td {
   color: #fff;
   border: 1px solid #444;
   padding: 0 15px;
-  /* Mismo padding que btn-refresh */
   border-radius: 6px;
   cursor: pointer;
   height: 36px;
-  /* Misma altura que btn-refresh para alineación perfecta */
   font-size: 1.1rem;
   display: flex;
   align-items: center;
@@ -794,5 +803,81 @@ td {
 .btn-pdf:hover {
   background: #dc3545;
   border-color: #dc3545;
+}
+
+.view-switch-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  min-width: 180px;
+}
+
+.view-switch {
+  background: #111;
+  border: 1px solid #333;
+  padding: 3px;
+  border-radius: 6px;
+  display: flex;
+  gap: 2px;
+}
+
+.view-switch button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #888;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-switch button.active {
+  background: #333;
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+.detail-row {
+  background: #1a1a1a;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.detail-container {
+  padding: 15px 25px;
+}
+
+.btn-mini-pay {
+  background: #2c2c2c;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-mini-pay:hover {
+  background: var(--color-primary);
+  color: #000;
+}
+
+/* [NUEVO] Estilo para la etiqueta de interés */
+.interest-badge {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+  border: 1px solid #4caf50;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+/* 👇 7. ESTILOS DE LA PAGINACIÓN */
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

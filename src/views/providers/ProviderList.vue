@@ -35,7 +35,7 @@ const tableHeaders = [
   { key: 'financials', label: 'Capital vs Disponible' }, // <--- COLUMNA COMBINADA
   { key: 'contact', label: 'Contacto' },
   { key: 'status', label: 'Estado' },
-  { key: 'actions', label: 'Acciones' }
+
 ]
 
 const fetchProviders = async (page = 1) => {

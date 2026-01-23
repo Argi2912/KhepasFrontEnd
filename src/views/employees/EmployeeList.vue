@@ -7,7 +7,6 @@ import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
-import BalanceFormModal from '@/components/shared/BalanceFormModal.vue'
 import EmployeeFormModal from './EmployeeFormModal.vue'
 
 // Estado
@@ -15,11 +14,10 @@ const employees = ref([])
 const pagination = ref({})
 const isLoading = ref(false)
 const filters = ref({})
-const isProcessing = ref(false) // <--- AHORA ESTÁ EN EL LUGAR CORRECTO
+const isProcessing = ref(false)
 
 // Modals
 const showFormModal = ref(false)
-const showBalanceModal = ref(false)
 const selectedEmployee = ref(null)
 
 const headers = [
@@ -46,7 +44,7 @@ const fetchEmployees = async (page = 1) => {
     }
 }
 
-// Acciones
+// Acciones CRUD
 const openCreate = () => {
     selectedEmployee.value = null
     showFormModal.value = true
@@ -55,11 +53,6 @@ const openCreate = () => {
 const openEdit = (emp) => {
     selectedEmployee.value = emp
     showFormModal.value = true
-}
-
-const openWallet = (emp) => {
-    selectedEmployee.value = emp
-    showBalanceModal.value = true
 }
 
 const deleteEmployee = async (emp) => {
@@ -75,16 +68,26 @@ const deleteEmployee = async (emp) => {
     }
 }
 
-// ---> FUNCIÓN DE NÓMINA (AHORA ESTÁ AFUERA Y VISIBLE) <---
-const processPayroll = async () => {
-    const confirm = await alert.confirm('¿Generar deuda de nómina para todos los activos?')
+// ---> FUNCIÓN DE NÓMINA INTELIGENTE <---
+// Si se pasa 'emp', procesa solo ese. Si no, procesa todos.
+const processPayroll = async (emp = null) => {
+    const isSingle = !!emp
+    const msg = isSingle
+        ? `¿Generar nómina individual para ${emp.name}?`
+        : '¿Generar deuda de nómina para TODOS los empleados activos?'
+
+    const confirm = await alert.confirm(msg)
 
     if (confirm) {
         isProcessing.value = true
         try {
-            const { data } = await api.post('/employees/process-payroll')
+            // Si es individual enviamos { employee_id: 123 }, si no enviamos vacío
+            const payload = isSingle ? { employee_id: emp.id } : {}
+
+            const { data } = await api.post('/employees/process-payroll', payload)
+
             notify.success(data.message)
-            fetchEmployees() // Recarga la tabla para ver los rojos
+            fetchEmployees()
         } catch (error) {
             console.error(error)
             notify.error('Error al procesar la nómina')
@@ -106,9 +109,9 @@ onMounted(() => fetchEmployees())
             <h1>Gestión de Nómina</h1>
 
             <div class="buttons-group">
-                <button @click="processPayroll" :disabled="isProcessing" class="btn-secondary">
+                <button @click="processPayroll()" :disabled="isProcessing" class="btn-secondary">
                     <span v-if="isProcessing">Procesando...</span>
-                    <span v-else>⚡ Procesar Nómina</span>
+                    <span v-else>⚡ Procesar Nómina General</span>
                 </button>
 
                 <button @click="openCreate" class="btn-primary">
@@ -158,9 +161,10 @@ onMounted(() => fetchEmployees())
                     </td>
 
                     <td class="actions">
-                        <button class="btn-icon wallet" title="Abonar / Adelanto" @click="openWallet(emp)">
-                            💰
+                        <button class="btn-icon payroll" title="Generar Nómina Individual" @click="processPayroll(emp)">
+                            📅
                         </button>
+
                         <button class="btn-icon edit" @click="openEdit(emp)">✏️</button>
                         <button class="btn-icon delete" @click="deleteEmployee(emp)">🗑️</button>
                     </td>
@@ -175,9 +179,6 @@ onMounted(() => fetchEmployees())
         <EmployeeFormModal :show="showFormModal" :employee="selectedEmployee" @close="showFormModal = false"
             @saved="fetchEmployees" />
 
-        <BalanceFormModal :show="showBalanceModal" :entity-id="selectedEmployee?.id" resource="employees"
-            :entity-name="selectedEmployee?.name" @close="showBalanceModal = false" @saved="fetchEmployees" />
-
     </div>
 </template>
 
@@ -189,11 +190,9 @@ onMounted(() => fetchEmployees())
     margin-bottom: 20px;
 }
 
-/* --- NUEVO: Agrupa los botones a la derecha --- */
 .buttons-group {
     display: flex;
     gap: 10px;
-    /* Espacio entre el botón de nómina y el de nuevo empleado */
 }
 
 .btn-primary {
@@ -206,15 +205,11 @@ onMounted(() => fetchEmployees())
     font-weight: bold;
 }
 
-/* --- NUEVO: Estilo para el botón de Procesar Nómina --- */
 .btn-secondary {
     background: #424242;
-    /* Gris oscuro elegante */
     color: white;
     border: 1px solid #666;
-    /* Borde sutil */
     padding: 10px 20px;
-    /* Mismo tamaño que el botón primario */
     border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
@@ -223,7 +218,6 @@ onMounted(() => fetchEmployees())
 
 .btn-secondary:hover {
     background: #616161;
-    /* Un poco más claro al pasar el mouse */
     border-color: #888;
 }
 
@@ -233,7 +227,7 @@ onMounted(() => fetchEmployees())
     background: #2c2c2c;
 }
 
-/* --- TUS ESTILOS ORIGINALES --- */
+/* --- ESTILOS TABLA --- */
 .emp-info {
     display: flex;
     flex-direction: column;
@@ -302,11 +296,8 @@ onMounted(() => fetchEmployees())
     transform: scale(1.1);
 }
 
-.wallet {
-    filter: grayscale(100%);
-}
-
-.wallet:hover {
-    filter: grayscale(0%);
+.payroll:hover {
+    transform: scale(1.2);
+    /* Un poco más grande para destacar */
 }
 </style>

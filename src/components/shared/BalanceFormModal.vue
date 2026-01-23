@@ -10,7 +10,7 @@ const props = defineProps({
     resource: { type: String, default: 'accounts' },
     entityId: [Number, String],
     entityName: String,
-    availableBalance: { type: Number, default: 0 } // <--- NUEVO: Recibimos el saldo real para validar
+    availableBalance: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['close', 'saved'])
@@ -22,19 +22,18 @@ const form = reactive({
     amount: '',
     type: 'income',
     description: '',
-    category: 'Carga de Saldo', // Valor por defecto
+    category: 'Carga de Saldo',
     transaction_date: new Date().toISOString().split('T')[0],
     target_account_id: null
 })
 
 // Títulos dinámicos
 const title = computed(() => {
-    if (props.resource === 'investors') return 'Gestionar Capital Inversionista'
-    if (props.resource === 'providers') return 'Gestionar Saldo Proveedor'
+    if (props.resource === 'investors') return 'Gestionar Capital'
+    if (props.resource === 'providers') return 'Gestionar Saldo'
     return 'Ajuste de Saldo'
 })
 
-// Categoría automática (Ya no la pedimos al usuario)
 const updateCategory = () => {
     if (form.type === 'income') {
         form.category = props.resource === 'investors' ? 'Aporte de Capital' : 'Carga de Saldo'
@@ -43,7 +42,6 @@ const updateCategory = () => {
     }
 }
 
-// Cargar bancos
 const fetchMyAccounts = async () => {
     try {
         const { data } = await api.get('/accounts')
@@ -59,23 +57,19 @@ const getSourceType = () => {
     return 'account'
 }
 
-// Formateador de moneda para el mensaje de error
 const formatMoney = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 }
 
 const handleSubmit = async () => {
-    // 1. VALIDACIÓN DE SALDO (Solo al restar)
     if (form.type === 'expense') {
         if (Number(form.amount) > props.availableBalance) {
             notify.error(`Saldo insuficiente. Disponible: ${formatMoney(props.availableBalance)}`)
-            return // Detenemos el proceso
+            return
         }
     }
 
     isSubmitting.value = true
-
-    // Aseguramos que la categoría tenga valor aunque el input esté oculto
     updateCategory()
 
     try {
@@ -85,7 +79,7 @@ const handleSubmit = async () => {
             source_type: getSourceType(),
             type: form.type,
             amount: form.amount,
-            category: form.category, // Se envía automático
+            category: form.category,
             description: form.description || 'Movimiento manual',
             transaction_date: form.transaction_date,
             entity_type: null,
@@ -104,7 +98,6 @@ const handleSubmit = async () => {
         emit('saved')
         emit('close')
 
-        // Reset
         form.amount = ''
         form.description = ''
         form.target_account_id = null
@@ -118,7 +111,6 @@ const handleSubmit = async () => {
     }
 }
 
-// Resetear form al abrir
 watch(() => props.show, (val) => {
     if (val) {
         form.amount = ''
@@ -160,7 +152,7 @@ onMounted(() => {
                         </label>
                         <label :class="{ active: form.type === 'expense', expense: true }" @click="updateCategory">
                             <input type="radio" value="expense" v-model="form.type">
-                            RESTAR / TRANSFERIR (-)
+                            RESTAR (-)
                         </label>
                     </div>
 
@@ -174,9 +166,11 @@ onMounted(() => {
                         </select>
                     </div>
 
-                    <BaseInput label="Monto" type="number" step="0.01" v-model="form.amount" required />
+                    <BaseInput label="Monto" type="number" step="0.01" v-model="form.amount" required
+                        placeholder="0.00" />
 
                     <BaseInput label="Fecha" type="date" v-model="form.transaction_date" required />
+
                     <BaseInput label="Nota / Descripción" v-model="form.description"
                         placeholder="Ej: Pago de factura, Retiro..." />
 
@@ -193,27 +187,34 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* ESTILOS BASE (PC) */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    backdrop-filter: blur(2px);
 }
 
 .modal-content {
     background: #1e2023;
     padding: 25px;
     border-radius: 12px;
-    width: 420px;
+    width: 450px;
+    /* Un poco más ancho en PC */
     color: white;
     border: 1px solid #333;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    max-height: 90vh;
+    /* Evita que se salga si es muy alto */
+    overflow-y: auto;
+    /* Scroll interno si hace falta */
 }
 
 .modal-header {
@@ -222,30 +223,39 @@ onMounted(() => {
     align-items: center;
     margin-bottom: 20px;
     border-bottom: 1px solid #333;
-    padding-bottom: 10px;
+    padding-bottom: 15px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #fbbf24;
+    /* Color de marca */
 }
 
 .close-btn {
     background: none;
     border: none;
     color: #aaa;
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     cursor: pointer;
+    line-height: 1;
 }
 
 /* Info Box */
 .info-entity {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
     font-size: 0.95rem;
     color: #ccc;
     text-align: center;
     background: #2c2f33;
-    padding: 10px;
-    border-radius: 6px;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #3f3f46;
 }
 
 .available-display {
-    font-size: 0.85rem;
+    font-size: 1rem;
     color: #27ae60;
     margin-top: 5px;
     font-weight: bold;
@@ -254,21 +264,27 @@ onMounted(() => {
 .type-selector {
     display: flex;
     margin-bottom: 20px;
-    border: 1px solid #444;
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
+    gap: 5px;
+    /* Espacio entre botones */
 }
 
 .type-selector label {
     flex: 1;
     text-align: center;
-    padding: 12px;
+    padding: 15px;
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: bold;
-    opacity: 0.6;
-    transition: 0.2s;
+    opacity: 0.5;
+    transition: all 0.2s;
     background: #25282c;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .type-selector input {
@@ -278,27 +294,31 @@ onMounted(() => {
 .type-selector label.active {
     opacity: 1;
     color: white;
+    transform: scale(1.02);
+    border-color: transparent;
 }
 
 .type-selector label.income.active {
     background: #27ae60;
+    box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
 }
 
 .type-selector label.expense.active {
     background: #c0392b;
+    box-shadow: 0 4px 10px rgba(192, 57, 43, 0.3);
 }
 
 .destination-box {
     background: rgba(192, 57, 43, 0.1);
-    padding: 12px;
-    border-radius: 6px;
+    padding: 15px;
+    border-radius: 8px;
     border: 1px solid #c0392b;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 .destination-box label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     font-size: 0.9rem;
     color: #ffadad;
     font-weight: bold;
@@ -306,30 +326,33 @@ onMounted(() => {
 
 .form-select {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     border-radius: 6px;
     border: 1px solid #555;
     background: #121212;
     color: white;
-    font-size: 0.95rem;
+    font-size: 1rem;
 }
 
 .modal-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
-    margin-top: 25px;
+    gap: 15px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #333;
 }
 
 .btn-primary {
     background: #fcd535;
     color: black;
-    padding: 10px 25px;
+    padding: 12px 30px;
     border: none;
     border-radius: 6px;
     font-weight: bold;
     cursor: pointer;
     transition: 0.2s;
+    font-size: 1rem;
 }
 
 .btn-primary:hover {
@@ -341,12 +364,59 @@ onMounted(() => {
     background: transparent;
     border: 1px solid #555;
     color: #ccc;
-    padding: 10px 20px;
+    padding: 12px 25px;
     border-radius: 6px;
     cursor: pointer;
+    font-size: 1rem;
 }
 
 .btn-cancel:hover {
     background: #333;
+    color: white;
+}
+
+/* ==========================================================================
+   RESPONSIVIDAD (MÓVIL)
+   ========================================================================== */
+@media (max-width: 768px) {
+
+    /* Modal Ancho Completo */
+    .modal-content {
+        width: 95%;
+        max-height: 95vh;
+        padding: 20px;
+        margin: 10px;
+    }
+
+    /* Botones Tipo (+/-) Verticales si es muy estrecho */
+    .type-selector {
+        gap: 10px;
+    }
+
+    .type-selector label {
+        padding: 12px;
+        /* Táctil */
+    }
+
+    /* Inputs más grandes */
+    .form-select,
+    input {
+        height: 48px;
+        /* Altura touch */
+    }
+
+    /* Botones de Acción Apilados */
+    .modal-actions {
+        flex-direction: column-reverse;
+        /* Cancelar abajo */
+        gap: 10px;
+    }
+
+    .btn-primary,
+    .btn-cancel {
+        width: 100%;
+        justify-content: center;
+        padding: 14px;
+    }
 }
 </style>
