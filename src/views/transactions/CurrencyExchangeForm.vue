@@ -697,7 +697,7 @@ const handleConfirm = async () => {
               <div class="comm-card income">
                 <label>{{
                   operationType === 'purchase' ? 'Ganancia Bruta (%)' : 'Comisión (%)'
-                }}</label>
+                  }}</label>
                 <div class="pct-input-wrapper">
                   <input type="number" v-model="form.commission_charged_pct" placeholder="0" />
                   <span>%</span>
@@ -763,7 +763,7 @@ const handleConfirm = async () => {
                 <span>Cliente</span>
                 <strong>{{
                   transactionStore.getClients.find((c) => c.id == form.client_id)?.name
-                }}</strong>
+                  }}</strong>
               </div>
 
               <div class="row" v-if="form.platform_id">
@@ -775,7 +775,7 @@ const handleConfirm = async () => {
                 <span>Corredor</span>
                 <span>{{
                   transactionStore.getBrokers.find((b) => b.id == form.broker_id)?.name
-                }}</span>
+                  }}</span>
               </div>
 
               <div class="row" v-if="form.provider_id">

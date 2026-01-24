@@ -61,7 +61,10 @@ const formatMoney = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 }
 
+// Reemplaza SOLO la función handleSubmit en tu BalanceFormModal.vue
+
 const handleSubmit = async () => {
+    // 1. Validación de saldo para retiros (Mantenemos tu validación)
     if (form.type === 'expense') {
         if (Number(form.amount) > props.availableBalance) {
             notify.error(`Saldo insuficiente. Disponible: ${formatMoney(props.availableBalance)}`)
@@ -73,12 +76,15 @@ const handleSubmit = async () => {
     updateCategory()
 
     try {
-        const payload = {
+        let url = '/transactions/internal'
+
+        // Payload base (Tu código original)
+        let payload = {
             account_id: props.entityId,
             user_id: authStore.authUser?.id,
             source_type: getSourceType(),
-            type: form.type,
-            amount: form.amount,
+            type: form.type, // <--- Esto lo modificaremos solo si es necesario
+            amount: Math.abs(form.amount), // Aseguramos que siempre vaya positivo
             category: form.category,
             description: form.description || 'Movimiento manual',
             transaction_date: form.transaction_date,
@@ -86,18 +92,50 @@ const handleSubmit = async () => {
             entity_id: null
         }
 
-        if (form.type === 'expense' && form.target_account_id) {
+        // ============================================================
+        // CASO 1: PROVEEDOR -> SUMAR (Recarga)
+        // ============================================================
+        // Esta parte ya funcionaba bien, la dejamos igual.
+        if (props.resource === 'providers' && form.type === 'income') {
+            url = `/providers/${props.entityId}/balance`
+            payload = {
+                amount: form.amount,
+                description: form.description || 'Recarga de saldo disponible'
+            }
+        }
+
+        // ============================================================
+        // CASO 2: PROVEEDOR -> RESTAR (Retiro) - 🔥 AQUÍ ESTÁ EL FIX 🔥
+        // ============================================================
+        else if (props.resource === 'providers' && form.type === 'expense') {
+            // TRUCO: Si tú "Restas" al proveedor, para la empresa es un "Ingreso" (Income).
+            // Cambiamos el tipo en el payload para que el backend reste el saldo.
+            payload.type = 'income';
+
+            // Si el usuario eligió una cuenta destino (ej: Banco), configuramos la entidad destino
+            if (form.target_account_id) {
+                payload.entity_type = 'App\\Models\\Account';
+                payload.entity_id = form.target_account_id;
+            }
+        }
+
+        // ============================================================
+        // CASO 3: RESTO (Inversionistas / Cuentas)
+        // ============================================================
+        // Mantenemos tu lógica original para todo lo demás
+        else if (form.type === 'expense' && form.target_account_id) {
             payload.entity_type = 'App\\Models\\Account'
             payload.entity_id = form.target_account_id
             if (!form.description) payload.description = `Transferencia a mis cuentas`
         }
 
-        await api.post('/transactions/internal', payload)
+        await api.post(url, payload)
 
-        notify.success('Transacción registrada correctamente')
+        notify.success('Operación realizada con éxito')
         emit('saved')
         emit('close')
 
+        // Limpiar campos
         form.amount = ''
         form.description = ''
         form.target_account_id = null

@@ -431,7 +431,6 @@ onMounted(() => {
   color: #e2e8f0;
   padding: 1.5rem;
   box-sizing: border-box;
-  /* Asegura que el padding no rompa el ancho */
 }
 
 /* Header y Títulos */
@@ -441,13 +440,11 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 2rem;
   flex-wrap: wrap;
-  /* Permite que caiga si no hay espacio */
   gap: 1.5rem;
 }
 
 .title {
   font-size: clamp(1.5rem, 4vw, 2.2rem);
-  /* Tipografía fluida */
   font-weight: 800;
   color: #fff;
   margin: 0;
@@ -475,9 +472,7 @@ onMounted(() => {
   border-radius: 12px;
   border: 1px solid #374151;
   min-width: 140px;
-  /* Ancho mínimo para que no se aplasten */
   flex-grow: 1;
-  /* Crecen para llenar huecos en móvil */
   max-width: 300px;
 }
 
@@ -520,7 +515,6 @@ onMounted(() => {
   padding: 0.75rem 1rem;
   color: #fff;
   width: 100%;
-  /* Ocupa todo el contenedor */
   box-sizing: border-box;
 }
 
@@ -580,7 +574,6 @@ onMounted(() => {
 .grid-container {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  /* Layout original desktop */
   gap: 2rem;
 }
 
@@ -622,7 +615,6 @@ onMounted(() => {
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  /* Importante para móvil */
 }
 
 .rank-badge {
@@ -660,7 +652,6 @@ onMounted(() => {
   gap: 0.5rem;
   font-size: 0.95rem;
   min-width: 200px;
-  /* Fuerza wrap si es muy estrecho */
 }
 
 .from,
@@ -690,17 +681,14 @@ onMounted(() => {
   gap: 1rem;
   font-size: 0.85rem;
   margin-left: auto;
-  /* Empuja a la derecha */
 }
 
 /* Tabla Matriz */
 .table-wrapper {
   overflow: auto;
-  /* Permite scroll en ambas direcciones */
   max-height: 80vh;
   width: 100%;
   -webkit-overflow-scrolling: touch;
-  /* Scroll suave en iOS */
 }
 
 .flow-table {
@@ -727,27 +715,23 @@ onMounted(() => {
   border-right: 1px solid #374151;
   text-align: center;
   min-width: 120px;
-  /* Ancho mínimo para columnas */
 }
 
-/* === RESPONSIVIDAD (MEDIA QUERIES) === */
+/* === RESPONSIVIDAD GENERAL (MEDIA QUERIES) === */
 
 /* Tablets y Laptops Pequeñas (max 1200px) */
 @media (max-width: 1200px) {
   .grid-container {
     grid-template-columns: 1fr;
-    /* Colapsa a 1 columna */
   }
 
   .matrix-card {
     order: 2;
-    /* Pone la matriz abajo */
   }
 
   .top-routes-card {
     order: 1;
     max-height: 500px;
-    /* Limita altura */
   }
 }
 
@@ -755,10 +739,8 @@ onMounted(() => {
 @media (max-width: 768px) {
   .profit-matrix-pro {
     padding: 1rem;
-    /* Menos padding general */
   }
 
-  /* Header Vertical */
   .header-summary {
     flex-direction: column;
     align-items: flex-start;
@@ -771,7 +753,6 @@ onMounted(() => {
 
   .summary-card {
     width: 48%;
-    /* Dos por fila */
     padding: 0.8rem;
   }
 
@@ -779,7 +760,6 @@ onMounted(() => {
     font-size: 1.1rem;
   }
 
-  /* Filtros en columna */
   .filters-bar {
     flex-direction: column;
     align-items: stretch;
@@ -795,7 +775,6 @@ onMounted(() => {
     flex: 1;
   }
 
-  /* Items de la lista */
   .route-item {
     flex-direction: column;
     align-items: flex-start;
@@ -809,49 +788,274 @@ onMounted(() => {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  /* Tabla */
   .sticky-col {
     position: relative;
-    /* Quita sticky en movil para ganar espacio */
     left: auto;
     border-right: none;
     background: #252525;
   }
 }
 
-/* MODAL RESPONSIVO */
+/* =========================================================
+   ESTILOS DEL MODAL (CORREGIDOS PARA CENTRADO PERFECTO)
+   ========================================================= */
+
+/* Fondo oscurecido */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* Caja del Modal */
 .modal-content {
-  width: 95%;
-  max-height: 95vh;
+  background: #1e1e1e;
+  width: 90%;
+  max-width: 800px;
+  /* Limita ancho en Desktop */
+  border-radius: 16px;
+  border: 1px solid #374151;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
 }
 
-.modal-body {
-  overflow-y: auto;
+/* Cabecera del Modal */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 1.5rem;
+  border-bottom: 1px solid #374151;
+  background: rgba(30, 30, 30, 0.95);
 }
 
+.modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+/* Cuerpo del Modal */
+.modal-body {
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+/* Header de la Ruta (Origen -> Destino) */
 .route-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Centrado horizontal */
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1.5rem;
+  border-radius: 12px;
+}
+
+.from-section,
+.to-section {
+  flex: 1;
+  display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 }
 
+.label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
 .account-box {
+  background: #2d2d2d;
+  border: 1px solid #4b5563;
+  padding: 1rem 1.5rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   width: 100%;
+  max-width: 250px;
   justify-content: center;
 }
 
-.arrow-center {
-  transform: rotate(90deg);
-  /* Flecha hacia abajo en móvil */
-  margin: 1rem 0;
+.account-box.out {
+  border-left: 4px solid #ef4444;
 }
 
-@media (min-width: 768px) {
-  .arrow-center {
-    transform: rotate(0deg);
+.account-box.in {
+  border-left: 4px solid #34d399;
+}
+
+.account-box .name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.account-box .currency {
+  font-size: 0.9rem;
+  color: #9ca3af;
+}
+
+.arrow-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6366f1;
+}
+
+/* Grid de Métricas (Tarjetas) */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  /* Auto ajuste */
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.metric-card {
+  background: #262626;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #404040;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  background: #2a2a2a;
+}
+
+.metric-card .icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.metric-card .value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+}
+
+.metric-card .value.big {
+  font-size: 1.6rem;
+}
+
+/* Highlights */
+.metric-card.highlight {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.metric-card.profit {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* Info Extra (Abajo) */
+.extra-info {
+  display: flex;
+  justify-content: space-between;
+  background: #2d2d2d;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.info-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.info-item .value {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Footer */
+.modal-footer {
+  padding: 1.5rem;
+  border-top: 1px solid #374151;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(30, 30, 30, 0.95);
+}
+
+.btn-close {
+  background: #374151;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-close:hover {
+  background: #4b5563;
+}
+
+/* === RESPONSIVE DEL MODAL (Móvil) === */
+@media (max-width: 768px) {
+  .route-header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .arrow-center i {
+    transform: rotate(90deg);
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .extra-info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
   }
 }
 </style>

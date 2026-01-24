@@ -38,39 +38,76 @@ const handleItemClick = () => {
 }
 
 // MENÚ AUTOMÁTICO
+// Sidebar.vue
+
+// ... (todo lo anterior sigue igual)
+
+// MENÚ AUTOMÁTICO
 const menuItems = computed(() => {
   const items = []
+
+  // 1. Usamos 'router.options.routes' para respetar la jerarquía (Padres e Hijos)
+  // En lugar de 'router.getRoutes()' que aplana todo y causa duplicados.
+  const allRoutes = router.options.routes
+
   if (authStore.isSuperAdmin) {
-    router.getRoutes()
+    allRoutes
       .filter((r) => r.path.startsWith('/superadmin') && r.meta?.label && !r.meta?.hidden)
       .sort((a, b) => a.path.localeCompare(b.path))
       .forEach((r) => items.push({ type: 'item', name: r.name, label: r.meta.label, icon: r.meta.icon }))
     return items
   }
 
-  const visibleRoutes = router.getRoutes().filter(
+  const visibleRoutes = allRoutes.filter(
     (r) => r.meta?.label && r.meta?.icon && !r.meta?.hidden && !r.meta?.hiddenInMenu && r.path !== '/' && !r.path.includes('/:'),
   )
 
-  const order = ['/dashboard', '/reports', '/users', '/employees', '/clients', '/providers', '/brokers', '/admi-platforms', '/financial-config', '/transactions']
+  // Agregamos '/tools' a la lista de orden para que sepa dónde ponerlo
+  const order = [
+    '/dashboard',
+    '/reports',
+    '/users',
+    '/employees',
+    '/clients',
+    '/providers',
+    '/brokers',
+    '/admi-platforms',
+    '/financial-config',
+    '/transactions',
+    '/tools', // <--- Importante
+    '/Dailyngclosing'
+  ]
 
   visibleRoutes.sort((a, b) => {
     const ia = order.indexOf(a.path)
     const ib = order.indexOf(b.path)
+    // Si no está en la lista, lo manda al final (99)
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
   })
 
   visibleRoutes.forEach((route) => {
-    if (route.meta.permission && !authStore.can(route.meta.permission)) return
+    if (route.meta?.permission && !authStore.can(route.meta.permission)) return
+
+    // Si tiene hijos visibles, es un GRUPO
     if (route.children?.length) {
-      const visibleChildren = route.children.filter((c) => c.meta?.label && !c.meta?.hidden && (!c.meta.permission || authStore.can(c.meta.permission)))
+      const visibleChildren = route.children.filter((c) => c.meta?.label && !c.meta?.hidden && (!c.meta?.permission || authStore.can(c.meta.permission)))
+
       if (visibleChildren.length > 0) {
         items.push({
-          type: 'group', path: route.path, label: route.meta.label, icon: route.meta.icon,
-          children: visibleChildren.map((c) => ({ name: c.name, label: c.meta.label })),
+          type: 'group',
+          path: route.path,
+          label: route.meta.label,
+          icon: route.meta.icon,
+          // Mapeamos los hijos correctamente
+          children: visibleChildren.map((c) => ({
+            name: c.name,
+            label: c.meta.label
+          })),
         })
       }
-    } else if (route.name) {
+    }
+    // Si NO tiene hijos, es un ITEM suelto
+    else if (route.name) {
       items.push({ type: 'item', name: route.name, label: route.meta.label, icon: route.meta.icon })
     }
   })

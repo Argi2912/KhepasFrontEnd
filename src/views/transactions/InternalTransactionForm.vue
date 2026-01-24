@@ -22,7 +22,8 @@ const lists = reactive({
   clients: [],
   providers: [],
   brokers: [],
-  platforms: []
+  platforms: [],
+  investors: [] // <--- AGREGADO: Lista de Inversionistas
 })
 
 // Opciones para el primer selector
@@ -32,6 +33,7 @@ const entityTypes = [
   { id: 'App\\Models\\Provider', name: 'Proveedores' },
   { id: 'App\\Models\\Broker', name: 'Corredores' },
   { id: 'App\\Models\\Platform', name: 'Plataformas' },
+  { id: 'App\\Models\\Investor', name: 'Inversionistas' }, // <--- AGREGADO: Opción Inversionistas
   { id: 'manual', name: 'Otro / Manual' }
 ]
 
@@ -90,6 +92,12 @@ onMounted(async () => {
     const { data } = await api.get('/employees?per_page=100')
     lists.employees = data.data.map(x => ({ id: x.id, name: x.name }))
   } catch (e) { console.warn("No se pudo cargar Empleados") }
+
+  // 6. Inversionistas (AGREGADO)
+  try {
+    const { data } = await api.get('/investors?per_page=100')
+    lists.investors = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
+  } catch (e) { console.error("Error cargando Inversionistas", e) }
 })
 
 // =========================================================================
@@ -102,6 +110,7 @@ const entityOptions = computed(() => {
     case 'App\\Models\\Provider': return lists.providers
     case 'App\\Models\\Broker': return lists.brokers
     case 'App\\Models\\Platform': return lists.platforms
+    case 'App\\Models\\Investor': return lists.investors // <--- AGREGADO: Case Inversionistas
     default: return []
   }
 })

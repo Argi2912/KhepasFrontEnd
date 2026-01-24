@@ -6,11 +6,13 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
-const summary = ref(null)
-const isLoading = ref(false)
+// CAMBIO: Ahora esperamos un array (lista), no un objeto único
+const breakdown = ref([])
+const isLoading = ref(true)
 
 /**
  * Formatea un número a moneda (con corrección USDT y soporte para BS).
+ * Mantenemos tu función exacta para no romper nada.
  */
 const formatCurrency = (value, currency = 'USD') => {
   if (value === null || value === undefined) value = 0
@@ -18,17 +20,15 @@ const formatCurrency = (value, currency = 'USD') => {
   // 1. Normalizar código (USDT -> USD)
   let currencyCode = currency === 'USDT' ? 'USD' : currency
 
-  // 2. 🚨 CORRECCIÓN PARA 'BS': 
-  // 'BS' no es un código ISO válido para Intl (el oficial es VES).
-  // Lo formateamos manualmente para evitar el crash.
-  if (currencyCode === 'BS') {
+  // 2. 🚨 CORRECCIÓN PARA 'BS' (Tu parche original)
+  if (currencyCode === 'BS' || currencyCode === 'VES') {
     return `Bs. ${new Intl.NumberFormat('es-VE', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value)}`
   }
 
-  // 3. Intento estándar con protección de errores
+  // 3. Intento estándar
   try {
     return new Intl.NumberFormat('es-VE', {
       style: 'currency',
@@ -37,7 +37,6 @@ const formatCurrency = (value, currency = 'USD') => {
       maximumFractionDigits: 2,
     }).format(value)
   } catch (error) {
-    // Fallback por si llega otro código raro
     console.warn('Moneda desconocida:', currencyCode)
     return `${currencyCode} ${Number(value).toFixed(2)}`
   }
@@ -50,7 +49,8 @@ const fetchSummary = async () => {
   isLoading.value = true
   try {
     const response = await api.get('/dashboard/summary')
-    summary.value = response.data
+    // CAMBIO: Asignamos el array 'breakdown' que definimos en el Controller
+    breakdown.value = response.data.breakdown || []
   } catch (error) {
     notify.error('No se pudieron cargar los datos del Dashboard.')
     console.error(error)
@@ -60,8 +60,7 @@ const fetchSummary = async () => {
 }
 
 onMounted(() => {
-  // Ejecutamos siempre para evitar que se quede "Cargando..." si el store tarda en iniciar
-  fetchSummary()
+  if (authStore.isLoggedIn) fetchSummary()
 })
 </script>
 
@@ -69,65 +68,92 @@ onMounted(() => {
   <div class="dashboard">
     <div class="page-header">
       <h1>Resumen Financiero</h1>
-      <p class="subtitle">Estado actual de las cuentas y obligaciones del Tenant.</p>
+      <p class="subtitle">Estado real de liquidez desglosado por moneda.</p>
     </div>
 
     <div v-if="isLoading" class="loading-state">
       <FontAwesomeIcon icon="fa-solid fa-spinner" spin pulse class="loading-icon" />
-      <p>Cargando datos financieros...</p>
+      <p>Analizando cuentas...</p>
     </div>
 
-    <div v-else-if="summary" class="content-wrapper">
+    <div v-else-if="breakdown.length > 0" class="content-wrapper">
+
       <div class="kpi-grid">
+
         <div class="kpi-card balance-neto">
-          <p class="kpi-title">Balance Neto (USD)</p>
-          <h3 class="kpi-value">{{ formatCurrency(summary.balance_general_usd, 'USD') }}</h3>
-          <FontAwesomeIcon icon="fa-solid fa-receipt" class="kpi-icon" />
+          <div class="card-header-row">
+            <p class="kpi-title">Balance Neto (Real)</p>
+            <FontAwesomeIcon icon="fa-solid fa-wallet" class="header-icon primary" />
+          </div>
+
+          <div class="currency-list">
+            <div v-for="item in breakdown" :key="item.currency_code" class="currency-row">
+              <span class="curr-code">{{ item.currency_code }}</span>
+              <span class="curr-value" :class="{ 'negative-text': item.balance_neto < 0 }">
+                {{ formatCurrency(item.balance_neto, item.currency_code) }}
+              </span>
+            </div>
+          </div>
         </div>
 
         <div class="kpi-card por-cobrar">
-          <p class="kpi-title">Por Cobrar (Total)</p>
-          <h3 class="kpi-value">{{ formatCurrency(summary.total_por_cobrar, 'USD') }}</h3>
-
-          <div class="kpi-breakdown" v-if="summary.desglose_por_cobrar">
-            <div class="break-row">
-              <span>Deudas (Ledger):</span>
-              <strong>{{ formatCurrency(summary.desglose_por_cobrar.ledger, 'USD') }}</strong>
-            </div>
-            <div class="break-row highlight">
-              <span>Compras Pend.:</span>
-              <strong>{{
-                formatCurrency(summary.desglose_por_cobrar.compras_pendientes, 'USD')
-              }}</strong>
-            </div>
+          <div class="card-header-row">
+            <p class="kpi-title">Por Cobrar</p>
+            <FontAwesomeIcon icon="fa-solid fa-hand-holding-dollar" class="header-icon success" />
           </div>
 
-          <FontAwesomeIcon icon="fa-solid fa-arrow-up" class="kpi-icon" />
+          <div class="currency-list">
+            <div v-for="item in breakdown.filter(i => i.por_cobrar > 0)" :key="'cobrar-' + item.currency_code"
+              class="currency-row">
+              <span class="curr-code">{{ item.currency_code }}</span>
+              <span class="curr-value success-text">
+                {{ formatCurrency(item.por_cobrar, item.currency_code) }}
+              </span>
+            </div>
+            <div v-if="breakdown.filter(i => i.por_cobrar > 0).length === 0" class="empty-state-mini">
+              Sin cobros pendientes
+            </div>
+          </div>
         </div>
 
         <div class="kpi-card por-pagar">
-          <p class="kpi-title">Por Pagar Pendiente</p>
-          <h3 class="kpi-value">{{ formatCurrency(summary.total_por_pagar, 'USD') }}</h3>
-          <FontAwesomeIcon icon="fa-solid fa-arrow-down" class="kpi-icon" />
+          <div class="card-header-row">
+            <p class="kpi-title">Por Pagar</p>
+            <FontAwesomeIcon icon="fa-solid fa-file-invoice-dollar" class="header-icon danger" />
+          </div>
+
+          <div class="currency-list">
+            <div v-for="item in breakdown.filter(i => i.por_pagar > 0)" :key="'pagar-' + item.currency_code"
+              class="currency-row">
+              <span class="curr-code">{{ item.currency_code }}</span>
+              <span class="curr-value danger-text">
+                {{ formatCurrency(item.por_pagar, item.currency_code) }}
+              </span>
+            </div>
+            <div v-if="breakdown.filter(i => i.por_pagar > 0).length === 0" class="empty-state-mini">
+              Sin deudas pendientes
+            </div>
+          </div>
         </div>
+
       </div>
 
       <div class="box-detail-wrapper">
-        <h2>💰 Caja por Moneda</h2>
+        <h2>💰 Caja (Disponible)</h2>
         <div class="cash-grid">
-          <div v-for="account in summary.caja_general_por_moneda" :key="account.currency_code" class="cash-card">
-            <p class="cash-title">{{ account.currency_code }}</p>
+          <div v-for="item in breakdown" :key="'caja-' + item.currency_code" class="cash-card">
+            <p class="cash-title">{{ item.currency_code }}</p>
             <h4 class="cash-value">
-              {{ formatCurrency(account.total_balance, account.currency_code) }}
+              {{ formatCurrency(item.caja, item.currency_code) }}
             </h4>
-            <span class="cash-note">Total en cuentas {{ account.currency_code }}</span>
+            <span class="cash-note">Total en cuentas {{ item.currency_code }}</span>
           </div>
         </div>
       </div>
     </div>
 
     <div v-else class="error-state">
-      <p>No hay datos disponibles. Verifique su conexión o permisos.</p>
+      <p>No hay movimientos registrados.</p>
     </div>
   </div>
 </template>
@@ -144,18 +170,19 @@ onMounted(() => {
   font-size: 1.8rem;
   margin-bottom: 5px;
   line-height: 1.2;
-  /* Mejor lectura si el título hace salto de línea */
+  color: var(--color-text-light);
+  /* Aseguramos contraste */
 }
 
 .subtitle {
   opacity: 0.6;
   font-size: 0.95rem;
+  color: var(--color-text-light);
 }
 
 /* --- Grid de KPIs --- */
 .kpi-grid {
   display: grid;
-  /* En PC: mínimo 300px. En Móvil: 100% del ancho */
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 25px;
   margin-bottom: 40px;
@@ -163,122 +190,132 @@ onMounted(() => {
 
 .kpi-card {
   background-color: var(--color-secondary);
-  padding: 25px;
+  padding: 20px 25px;
   border-radius: 12px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   position: relative;
   overflow: hidden;
-  border-bottom: 4px solid transparent;
-  /* Borde inferior más visible */
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  /* Borde superior de color en lugar de inferior para separar mejor */
+  border-top: 4px solid transparent;
 }
 
-.kpi-icon {
-  position: absolute;
-  bottom: -15px;
-  right: -10px;
-  font-size: 6rem;
-  opacity: 0.06;
-  color: var(--color-text-light);
-  transform: rotate(-10deg);
-  z-index: 0;
-  pointer-events: none;
-  /* Evita que interfiera con clicks */
+/* Cabecera interna de la tarjeta para título e icono */
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
 }
 
 .kpi-title {
   font-size: 1rem;
-  opacity: 0.8;
-  margin-bottom: 5px;
-  position: relative;
-  z-index: 1;
-  font-weight: 500;
+  opacity: 0.9;
+  margin: 0;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  color: var(--color-text-light);
 }
 
-.kpi-value {
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin-top: 5px;
-  position: relative;
-  z-index: 1;
-  word-break: break-word;
-  /* Evita desbordamiento si el número es muy largo */
-  line-height: 1.1;
-}
-
-/* Colores de Borde y Texto Dinámicos */
-.balance-neto {
-  border-color: var(--color-primary);
-}
-
-.por-cobrar {
-  border-color: var(--color-success);
-}
-
-.por-pagar {
-  border-color: var(--color-danger);
-}
-
-.balance-neto .kpi-value {
-  color: var(--color-primary);
-}
-
-.por-cobrar .kpi-value {
-  color: var(--color-success);
-}
-
-.por-pagar .kpi-value {
-  color: var(--color-danger);
-}
-
-/* --- Desglose (Breakdown) --- */
-.kpi-breakdown {
-  margin-top: 15px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.9rem;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
-}
-
-.break-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.header-icon {
+  font-size: 1.2rem;
   opacity: 0.9;
 }
 
-.break-row.highlight {
-  color: #f39c12;
-  /* Naranja estático o usa var(--color-warning) */
-  font-weight: 600;
-  background: rgba(243, 156, 18, 0.1);
-  /* Fondo sutil para destacar */
-  padding: 4px 8px;
-  border-radius: 4px;
-  margin: 0 -8px;
-  /* Compensar padding */
+.header-icon.primary {
+  color: var(--color-primary);
 }
 
-/* --- Detalle de Caja General --- */
+.header-icon.success {
+  color: var(--color-success);
+}
+
+.header-icon.danger {
+  color: var(--color-danger);
+}
+
+/* --- Lista de Monedas (Nuevo Diseño) --- */
+.currency-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.currency-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.1rem;
+  /* Tamaño legible */
+  padding: 2px 0;
+}
+
+.curr-code {
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  /* Fondo sutil para el código */
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--color-text-light);
+  opacity: 0.9;
+}
+
+.curr-value {
+  font-weight: 600;
+  color: var(--color-text-light);
+}
+
+/* Colores de estado para los valores */
+.success-text {
+  color: var(--color-success);
+}
+
+.danger-text {
+  color: var(--color-danger);
+}
+
+.negative-text {
+  color: var(--color-danger);
+}
+
+.empty-state-mini {
+  font-size: 0.85rem;
+  color: #777;
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+}
+
+/* Colores de Borde Superior de las Tarjetas */
+.balance-neto {
+  border-top-color: var(--color-primary);
+}
+
+.por-cobrar {
+  border-top-color: var(--color-success);
+}
+
+.por-pagar {
+  border-top-color: var(--color-danger);
+}
+
+/* --- Detalle de Caja General (Reutilizado) --- */
 .box-detail-wrapper h2 {
   font-size: 1.5rem;
   margin-bottom: 20px;
   color: var(--color-text-light);
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 10px;
+  opacity: 0.9;
 }
 
 .cash-grid {
   display: grid;
-  /* Adaptable: tarjetas más pequeñas para que quepan más */
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 20px;
 }
@@ -293,13 +330,11 @@ onMounted(() => {
 
 .cash-card:hover {
   transform: translateY(-3px);
-  /* Efecto hover sutil */
 }
 
 .cash-title {
   font-size: 0.9rem;
   color: #3498db;
-  /* Azul consistente con el borde */
   font-weight: 700;
   margin-bottom: 5px;
 }
@@ -314,6 +349,7 @@ onMounted(() => {
 .cash-note {
   font-size: 0.75rem;
   opacity: 0.6;
+  color: var(--color-text-light);
   display: block;
 }
 
@@ -338,7 +374,6 @@ onMounted(() => {
 @media (max-width: 768px) {
   .dashboard {
     padding: 0;
-    /* Aprovechar todo el ancho */
   }
 
   .page-header {
@@ -348,23 +383,25 @@ onMounted(() => {
 
   .page-header h1 {
     font-size: 1.5rem;
-    /* Título más pequeño */
   }
 
   .kpi-grid {
     gap: 15px;
-    /* Menos espacio entre tarjetas */
     margin-bottom: 30px;
   }
 
   .kpi-card {
-    padding: 20px;
-    /* Padding interno reducido */
+    padding: 15px;
   }
 
-  .kpi-value {
-    font-size: 1.8rem;
-    /* Números más pequeños para que no se corten */
+  /* Ajuste de fuentes en móvil */
+  .currency-row {
+    font-size: 1rem;
+  }
+
+  .curr-code {
+    font-size: 0.8rem;
+    padding: 2px 6px;
   }
 
   .box-detail-wrapper h2 {
@@ -373,14 +410,12 @@ onMounted(() => {
 
   .cash-grid {
     grid-template-columns: 1fr 1fr;
-    /* Forzar 2 columnas en móvil */
     gap: 10px;
   }
 
   .cash-card {
     padding: 15px;
     min-width: 0;
-    /* Permitir que se encojan */
   }
 
   .cash-value {
@@ -388,11 +423,9 @@ onMounted(() => {
   }
 }
 
-/* Móviles muy pequeños (iPhone SE, etc) */
 @media (max-width: 480px) {
   .cash-grid {
     grid-template-columns: 1fr;
-    /* Volver a 1 columna si es muy estrecho */
   }
 }
 </style>

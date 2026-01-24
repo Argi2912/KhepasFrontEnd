@@ -20,7 +20,7 @@ const isLoadingDetail = ref(false)
 
 // --- DEFINICIÓN DE COLUMNAS ---
 const headers = [
-  { key: 'date_fmt', label: 'Fecha' }, // Ajusté la key para que ordene visualmente si base table lo usa
+  { key: 'date_fmt', label: 'Fecha' },
   { key: 'type', label: 'Tipo' },
   { key: 'person_name', label: 'Persona / Tercero' },
   { key: 'category', label: 'Categoría' },
@@ -30,7 +30,7 @@ const headers = [
   { key: 'actions', label: '' },
 ]
 
-// --- HELPER: NORMALIZACIÓN DE DATOS INTELIGENTE ---
+// --- HELPER: NORMALIZACIÓN DE DATOS INTELIGENTE (CORREGIDO) ---
 const normalizeInternalTx = (data) => {
   if (!data) return {}
 
@@ -54,21 +54,40 @@ const normalizeInternalTx = (data) => {
     }
   }
 
-  // 2. 🧠 LÓGICA DE NOMBRE (PRIORIDAD: ENTIDAD > MANUAL)
-  let finalPersonName = 'N/A'
+  // 2. LÓGICA DE NOMBRE (USUARIO SISTEMA VS TERCERO)
+  let finalPersonName = '---';
 
-  if (data.entity) {
-    // Si viene de base de datos (Cliente, Empleado, etc.)
-    finalPersonName = data.entity.name || data.entity.alias || data.entity.business_name || 'Entidad s/n'
-  } else if (data.person_name) {
-    // Si fue escrito a mano
-    finalPersonName = data.person_name
+  const category = (data.category || '').toLowerCase();
+  const entityType = (data.entity_type || '');
+
+  // Detectamos si es una de las operaciones donde debe salir el Usuario del Sistema
+  const isSystemOperation =
+    entityType.includes('CurrencyExchange') ||  // Operaciones
+    category.includes('intercambio') ||
+    category.includes('pago') ||                // Pagos Deuda
+    category.includes('cobro') ||
+    category.includes('deuda') ||
+    !data.entity_type;                          // Caja Manual
+
+  if (isSystemOperation) {
+    // CASO 1: Es el Usuario del Sistema
+    finalPersonName = user.name || 'Usuario Sistema';
+  } else {
+    // CASO 2: Es un Tercero (Proveedor, Inversionista, etc.)
+    // Prioridad: Entidad Relacionada > Nombre Guardado
+    if (data.entity) {
+      finalPersonName = data.entity.name || data.entity.alias || data.entity.business_name;
+    } else {
+      finalPersonName = data.person_name;
+    }
   }
 
-  // 3. 🧠 LÓGICA DE DUEÑO/TIPO (PRIORIDAD: MANUAL > DEDUCIDO)
+  if (!finalPersonName || finalPersonName === 'N/A') finalPersonName = 'Desconocido';
+
+  // 3. LÓGICA DE DUEÑO/TIPO (PRIORIDAD: MANUAL > DEDUCIDO)
   let finalOwner = data.dueño || 'N/A'
 
-  // Si no hay dueño manual pero hay tipo de entidad, lo traducimos
+  // Si no hay dueño manual pero hay tipo de entidad, lo traducimos (Fallback)
   if (finalOwner === 'N/A' && data.entity_type) {
     if (data.entity_type.includes('Client')) finalOwner = 'Cliente'
     else if (data.entity_type.includes('Provider')) finalOwner = 'Proveedor'
@@ -76,6 +95,29 @@ const normalizeInternalTx = (data) => {
     else if (data.entity_type.includes('Broker')) finalOwner = 'Corredor'
     else if (data.entity_type.includes('Platform')) finalOwner = 'Plataforma'
     else if (data.entity_type.includes('Investor')) finalOwner = 'Inversionista'
+  }
+
+  // Fallback final
+  if (finalOwner === 'N/A') finalOwner = 'Interno';
+
+  // 4. LÓGICA DE CUENTA (CORREGIDA PARA BILLETERAS)
+  let finalAccountName = 'Cuenta Eliminada';
+  let finalCurrency = account.currency_code || '';
+
+  if (account.name) {
+    finalAccountName = account.name;
+  }
+  // Si no hay banco, chequeamos si es billetera virtual
+  else if (data.entity_type && data.entity_type.includes('Provider')) {
+    finalAccountName = `Billetera: ${finalPersonName}`;
+    if (!finalCurrency) finalCurrency = 'USD';
+  }
+  else if (data.entity_type && data.entity_type.includes('Investor')) {
+    finalAccountName = `Capital: ${finalPersonName}`;
+    if (!finalCurrency) finalCurrency = 'USD';
+  }
+  else if (data.person_name) {
+    finalAccountName = `Virtual: ${data.person_name}`;
   }
 
   return {
@@ -93,9 +135,8 @@ const normalizeInternalTx = (data) => {
     // --- CAMPOS CORREGIDOS ---
     dueño: finalOwner,
     person_name: finalPersonName,
-
-    account_name: account.name || 'Cuenta Eliminada',
-    currency: account.currency_code || '',
+    account_name: finalAccountName, // <--- Aquí ya saldrá "Billetera: Juan"
+    currency: finalCurrency,
     user_name: user.name || 'Usuario Eliminado',
 
     amount: parseFloat(data.amount || 0),
@@ -111,21 +152,19 @@ const formatMoney = (amount, currency = '') => {
 const downloadReport = async (format) => {
   isDownloading.value = true
   try {
-    // Definimos "Hoy" y el "Inicio de los tiempos"
     const today = new Date().toISOString().slice(0, 10);
-    const startOfTime = '2020-01-01'; // <--- TRUCO: Fecha muy antigua para traer todo
+    const startOfTime = '2020-01-01';
 
     const response = await api.get('/reports/download', {
       params: {
         report_type: 'internal',
         format: format,
-        start_date: startOfTime, // <--- AHORA SÍ ENVIAMOS LAS FECHAS
+        start_date: startOfTime,
         end_date: today
       },
       responseType: 'blob'
     })
 
-    // Verificación de seguridad: si el backend devuelve error JSON en vez de PDF
     if (response.data.type === 'application/json') {
       const errorText = await response.data.text();
       throw new Error(JSON.parse(errorText).message || 'Error generando reporte');
@@ -315,6 +354,42 @@ onMounted(() => fetchTransactions())
 
 <style scoped>
 /* Layout */
+/* GRUPO DE ACCIONES DE CABECERA */
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Botones Exportar */
+.btn-export {
+  background: #333;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+}
+
+.btn-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-excel:hover {
+  background: #198754;
+  /* Verde Excel */
+  border-color: #198754;
+}
+
+.btn-pdf:hover {
+  background: #dc3545;
+  /* Rojo PDF */
+  border-color: #dc3545;
+}
+
 .list-view {
   padding: 20px;
   max-width: 1200px;
