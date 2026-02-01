@@ -3,6 +3,10 @@ import { reactive, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { useRouter } from 'vue-router' // <--- 1. Importar router
+
+const router = useRouter() // <--- 2. Instanciar router
+const authStore = useAuthStore()
 
 const form = reactive({
   email: 'admin@kephas.com',
@@ -10,7 +14,6 @@ const form = reactive({
 })
 
 const isLoading = ref(false)
-const authStore = useAuthStore()
 
 const handleLogin = async () => {
   if (!form.email || !form.password) {
@@ -23,11 +26,15 @@ const handleLogin = async () => {
     await authStore.login(form)
     notify.success('¡Bienvenido!')
   } catch (error) {
-    // El interceptor maneja la notificación de errores 401/422.
     console.error('Login error details:', error)
   } finally {
     isLoading.value = false
   }
+}
+
+// <--- 3. Función para volver a la landing
+const goBack = () => {
+  router.push({ name: 'landing' })
 }
 </script>
 
@@ -62,6 +69,11 @@ const handleLogin = async () => {
           <span v-if="isLoading">Cargando...</span>
           <span v-else>Iniciar Sesión</span>
         </button>
+
+        <button type="button" class="back-btn" @click="goBack" :disabled="isLoading">
+          <FontAwesomeIcon icon="fa-solid fa-arrow-left" class="mr-2" />
+          Volver al Inicio
+        </button>
       </form>
     </div>
   </div>
@@ -70,7 +82,6 @@ const handleLogin = async () => {
 <style scoped>
 /* Estilos para el AuthLayout */
 .login-card-container {
-  /* Ocupa el 100% de la vista, centrado por el AuthLayout */
   width: 100%;
   padding: 20px;
 }
@@ -120,9 +131,7 @@ label {
   border: 1px solid var(--color-border);
   background-color: var(--color-background);
   border-radius: 6px;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .input-wrapper:focus-within {
@@ -159,9 +168,7 @@ input:focus {
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
-  transition:
-    background-color 0.2s,
-    opacity 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
   margin-top: 10px;
 }
 
@@ -172,5 +179,30 @@ input:focus {
 .submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* <--- 5. ESTILOS DEL BOTÓN VOLVER */
+.back-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 15px;
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: #aaa;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.back-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background-color: rgba(240, 185, 11, 0.05);
 }
 </style>

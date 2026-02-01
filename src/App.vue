@@ -1,22 +1,59 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+
+// Importamos los Layouts
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import AppLayout from '@/layouts/AppLayout.vue'
+import EmptyLayout from '@/layouts/EmptyLayout.vue' // Asegúrate de tener este archivo
 
-//import '@/assets/global.css' // Descomenta si lo usas
+// Importamos estilos globales
+import '@/assets/css/global.css'
 
 const route = useRoute()
 
+// 1. Selección dinámica del Layout
 const layoutComponent = computed(() => {
   const layout = route.meta.layout || 'AppLayout'
+
   if (layout === 'AuthLayout') return AuthLayout
+  if (layout === 'empty') return EmptyLayout // Para la Landing Page
+
   return AppLayout
+})
+
+// 2. Lógica para animaciones inteligentes
+// Evita que el Sidebar parpadee al navegar DENTRO del sistema
+const transitionKey = computed(() => {
+  const layout = route.meta.layout || 'AppLayout'
+  return layout === 'AppLayout' ? 'dashboard-static' : route.fullPath
 })
 </script>
 
 <template>
-  <component :is="layoutComponent">
-    <router-view />
-  </component>
+  <router-view v-slot="{ Component }">
+    <Transition name="page-slide" mode="out-in">
+      <component :is="layoutComponent" :key="transitionKey">
+        <component :is="Component" />
+      </component>
+    </Transition>
+  </router-view>
 </template>
+
+<style>
+/* Animaciones globales */
+.page-slide-enter-active,
+.page-slide-leave-active {
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.25, 0.8, 0.5, 1);
+}
+
+.page-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+</style>

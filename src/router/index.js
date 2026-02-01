@@ -1,14 +1,40 @@
 // src/router/index.js
-import { createRouter, createWebHistory, RouterView } from 'vue-router' // 👈 1. IMPORTAMOS RouterView
+import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
 
+// Importación estática de la Landing (Mejor rendimiento inicial)
+import LandingPage from '@/views/LandingPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     // =========================================================================
-    // 1. SUPERADMIN
+    // 0. LANDING PAGE (PÚBLICA - NUEVO INICIO)
+    // =========================================================================
+    {
+      path: '/',
+      name: 'landing',
+      component: LandingPage,
+      meta: {
+        requiresAuth: false,
+        layout: 'empty' // Asegúrate de que tu App.vue maneje este layout o usa null
+      },
+    },
+
+    // =========================================================================
+    // 1. AUTENTICACIÓN
+    // =========================================================================
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/Login.vue'),
+      meta: { layout: 'AuthLayout', requiresAuth: false },
+    },
+    // (Se eliminó la ruta de Registro según tu solicitud)
+
+    // =========================================================================
+    // 2. SUPERADMIN
     // =========================================================================
     {
       path: '/superadmin',
@@ -34,18 +60,7 @@ const router = createRouter({
     },
 
     // =========================================================================
-    // 2. PÚBLICAS
-    // =========================================================================
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('@/views/Login.vue'),
-      meta: { layout: 'AuthLayout', requiresAuth: false },
-    },
-    { path: '/', name: 'root', meta: { requiresAuth: true } },
-
-    // =========================================================================
-    // 3. DASHBOARD
+    // 3. DASHBOARD (TENANT)
     // =========================================================================
     {
       path: '/dashboard',
@@ -162,7 +177,6 @@ const router = createRouter({
         label: 'Proveedores',
       },
     },
-    // ✅ MOVIMOS INVERSIONISTAS AQUÍ ARRIBA
     {
       path: '/investors',
       name: 'investors_list',
@@ -301,7 +315,7 @@ const router = createRouter({
           },
         },
       ],
-    }, // 👈 AQUÍ CERRAMOS OPERACIONES CORRECTAMENTE
+    },
 
     // =========================================================================
     // 8. HERRAMIENTAS
@@ -315,7 +329,6 @@ const router = createRouter({
         label: 'Herramientas',
       },
       children: [
-        // 1. Calculadora P2P
         {
           path: 'calculator',
           name: 'p2p_calculator',
@@ -325,25 +338,27 @@ const router = createRouter({
             icon: 'fa-solid fa-calculator'
           }
         },
-        // 2. Calculadora PayPal (NUEVA) 🔥
         {
           path: 'paypal',
           name: 'paypal_calculator',
           component: () => import('@/views/tools/PayPalCalculator.vue'),
           meta: {
             label: 'Calculadora PayPal',
-            icon: 'fa-brands fa-paypal' // Asegúrate de tener el ícono de marca
+            icon: 'fa-brands fa-paypal'
           }
         }
       ]
     },
-
   ],
 })
 
-// GUARDIA GLOBAL
+// =============================================================================
+// GUARDIA GLOBAL DE NAVEGACIÓN
+// =============================================================================
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+
+  // 1. Recuperar sesión si hay token pero no usuario
   if (authStore.token && !authStore.user) {
     try {
       await authStore.fetchUser()
@@ -356,17 +371,24 @@ router.beforeEach(async (to, from, next) => {
   const isLoggedIn = authStore.isLoggedIn
   const isSuperAdmin = authStore.user?.tenant_id === null
 
-  if (isLoggedIn && (to.name === 'login' || to.name === 'root')) {
+  // 2. Redirección si ya está logueado e intenta ir a Login o Landing
+  // Si entra al '/' (landing) o '/login' y ya tiene sesión, lo mandamos al Dashboard.
+  if (isLoggedIn && (to.name === 'login' || to.name === 'landing')) {
     return next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
   }
+
+  // 3. Protección de rutas privadas
   if (to.meta.requiresAuth && !isLoggedIn) {
     return next({ name: 'login', query: { redirect: to.fullPath } })
   }
+
+  // 4. Verificación de Permisos
   if (to.meta.permission && !authStore.can(to.meta.permission)) {
     return from.name
       ? next(false)
       : next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
   }
+
   next()
 })
 
