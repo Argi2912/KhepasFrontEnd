@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const router = useRouter()
 const goToLogin = () => router.push({ name: 'login' })
+const goToRegister = () => router.push({ name: 'register' })
 
 const features = [
     { icon: 'fa-solid fa-bolt', title: 'Motor Ultra Rápido', desc: 'Ejecución de cambios y validación de saldos en milisegundos.' },
@@ -27,7 +28,7 @@ const features = [
             </div>
             <div class="nav-links">
                 <button @click="goToLogin" class="btn-text">Ingresar</button>
-                <button @click="goToLogin" class="btn-gold">Comenzar</button>
+                <button @click="goToRegister" class="btn-gold">Comenzar</button>
             </div>
         </nav>
 
@@ -48,7 +49,7 @@ const features = [
                 </p>
 
                 <div class="cta-group">
-                    <button @click="goToLogin" class="btn-gold btn-lg glow-effect">
+                    <button @click="goToRegister" class="btn-gold btn-lg glow-effect">
                         Crear Cuenta Gratis
                     </button>
                     <button class="btn-glass btn-lg">

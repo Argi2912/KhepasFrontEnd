@@ -31,6 +31,12 @@ const router = createRouter({
       component: () => import('@/views/Login.vue'),
       meta: { layout: 'AuthLayout', requiresAuth: false },
     },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/Register.vue'),
+      meta: { layout: 'AuthLayout', requiresAuth: false },
+    },
     // (Se eliminó la ruta de Registro según tu solicitud)
 
     // =========================================================================

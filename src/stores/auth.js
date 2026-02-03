@@ -37,6 +37,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+async function register(data) {
+  try {
+    const response = await api.post('/register', data)
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
   async function login(credentials) {
     const response = await api.post('/login', credentials)
     const newToken = response.data.access_token
@@ -127,6 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
     authUser,
     can, // La función que consume la lista plana
     login,
+    register,
     fetchUser,
     logout,
     checkAuth,
