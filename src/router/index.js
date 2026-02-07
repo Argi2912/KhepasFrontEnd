@@ -18,7 +18,7 @@ const router = createRouter({
       component: LandingPage,
       meta: {
         requiresAuth: false,
-        layout: 'empty' // Asegúrate de que tu App.vue maneje este layout o usa null
+        layout: 'empty', // Asegúrate de que tu App.vue maneje este layout o usa null
       },
     },
 
@@ -37,7 +37,16 @@ const router = createRouter({
       component: () => import('@/views/Register.vue'),
       meta: { layout: 'AuthLayout', requiresAuth: false },
     },
-    // (Se eliminó la ruta de Registro según tu solicitud)
+    {
+      path: '/payment-success',
+      name: 'payment-success',
+      component: () => import('@/views/PaymentSuccess.vue'),
+      meta: {
+        layout: 'AuthLayout',
+        requiresAuth: false,
+      },
+      props: (route) => ({ tenant_id: route.query.tenant_id }),
+    },
 
     // =========================================================================
     // 2. SUPERADMIN
@@ -341,8 +350,8 @@ const router = createRouter({
           component: () => import('@/views/tools/P2PCalculator.vue'),
           meta: {
             label: 'Calculadora P2P',
-            icon: 'fa-solid fa-calculator'
-          }
+            icon: 'fa-solid fa-calculator',
+          },
         },
         {
           path: 'paypal',
@@ -350,10 +359,10 @@ const router = createRouter({
           component: () => import('@/views/tools/PayPalCalculator.vue'),
           meta: {
             label: 'Calculadora PayPal',
-            icon: 'fa-brands fa-paypal'
-          }
-        }
-      ]
+            icon: 'fa-brands fa-paypal',
+          },
+        },
+      ],
     },
   ],
 })
@@ -361,14 +370,18 @@ const router = createRouter({
 // =============================================================================
 // GUARDIA GLOBAL DE NAVEGACIÓN
 // =============================================================================
+// =============================================================================
+// GUARDIA GLOBAL DE NAVEGACIÓN (CORREGIDO)
+// =============================================================================
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // 1. Recuperar sesión si hay token pero no usuario
+  // 1. Recuperar sesión si hay token pero no usuario cargado
   if (authStore.token && !authStore.user) {
     try {
       await authStore.fetchUser()
-    } catch {
+    } catch (error) {
+      console.error('Error al recuperar usuario:', error)
       authStore.logout()
       return next({ name: 'login' })
     }
@@ -377,24 +390,30 @@ router.beforeEach(async (to, from, next) => {
   const isLoggedIn = authStore.isLoggedIn
   const isSuperAdmin = authStore.user?.tenant_id === null
 
-  // 2. Redirección si ya está logueado e intenta ir a Login o Landing
-  // Si entra al '/' (landing) o '/login' y ya tiene sesión, lo mandamos al Dashboard.
-  if (isLoggedIn && (to.name === 'login' || to.name === 'landing')) {
+  // 2. Definición de rutas públicas (No requieren login)
+  // Añadimos 'payment-success' a esta lista
+  const publicPages = ['landing', 'login', 'register', 'payment-success']
+  const isPublicPage = publicPages.includes(to.name)
+
+  // 3. Redirección si ya está logueado e intenta ir a páginas de invitados
+  if (isLoggedIn && (to.name === 'login' || to.name === 'register' || to.name === 'landing')) {
     return next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
   }
 
-  // 3. Protección de rutas privadas
-  if (to.meta.requiresAuth && !isLoggedIn) {
+  // 4. Protección de rutas privadas
+  // Si la ruta NO es pública y el usuario NO está logueado, al login
+  if (!isPublicPage && !isLoggedIn) {
+    notify.info('Por favor, inicia sesión para continuar.')
     return next({ name: 'login', query: { redirect: to.fullPath } })
   }
 
-  // 4. Verificación de Permisos
+  // 5. Verificación de Permisos (Solo para rutas que requieren auth)
   if (to.meta.permission && !authStore.can(to.meta.permission)) {
-    return from.name
-      ? next(false)
-      : next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
+    notify.error('No tienes permiso para acceder a esta sección.')
+    return next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
   }
 
+  // 6. Si todo está correcto, permitir la navegación
   next()
 })
 
