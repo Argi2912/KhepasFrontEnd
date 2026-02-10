@@ -28,9 +28,11 @@ const form = reactive({
 })
 
 // Títulos dinámicos
+const isProvider = computed(() => props.resource === 'providers')
+
 const title = computed(() => {
     if (props.resource === 'investors') return 'Gestionar Capital'
-    if (props.resource === 'providers') return 'Gestionar Saldo'
+    if (isProvider.value) return 'Registrar Por Pagar'
     return 'Ajuste de Saldo'
 })
 
@@ -64,8 +66,14 @@ const formatMoney = (amount) => {
 // Reemplaza SOLO la función handleSubmit en tu BalanceFormModal.vue
 
 const handleSubmit = async () => {
-    // 1. Validación de saldo para retiros (Mantenemos tu validación)
-    if (form.type === 'expense') {
+    // Validación: Proveedores requieren cuenta destino
+    if (isProvider.value && !form.target_account_id) {
+        notify.error('Debe seleccionar una cuenta destino')
+        return
+    }
+
+    // Validación de saldo para retiros (solo NO proveedores)
+    if (!isProvider.value && form.type === 'expense') {
         if (Number(form.amount) > props.availableBalance) {
             notify.error(`Saldo insuficiente. Disponible: ${formatMoney(props.availableBalance)}`)
             return
@@ -78,13 +86,43 @@ const handleSubmit = async () => {
     try {
         let url = '/transactions/internal'
 
-        // Payload base (Tu código original)
+        // ============================================================
+        // CASO PROVEEDOR: Registrar "Por Pagar" via transacción interna
+        // Esto crea el registro en el Ledger (Cuentas por Pagar)
+        // ============================================================
+        if (isProvider.value) {
+            const payload = {
+                account_id: form.target_account_id,
+                user_id: authStore.authUser?.id,
+                source_type: 'account',
+                type: 'income',  // Ingresa a la cuenta (dinero prestado del proveedor)
+                amount: Math.abs(form.amount),
+                category: 'Cuenta por Pagar - Proveedor',
+                description: form.description || 'Registro por pagar a proveedor',
+                transaction_date: form.transaction_date,
+                entity_type: 'App\\Models\\Provider',
+                entity_id: props.entityId
+            }
+
+            await api.post(url, payload)
+            notify.success('Por pagar registrado con éxito')
+            emit('saved')
+            emit('close')
+            form.amount = ''
+            form.description = ''
+            form.target_account_id = null
+            return
+        }
+
+        // ============================================================
+        // CASO: Inversionistas / Cuentas (sin cambios)
+        // ============================================================
         let payload = {
             account_id: props.entityId,
             user_id: authStore.authUser?.id,
             source_type: getSourceType(),
-            type: form.type, // <--- Esto lo modificaremos solo si es necesario
-            amount: Math.abs(form.amount), // Aseguramos que siempre vaya positivo
+            type: form.type,
+            amount: Math.abs(form.amount),
             category: form.category,
             description: form.description || 'Movimiento manual',
             transaction_date: form.transaction_date,
@@ -92,38 +130,7 @@ const handleSubmit = async () => {
             entity_id: null
         }
 
-        // ============================================================
-        // CASO 1: PROVEEDOR -> SUMAR (Recarga)
-        // ============================================================
-        // Esta parte ya funcionaba bien, la dejamos igual.
-        if (props.resource === 'providers' && form.type === 'income') {
-            url = `/providers/${props.entityId}/balance`
-            payload = {
-                amount: form.amount,
-                description: form.description || 'Recarga de saldo disponible'
-            }
-        }
-
-        // ============================================================
-        // CASO 2: PROVEEDOR -> RESTAR (Retiro) - 🔥 AQUÍ ESTÁ EL FIX 🔥
-        // ============================================================
-        else if (props.resource === 'providers' && form.type === 'expense') {
-            // TRUCO: Si tú "Restas" al proveedor, para la empresa es un "Ingreso" (Income).
-            // Cambiamos el tipo en el payload para que el backend reste el saldo.
-            payload.type = 'income';
-
-            // Si el usuario eligió una cuenta destino (ej: Banco), configuramos la entidad destino
-            if (form.target_account_id) {
-                payload.entity_type = 'App\\Models\\Account';
-                payload.entity_id = form.target_account_id;
-            }
-        }
-
-        // ============================================================
-        // CASO 3: RESTO (Inversionistas / Cuentas)
-        // ============================================================
-        // Mantenemos tu lógica original para todo lo demás
-        else if (form.type === 'expense' && form.target_account_id) {
+        if (form.type === 'expense' && form.target_account_id) {
             payload.entity_type = 'App\\Models\\Account'
             payload.entity_id = form.target_account_id
             if (!form.description) payload.description = `Transferencia a mis cuentas`
@@ -176,14 +183,15 @@ onMounted(() => {
             <div class="modal-body">
                 <div class="info-entity">
                     Entidad: <strong>{{ entityName }}</strong>
-                    <div v-if="resource !== 'accounts'" class="available-display">
+                    <div v-if="resource !== 'accounts' && !isProvider" class="available-display">
                         Disponible: {{ formatMoney(availableBalance) }}
                     </div>
                 </div>
 
                 <form @submit.prevent="handleSubmit">
 
-                    <div class="type-selector">
+                    <!-- Selector SUMAR/RESTAR solo para NO proveedores -->
+                    <div v-if="!isProvider" class="type-selector">
                         <label :class="{ active: form.type === 'income', income: true }" @click="updateCategory">
                             <input type="radio" value="income" v-model="form.type">
                             SUMAR (+)
@@ -194,7 +202,19 @@ onMounted(() => {
                         </label>
                     </div>
 
-                    <div v-if="form.type === 'expense'" class="form-group destination-box">
+                    <!-- Cuenta destino para proveedores (siempre visible) -->
+                    <div v-if="isProvider" class="form-group account-destination-box">
+                        <label>¿A cuál cuenta va este dinero?</label>
+                        <select v-model="form.target_account_id" class="form-select" required>
+                            <option :value="null" disabled>-- Seleccione una cuenta --</option>
+                            <option v-for="acc in myAccounts" :key="acc.id" :value="acc.id">
+                                {{ acc.name }} ({{ acc.currency_code }})
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Cuenta destino para otros (solo al restar) -->
+                    <div v-if="!isProvider && form.type === 'expense'" class="form-group destination-box">
                         <label>¿A dónde va el dinero? (Opcional)</label>
                         <select v-model="form.target_account_id" class="form-select">
                             <option :value="null">-- Solo descontar (Sin destino) --</option>
@@ -359,6 +379,23 @@ onMounted(() => {
     margin-bottom: 8px;
     font-size: 0.9rem;
     color: #ffadad;
+    font-weight: bold;
+}
+
+/* Estilo neutro para cuenta destino de proveedores */
+.account-destination-box {
+    background: rgba(251, 191, 36, 0.08);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #fbbf24;
+    margin-bottom: 20px;
+}
+
+.account-destination-box label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #fbbf24;
     font-weight: bold;
 }
 

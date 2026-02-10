@@ -25,6 +25,8 @@ const isSubmitting = ref(false)
 const operationType = ref('purchase')
 const isAutoCalculating = ref(false)
 const lastEdited = ref('')
+const lastEditedDivisa = ref('')  // 'commission' | 'amount'
+const clientReceivesAmount = ref('')  // Monto final que recibe el cliente (Divisa)
 
 const form = reactive({
   client_id: '',
@@ -76,6 +78,7 @@ const handleDataReload = async () => {
 const onEditSent = () => (lastEdited.value = 'sent')
 const onEditReceived = () => (lastEdited.value = 'received')
 const onEditRate = () => (lastEdited.value = 'rate')
+const onEditClientReceives = () => (lastEditedDivisa.value = 'amount')
 
 // --- COMPUTED HELPERS ---
 const selectedInvestor = computed(() =>
@@ -254,9 +257,19 @@ watch(
       }
       calculateCommissions()
     } else {
+      // currency_change: amount_received = lo que el cliente entrega (entra a mi cuenta destino)
+      // clientReceivesAmount = lo que yo le entrego al cliente (sale de mi cuenta origen)
       const r = parseFloat(received) || 0
-      if (r >= 0) form.amount_sent = r
       calculateCommissions()
+
+      // Recalcular monto cliente si cambió el base y no fue editada manualmente
+      if (lastEditedDivisa.value !== 'amount' && r > 0) {
+        const pct = parseFloat(form.commission_charged_pct) || 0
+        clientReceivesAmount.value = (r - (r * pct / 100)).toFixed(2)
+        isAutoCalculating.value = true
+        form.amount_sent = clientReceivesAmount.value
+        setTimeout(() => (isAutoCalculating.value = false), 0)
+      }
     }
   },
 )
@@ -273,11 +286,16 @@ function calculateCommissions() {
   if (commissionBase > 0) {
     let grossPct = parseFloat(form.commission_charged_pct)
     if (isNaN(grossPct) || grossPct === 0) {
-      const r = parseFloat(form.received_rate) || 0
-      const b = parseFloat(form.buy_rate) || 0
-      if (r > 0) grossPct = ((r - b) / r) * 100
-      else grossPct = 0
-      form.commission_charged_pct = grossPct
+      // Para currency_change no recalcular desde tasas (no usa tasas)
+      if (operationType.value !== 'currency_change') {
+        const r = parseFloat(form.received_rate) || 0
+        const b = parseFloat(form.buy_rate) || 0
+        if (r > 0) grossPct = ((r - b) / r) * 100
+        else grossPct = 0
+        form.commission_charged_pct = grossPct
+      } else {
+        grossPct = 0
+      }
     }
 
     const grossAmount = commissionBase * (grossPct / 100)
@@ -325,6 +343,48 @@ function calculateAmounts() {
   calculateCommissions()
 }
 
+// --- CÁLCULO BIDIRECCIONAL DIVISA: Comisión ↔ Monto Cliente ---
+
+// Cuando el usuario edita la COMISIÓN % → recalcular monto que recibe el cliente
+watch(() => form.commission_charged_pct, (newPct) => {
+  if (operationType.value !== 'currency_change') return
+  if (isAutoCalculating.value) return  // Evitar loops
+  if (lastEditedDivisa.value === 'amount') return  // Evitar loop
+  
+  lastEditedDivisa.value = 'commission'
+  const base = parseFloat(form.amount_received) || 0
+  const pct = parseFloat(newPct) || 0
+  if (base > 0) {
+    isAutoCalculating.value = true
+    clientReceivesAmount.value = (base - (base * pct / 100)).toFixed(2)
+    form.amount_sent = clientReceivesAmount.value
+    setTimeout(() => {
+      isAutoCalculating.value = false
+      lastEditedDivisa.value = ''
+    }, 0)
+  }
+})
+
+// Cuando el usuario edita el MONTO CLIENTE → recalcular comisión %
+watch(clientReceivesAmount, (newAmount) => {
+  if (operationType.value !== 'currency_change') return
+  if (lastEditedDivisa.value !== 'amount') return  // Solo si editó el monto manualmente
+  
+  const base = parseFloat(form.amount_received) || 0
+  const final = parseFloat(newAmount) || 0
+  if (base > 0 && final >= 0) {
+    isAutoCalculating.value = true
+    const pct = ((base - final) / base) * 100
+    form.commission_charged_pct = Math.max(0, pct).toFixed(2)
+    form.amount_sent = final
+    calculateCommissions()
+    setTimeout(() => {
+      isAutoCalculating.value = false
+      lastEditedDivisa.value = ''
+    }, 0)
+  }
+})
+
 function resetCommissions() {
   form.commission_charged_amount = 0
   form.commission_provider_amount = 0
@@ -350,6 +410,8 @@ watch(operationType, () => {
   form.commission_provider_pct = 0
   form.commission_admin_pct = 0
   form.commission_broker_pct = 0
+  clientReceivesAmount.value = ''
+  lastEditedDivisa.value = ''
   Object.keys(errors.value).forEach(key => clearError(key))
   resetCommissions()
 })
@@ -404,10 +466,13 @@ const handleConfirm = async () => {
 
     if (operationType.value === 'currency_change') {
       payload.operation_type = 'exchange'
-      if (!payload.exchange_rate || payload.exchange_rate == 0) payload.exchange_rate = 1
-      payload.amount_received = (
-        parseFloat(payload.amount_sent) * parseFloat(payload.exchange_rate)
-      ).toFixed(2)
+      // amount_sent = lo que sale de mi cuenta (lo que el cliente recibe)
+      // amount_received = lo que entra a mi cuenta (lo que el cliente entrega)
+      const clientAmount = parseFloat(clientReceivesAmount.value)
+      if (clientAmount > 0) {
+        payload.amount_sent = clientAmount
+      }
+      payload.exchange_rate = 1
       payload.buy_rate = null
       payload.received_rate = null
       payload.delivered = form.delivered
@@ -574,7 +639,8 @@ const handleConfirm = async () => {
           <div class="calc-panel">
             <div class="calc-row">
               <div class="input-group">
-                <label v-if="operationType === 'purchase' || isComplexExchange">Monto Recibido (USD)</label>
+                <label v-if="operationType === 'purchase'">Monto Recibido (USD)</label>
+                <label v-else-if="isComplexExchange">Monto del Cliente (Recibo)</label>
                 <label v-else>Monto Enviado ({{ sourceCurrency }})</label>
 
                 <input v-if="operationType === 'purchase' || isComplexExchange" type="number"
@@ -591,6 +657,7 @@ const handleConfirm = async () => {
                   toAccount?.currency_code === 'USD'
                 ">÷</span>
                 <span v-else-if="operationType === 'exchange'">×</span>
+                <span v-else-if="operationType === 'currency_change'">−</span>
                 <span v-else>×</span>
               </div>
 
@@ -628,8 +695,12 @@ const handleConfirm = async () => {
                 </div>
 
                 <div v-else class="input-group full-width-rate">
-                  <label>Tasa</label>
-                  <input type="number" v-model="form.exchange_rate" placeholder="1.00" class="big-input rate-input" />
+                  <label>Comisión (%)</label>
+                  <div class="pct-input-wrapper-inline">
+                    <input type="number" v-model="form.commission_charged_pct" placeholder="0" step="0.01"
+                      class="big-input rate-input" />
+                    <span class="pct-symbol">%</span>
+                  </div>
                 </div>
               </div>
 
@@ -637,7 +708,7 @@ const handleConfirm = async () => {
 
               <div class="input-group">
                 <label v-if="operationType === 'purchase'">Monto Enviado (BS)</label>
-                <label v-else>Monto Recibido</label>
+                <label v-else>Monto a Entregar al Cliente</label>
 
                 <input v-if="operationType === 'purchase'" type="number" v-model="form.amount_sent" placeholder="0.00"
                   class="big-input" readonly style="background: #1e2023; color: #ccc" />
@@ -645,7 +716,7 @@ const handleConfirm = async () => {
                 <input v-else-if="operationType === 'exchange'" type="number" v-model="form.amount_received"
                   @input="onEditReceived" placeholder="0.00" class="big-input" />
 
-                <input v-else type="text" :value="form.amount_received" readonly class="big-input readonly" />
+                <input v-else type="number" v-model="clientReceivesAmount" @input="onEditClientReceives" placeholder="0.00" class="big-input" />
               </div>
             </div>
 
@@ -1058,6 +1129,25 @@ const handleConfirm = async () => {
 
 .rate-inputs-container .full-width-rate {
   flex: 1;
+}
+
+.pct-input-wrapper-inline {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pct-input-wrapper-inline input {
+  padding-right: 30px;
+}
+
+.pct-input-wrapper-inline .pct-symbol {
+  position: absolute;
+  right: 12px;
+  color: #aaa;
+  font-weight: bold;
+  font-size: 1rem;
+  pointer-events: none;
 }
 
 .commissions-panel h4 {

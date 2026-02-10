@@ -32,7 +32,7 @@ const isLoading = ref(false)
 // Definición de Columnas
 const tableHeaders = [
   { key: 'name', label: 'Proveedor / Contacto' },
-  { key: 'financials', label: 'Capital vs Disponible' }, // <--- COLUMNA COMBINADA
+  { key: 'financials', label: 'Por Pagar' },
   { key: 'contact', label: 'Contacto' },
   { key: 'status', label: 'Estado' },
 
@@ -118,14 +118,8 @@ onMounted(() => fetchProviders())
           <td>
             <div class="financial-cell">
               <div class="row">
-                <span class="label">Deuda Total:</span>
+                <span class="label">Por Pagar:</span>
                 <span class="amount debt">{{ formatCurrency(provider.current_balance) }}</span>
-              </div>
-              <div class="row">
-                <span class="label">Disponible:</span>
-                <span :class="['amount', provider.available_balance < 0 ? 'negative' : 'positive']">
-                  {{ formatCurrency(provider.available_balance) }}
-                </span>
               </div>
             </div>
           </td>
@@ -173,7 +167,7 @@ onMounted(() => fetchProviders())
       @saved="fetchProviders(pagination.current_page)" />
 
     <BalanceFormModal :show="showBalanceModal" resource="providers" :entity-id="selectedProvider?.id"
-      :entity-name="selectedProvider?.name" :available-balance="selectedProvider?.available_balance"
+      :entity-name="selectedProvider?.name"
       @close="showBalanceModal = false" @saved="fetchProviders(pagination.current_page)" />
   </div>
 </template>
