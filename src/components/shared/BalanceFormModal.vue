@@ -87,24 +87,18 @@ const handleSubmit = async () => {
         let url = '/transactions/internal'
 
         // ============================================================
-        // CASO PROVEEDOR: Registrar "Por Pagar" via transacción interna
-        // Esto crea el registro en el Ledger (Cuentas por Pagar)
+        // CASO PROVEEDOR: Registrar "Por Pagar" vía endpoint del proveedor
         // ============================================================
         if (isProvider.value) {
             const payload = {
-                account_id: form.target_account_id,
-                user_id: authStore.authUser?.id,
-                source_type: 'account',
-                type: 'income',  // Ingresa a la cuenta (dinero prestado del proveedor)
                 amount: Math.abs(form.amount),
-                category: 'Cuenta por Pagar - Proveedor',
+                type: 'income',
                 description: form.description || 'Registro por pagar a proveedor',
-                transaction_date: form.transaction_date,
-                entity_type: 'App\\Models\\Provider',
-                entity_id: props.entityId
+                target_account_id: form.target_account_id,
+                transaction_date: form.transaction_date
             }
 
-            await api.post(url, payload)
+            await api.post(`/providers/${props.entityId}/balance`, payload)
             notify.success('Por pagar registrado con éxito')
             emit('saved')
             emit('close')
