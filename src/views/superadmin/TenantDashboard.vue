@@ -24,21 +24,23 @@ const pagination = ref({ current_page: 1, last_page: 1, total: 0 })
 const showModal = ref(false)
 const isSubmitting = ref(false)
 
-// Formulario reactivo
+// Formulario reactivo - SE AÑADE 'plan'
 const form = reactive({
   name: '',
   admin_name: '',
   admin_email: '',
   password: '',
+  plan: 'basic', // <--- Añadido
 })
 
 const headers = [
   { key: 'status', label: 'Estado' },
   { key: 'name', label: 'Negocio / Tenant' },
+  { key: 'plan', label: 'Plan' }, // <--- Añadido
   { key: 'users', label: 'Usuarios' },
   { key: 'admin', label: 'Admin Responsable' },
   { key: 'created_at', label: 'Registro' },
-  { key: 'actions', label: 'Acciones' }, // Etiqueta explícita para la columna final
+  { key: 'actions', label: 'Acciones' },
 ]
 
 // --- API ---
@@ -59,12 +61,13 @@ const fetchTenants = async (page = 1) => {
   try {
     const { data } = await api.get(`/superadmin/tenants?page=${page}`)
 
+    // PROCESAMIENTO CORREGIDO: Usamos t.admin directamente
     tenants.value = data.data.map((t) => {
-      const adminUser = t.users && t.users.length > 0 ? t.users[0] : null
+      const adminUser = t.admin; // Objeto enviado por el nuevo TenantController
       return {
         ...t,
-        admin_info: adminUser ? `${adminUser.name}` : 'Sin Asignar',
-        admin_email: adminUser ? adminUser.email : '',
+        admin_info: adminUser ? adminUser.name : 'Sin Asignar',
+        admin_email: adminUser ? adminUser.email : 'No registrado',
         created_fmt: new Date(t.created_at).toLocaleDateString(),
         // Badge color logic
         status_class: t.is_active ? 'bg-success' : 'bg-danger',
@@ -75,6 +78,7 @@ const fetchTenants = async (page = 1) => {
     const { data: list, ...meta } = data
     pagination.value = meta
   } catch (e) {
+    console.error(e)
     notify.error('Error cargando tenants')
   } finally {
     isLoading.value = false
@@ -93,6 +97,7 @@ const createTenant = async () => {
     form.admin_name = ''
     form.admin_email = ''
     form.password = ''
+    form.plan = 'basic' // <--- Reset añadido
 
     refreshAll()
   } catch (e) {
@@ -110,7 +115,7 @@ const toggleTenant = async (tenant) => {
 
   const result = await Swal.fire({
     title: `¿${action} Negocio?`,
-    text: `Vas a cambiar el estado de "${tenant.name}". Si lo desactivas, sus usuarios no podrán entrar.`,
+    text: `Vas a cambiar el estado de "${tenant.name}". Si lo activas manualmente, se le otorgará 1 mes de acceso inmediato.`,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonText: `Sí, ${action}`,
@@ -237,16 +242,24 @@ onMounted(() => refreshAll())
           </td>
 
           <td>
+            <div class="plan-badge" :class="row.plan_price > 10 ? 'pro' : 'basic'">
+              {{ row.plan_name || 'Básico' }}
+            </div>
+          </td>
+
+          <td>
             <div class="users-count">
               <FontAwesomeIcon icon="fa-solid fa-user-group" />
-              <span>{{ row.users_count }}</span>
+              <span>{{ row.users_count || (row.users ? row.users.length : 0) }}</span>
             </div>
           </td>
 
           <td>
             <div class="admin-info">
-              <strong>{{ row.admin_info }}</strong>
-              <small>{{ row.admin_email }}</small>
+              <strong :class="{ 'text-gray-500': row.admin_info === 'Sin Asignar' }">
+                {{ row.admin_info }}
+              </strong>
+              <small class="text-yellow-500 font-mono">{{ row.admin_email }}</small>
             </div>
           </td>
 
@@ -254,16 +267,14 @@ onMounted(() => refreshAll())
 
           <td class="actions-cell">
             <div class="actions-flex">
-
               <button @click="toggleTenant(row)" class="btn-icon" :class="row.is_active ? 'btn-disable' : 'btn-enable'"
-                :title="row.is_active ? 'Suspendr Tenant' : 'Reactivar Tenant'">
+                :title="row.is_active ? 'Suspender Tenant' : 'Reactivar Tenant'">
                 <FontAwesomeIcon :icon="row.is_active ? 'fa-solid fa-power-off' : 'fa-solid fa-play'" />
               </button>
 
               <button @click="deleteTenant(row)" class="btn-icon btn-delete" title="Eliminar Permanentemente">
                 <FontAwesomeIcon icon="fa-solid fa-trash" />
               </button>
-
             </div>
           </td>
         </tr>
@@ -284,6 +295,24 @@ onMounted(() => refreshAll())
           <BaseInput label="Contraseña Temporal" type="password" v-model="form.password" required />
         </div>
 
+        <div class="section-title mt-4 text-yellow-500">Configuración del Plan</div>
+        <div class="plan-selector">
+          <label class="plan-option" :class="{ 'selected': form.plan === 'basic' }">
+            <input type="radio" v-model="form.plan" value="basic" />
+            <div class="plan-content">
+              <span class="p-name">Plan Básico</span>
+              <span class="p-price">$10.00 / mes</span>
+            </div>
+          </label>
+          <label class="plan-option" :class="{ 'selected': form.plan === 'pro' }">
+            <input type="radio" v-model="form.plan" value="pro" />
+            <div class="plan-content">
+              <span class="p-name">Profesional</span>
+              <span class="p-price">$29.99 / mes</span>
+            </div>
+          </label>
+        </div>
+
         <div class="modal-footer">
           <button type="button" class="btn-secondary" @click="showModal = false">Cancelar</button>
           <button type="submit" class="btn-primary" :disabled="isSubmitting">
@@ -296,6 +325,7 @@ onMounted(() => refreshAll())
 </template>
 
 <style scoped>
+/* Tus estilos se mantienen iguales */
 .sa-container {
   padding: 20px;
   max-width: 1200px;
@@ -303,7 +333,6 @@ onMounted(() => refreshAll())
   color: var(--color-text-light);
 }
 
-/* Header */
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -316,7 +345,6 @@ onMounted(() => refreshAll())
   font-size: 1.8rem;
 }
 
-/* KPI CARDS */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -373,7 +401,6 @@ onMounted(() => refreshAll())
   color: #f1c40f;
 }
 
-/* Tabla */
 .table-card {
   background: var(--color-secondary);
   border-radius: 8px;
@@ -415,10 +442,9 @@ onMounted(() => refreshAll())
 }
 
 .admin-info small {
-  opacity: 0.7;
+  opacity: 0.9;
 }
 
-/* Badges */
 .badge {
   padding: 4px 8px;
   border-radius: 4px;
@@ -436,7 +462,6 @@ onMounted(() => refreshAll())
   color: #e74c3c;
 }
 
-/* Botones */
 .btn-primary {
   background: var(--color-primary);
   color: #000;
@@ -454,7 +479,6 @@ onMounted(() => refreshAll())
   background: #d4a000;
 }
 
-/* Acciones */
 .actions-cell {
   text-align: right;
 }
@@ -463,7 +487,6 @@ onMounted(() => refreshAll())
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  /* Separación entre botones */
 }
 
 .btn-icon {
@@ -479,7 +502,6 @@ onMounted(() => refreshAll())
   justify-content: center;
 }
 
-/* Botón Activar/Desactivar */
 .btn-disable {
   color: #e74c3c;
 }
@@ -498,11 +520,9 @@ onMounted(() => refreshAll())
   color: #fff;
 }
 
-/* Botón Eliminar (NUEVO) */
 .btn-delete {
   color: #e74c3c;
   border-color: #522;
-  /* Borde sutil rojo oscuro */
 }
 
 .btn-delete:hover {
@@ -511,7 +531,6 @@ onMounted(() => refreshAll())
   transform: scale(1.1);
 }
 
-/* Modal */
 .section-title {
   font-size: 0.85rem;
   color: var(--color-primary);
@@ -545,5 +564,73 @@ onMounted(() => refreshAll())
   padding: 10px 20px;
   border-radius: 6px;
   cursor: pointer;
+}
+
+/* --- NUEVOS ESTILOS PARA EL SELECTOR DE PLAN --- */
+.plan-selector {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+.plan-option {
+  flex: 1;
+  background: #2b3139;
+  border: 2px solid transparent;
+  padding: 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+  position: relative;
+}
+
+.plan-option input {
+  position: absolute;
+  opacity: 0;
+}
+
+.plan-option.selected {
+  border-color: #f0b90b;
+  background: rgba(240, 185, 11, 0.05);
+}
+
+.plan-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.p-name {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.p-price {
+  font-size: 0.8rem;
+  color: #f0b90b;
+  margin-top: 4px;
+}
+
+/* PLAN BADGE EN TABLA */
+.plan-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  width: fit-content;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.plan-badge.basic {
+  background: #333;
+  color: #aaa;
+}
+
+.plan-badge.pro {
+  background: rgba(240, 185, 11, 0.2);
+  color: #f0b90b;
+  border: 1px solid #f0b90b;
 }
 </style>

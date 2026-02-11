@@ -33,6 +33,15 @@ api.interceptors.response.use(
         return Promise.reject(error)
       }
 
+      // =================================================================
+      // NUEVO: 402 - PAGO REQUERIDO (SUSCRIPCIÓN VENCIDA)
+      // Si el middleware del backend devuelve 402, redirigimos a la pantalla de bloqueo
+      // =================================================================
+      if (status === 402) {
+        router.push({ name: 'subscription_expired' })
+        return Promise.reject(error)
+      }
+
       // 403: No tienes permiso
       if (status === 403) {
         notify.error('Acceso denegado. No tienes permisos para esta acción.')
@@ -41,8 +50,7 @@ api.interceptors.response.use(
 
       // 422: Errores de Validación (Laravel)
       if (status === 422) {
-        // CAMBIO AQUÍ: Mensaje genérico en lugar de específico
-        // Esto evita el juego de "Adivina cuál es el siguiente error"
+        // Mantenemos tu mensaje genérico para evitar saturación visual
         notify.warning(
           'Hay datos incorrectos en el formulario. Por favor revisa los campos en rojo.',
         )
@@ -57,10 +65,9 @@ api.interceptors.response.use(
 
       // 500: Error de Servidor
       if (status >= 500) {
-        // A veces el backend manda un mensaje útil en 'message', si no, usamos el genérico
+        // Tu lógica para mensajes cortos o genéricos
         const serverMsg = error.response.data?.message
         if (serverMsg && serverMsg.length < 100) {
-          // Solo si es un mensaje corto legible
           notify.error(`Error del servidor: ${serverMsg}`)
         } else {
           notify.error('Error interno del servidor. Inténtalo más tarde.')

@@ -18,7 +18,7 @@ const router = createRouter({
       component: LandingPage,
       meta: {
         requiresAuth: false,
-        layout: 'empty', // Asegúrate de que tu App.vue maneje este layout o usa null
+        layout: 'empty',
       },
     },
 
@@ -46,6 +46,19 @@ const router = createRouter({
         requiresAuth: false,
       },
       props: (route) => ({ tenant_id: route.query.tenant_id }),
+    },
+
+    // =========================================================================
+    // 1.1 ESTADO DE CUENTA (NUEVO)
+    // =========================================================================
+    {
+      path: '/subscription-expired',
+      name: 'subscription_expired',
+      component: () => import('@/views/SubscriptionExpired.vue'),
+      meta: {
+        requiresAuth: true,
+        layout: 'AuthLayout' // Usamos AuthLayout para ocultar sidebar/navbar del sistema
+      },
     },
 
     // =========================================================================
@@ -370,9 +383,6 @@ const router = createRouter({
 // =============================================================================
 // GUARDIA GLOBAL DE NAVEGACIÓN
 // =============================================================================
-// =============================================================================
-// GUARDIA GLOBAL DE NAVEGACIÓN (CORREGIDO)
-// =============================================================================
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
@@ -382,7 +392,7 @@ router.beforeEach(async (to, from, next) => {
       await authStore.fetchUser()
     } catch (error) {
       console.error('Error al recuperar usuario:', error)
-      authStore.logout()
+      authStore.logout() // Logout local si falla el fetch
       return next({ name: 'login' })
     }
   }
@@ -391,7 +401,6 @@ router.beforeEach(async (to, from, next) => {
   const isSuperAdmin = authStore.user?.tenant_id === null
 
   // 2. Definición de rutas públicas (No requieren login)
-  // Añadimos 'payment-success' a esta lista
   const publicPages = ['landing', 'login', 'register', 'payment-success']
   const isPublicPage = publicPages.includes(to.name)
 
@@ -400,8 +409,31 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: isSuperAdmin ? 'superadmin_dashboard' : 'dashboard' })
   }
 
+  // --- LÓGICA DE BLOQUEO POR SUSCRIPCIÓN VENCIDA (NUEVO) ---
+  if (isLoggedIn && authStore.user?.tenant) {
+    // Verificamos si el tenant (empresa) está activo
+    const isTenantActive = Boolean(authStore.user.tenant.is_active);
+
+    // CASO 1: Empresa suspendida (inactiva)
+    if (!isTenantActive) {
+      // Si intenta ir a cualquier sitio que NO sea la pantalla de aviso...
+      if (to.name !== 'subscription_expired') {
+        // ...lo redirigimos a la fuerza a la pantalla de aviso.
+        return next({ name: 'subscription_expired' });
+      }
+      // Si ya va a la pantalla de aviso, lo dejamos pasar.
+      return next();
+    }
+
+    // CASO 2: Empresa activa (al día)
+    if (isTenantActive && to.name === 'subscription_expired') {
+      // Si intenta ver la pantalla de aviso por error, lo mandamos al dashboard.
+      return next({ name: 'dashboard' });
+    }
+  }
+  // -----------------------------------------------------------
+
   // 4. Protección de rutas privadas
-  // Si la ruta NO es pública y el usuario NO está logueado, al login
   if (!isPublicPage && !isLoggedIn) {
     notify.info('Por favor, inicia sesión para continuar.')
     return next({ name: 'login', query: { redirect: to.fullPath } })
