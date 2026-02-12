@@ -50,7 +50,7 @@ const features = [
 
                 <div class="cta-group">
                     <button @click="goToRegister" class="btn-gold btn-lg glow-effect">
-                        Crear Cuenta Gratis
+                        Crear Cuenta
                     </button>
                     <button class="btn-glass btn-lg">
                         <FontAwesomeIcon icon="fa-solid fa-play" /> Ver Demo

@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 
 // COMPONENTES
-import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelectWithSearchAndCreate from '@/components/ui/BaseSelectWithSearchAndCreate.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
@@ -26,7 +25,7 @@ const operationType = ref('purchase')
 const isAutoCalculating = ref(false)
 const lastEdited = ref('')
 const lastEditedDivisa = ref('')  // 'commission' | 'amount'
-const clientReceivesAmount = ref('')  // Monto final que recibe el cliente (Divisa)
+const clientReceivesAmount = ref('') // Monto final que recibe el cliente (Divisa)
 
 const form = reactive({
   client_id: '',
@@ -56,7 +55,7 @@ const form = reactive({
   commission_admin_pct: 0,
   commission_broker_pct: 0,
 
-  // Valores calculados
+  // Valores calculados (Visuales)
   commission_charged_amount: 0,
   commission_provider_amount: 0,
   commission_admin_amount: 0,
@@ -69,7 +68,7 @@ const form = reactive({
   paid: true,
 })
 
-// --- FUNCIÓN DE RECARGA EN TIEMPO REAL ---
+// --- FUNCIÓN DE RECARGA EN TIEMPO REAL (Recuperada) ---
 const handleDataReload = async () => {
   await transactionStore.fetchAllSupportData()
 }
@@ -80,14 +79,14 @@ const onEditReceived = () => (lastEdited.value = 'received')
 const onEditRate = () => (lastEdited.value = 'rate')
 const onEditClientReceives = () => (lastEditedDivisa.value = 'amount')
 
-// --- COMPUTED HELPERS ---
+// --- COMPUTED HELPERS (Recuperados) ---
 const selectedInvestor = computed(() =>
   transactionStore.getInvestors.find((i) => i.id == form.investor_id),
 )
 
 const isComplexExchange = computed(() => operationType.value === 'currency_change')
-const sourceAccounts = computed(() => transactionStore.getAccounts)
-const destinationAccounts = computed(() => transactionStore.getAccounts)
+const sourceAccounts = computed(() => transactionStore.getAccounts || [])
+const destinationAccounts = computed(() => transactionStore.getAccounts || [])
 
 const fromAccount = computed(() =>
   transactionStore.getAccounts.find((a) => a.id == form.from_account_id),
@@ -129,16 +128,17 @@ const commissionCurrency = computed(() => {
 const hasSufficientBalance = computed(() => {
   if (!form.paid && form.capital_type === 'own') return true
 
+  const amountToCheck = parseFloat(form.amount_sent) || 0;
+
   if (form.capital_type === 'own') {
-    if (!fromAccount.value || !form.amount_sent) return true
-    const rawAccount = transactionStore.rawAccounts?.find((a) => a.id == form.from_account_id)
-    return rawAccount ? parseFloat(rawAccount.balance) >= parseFloat(form.amount_sent) : true
+    if (!fromAccount.value || !amountToCheck) return true
+    const rawAccount = transactionStore.getAccounts?.find((a) => a.id == form.from_account_id)
+    return rawAccount ? parseFloat(rawAccount.balance) >= amountToCheck : true
   }
   if (form.capital_type === 'investor') {
-    if (!selectedInvestor.value || !form.amount_sent) return true
-    const investorBal = parseFloat(selectedInvestor.value.current_balance || 0)
-    const amountToSend = parseFloat(form.amount_sent)
-    return investorBal >= amountToSend
+    if (!selectedInvestor.value || !amountToCheck) return true
+    const investorBal = parseFloat(selectedInvestor.value.available_balance || selectedInvestor.value.current_balance || 0)
+    return investorBal >= amountToCheck
   }
   return true
 })
@@ -151,7 +151,7 @@ const exchangePercentage = computed(() => {
   return pct.toFixed(2)
 })
 
-// --- LÓGICA MATEMÁTICA ---
+// --- LÓGICA MATEMÁTICA (Recuperada) ---
 
 watch([() => form.buy_rate, () => form.received_rate], ([buy, received]) => {
   if (operationType.value === 'purchase' && !isAutoCalculating.value) {
@@ -257,8 +257,7 @@ watch(
       }
       calculateCommissions()
     } else {
-      // currency_change: amount_received = lo que el cliente entrega (entra a mi cuenta destino)
-      // clientReceivesAmount = lo que yo le entrego al cliente (sale de mi cuenta origen)
+      // currency_change
       const r = parseFloat(received) || 0
       calculateCommissions()
 
@@ -286,7 +285,6 @@ function calculateCommissions() {
   if (commissionBase > 0) {
     let grossPct = parseFloat(form.commission_charged_pct)
     if (isNaN(grossPct) || grossPct === 0) {
-      // Para currency_change no recalcular desde tasas (no usa tasas)
       if (operationType.value !== 'currency_change') {
         const r = parseFloat(form.received_rate) || 0
         const b = parseFloat(form.buy_rate) || 0
@@ -343,14 +341,12 @@ function calculateAmounts() {
   calculateCommissions()
 }
 
-// --- CÁLCULO BIDIRECCIONAL DIVISA: Comisión ↔ Monto Cliente ---
-
-// Cuando el usuario edita la COMISIÓN % → recalcular monto que recibe el cliente
+// --- CÁLCULO BIDIRECCIONAL DIVISA ---
 watch(() => form.commission_charged_pct, (newPct) => {
   if (operationType.value !== 'currency_change') return
-  if (isAutoCalculating.value) return  // Evitar loops
-  if (lastEditedDivisa.value === 'amount') return  // Evitar loop
-  
+  if (isAutoCalculating.value) return
+  if (lastEditedDivisa.value === 'amount') return
+
   lastEditedDivisa.value = 'commission'
   const base = parseFloat(form.amount_received) || 0
   const pct = parseFloat(newPct) || 0
@@ -365,11 +361,10 @@ watch(() => form.commission_charged_pct, (newPct) => {
   }
 })
 
-// Cuando el usuario edita el MONTO CLIENTE → recalcular comisión %
 watch(clientReceivesAmount, (newAmount) => {
   if (operationType.value !== 'currency_change') return
-  if (lastEditedDivisa.value !== 'amount') return  // Solo si editó el monto manualmente
-  
+  if (lastEditedDivisa.value !== 'amount') return
+
   const base = parseFloat(form.amount_received) || 0
   const final = parseFloat(newAmount) || 0
   if (base > 0 && final >= 0) {
@@ -397,6 +392,7 @@ function resetCommissions() {
 }
 
 watch(operationType, () => {
+  // Reset de formulario al cambiar pestaña
   form.from_account_id = ''
   form.to_account_id = ''
   form.amount_sent = ''
@@ -420,7 +416,7 @@ onMounted(async () => {
   await transactionStore.fetchAllSupportData()
 })
 
-// --- NAVEGACIÓN Y CONFIRMACIÓN ---
+// --- NAVEGACIÓN ---
 const nextStep = () => {
   if (currentStep.value === 1) {
     const isExternalCapital = ['investor'].includes(form.capital_type)
@@ -438,13 +434,14 @@ const prevStep = () => {
   if (currentStep.value > 1) currentStep.value--
 }
 
+// --- CONFIRMACIÓN SEGURA (Backend Authority) ---
 const handleConfirm = async () => {
+  // 1. Validaciones Previas
   if (!hasSufficientBalance.value) return Swal.fire('Error', 'Saldo insuficiente', 'error')
 
   if (isComplexExchange.value) {
     if (!form.provider_id) return Swal.fire('Falta Datos', 'Seleccione el Proveedor', 'warning')
-    if (!form.platform_id)
-      return Swal.fire('Falta Datos', 'Seleccione la Plataforma/Admin', 'warning')
+    if (!form.platform_id) return Swal.fire('Falta Datos', 'Seleccione la Plataforma/Admin', 'warning')
   }
 
   if (operationType.value === 'exchange' && !form.platform_id) {
@@ -457,44 +454,60 @@ const handleConfirm = async () => {
   }
 
   isSubmitting.value = true
-  try {
-    let payload = { ...form }
 
-    if (form.capital_type === 'investor') {
-      payload.from_account_id = null
+  try {
+    // 2. Construcción del Payload Seguro
+    let payload = {
+      client_id: form.client_id,
+      capital_type: form.capital_type,
+      admin_user_id: form.admin_user_id,
+      from_account_id: form.capital_type === 'own' ? form.from_account_id : null,
+      to_account_id: form.to_account_id,
+
+      investor_id: form.capital_type === 'investor' ? form.investor_id : null,
+      investor_profit_pct: form.investor_profit_pct || 0,
+
+      reference_id: form.reference_id,
+      delivered: form.delivered,
+      paid: form.paid,
+
+      commission_charged_pct: form.commission_charged_pct || 0,
+      commission_provider_pct: form.commission_provider_pct || 0,
+      commission_broker_pct: form.commission_broker_pct || 0,
+      commission_admin_pct: form.commission_admin_pct || 0,
+
+      broker_id: form.broker_id || null,
+      provider_id: form.provider_id || null,
+      platform_id: form.platform_id || null,
     }
 
+    // 3. Lógica específica por Tipo
     if (operationType.value === 'currency_change') {
       payload.operation_type = 'exchange'
-      // amount_sent = lo que sale de mi cuenta (lo que el cliente recibe)
-      // amount_received = lo que entra a mi cuenta (lo que el cliente entrega)
-      const clientAmount = parseFloat(clientReceivesAmount.value)
-      if (clientAmount > 0) {
-        payload.amount_sent = clientAmount
-      }
-      payload.exchange_rate = 1
+      const amountOut = parseFloat(clientReceivesAmount.value)
+      const amountIn = parseFloat(form.amount_received)
+
+      payload.amount_sent = amountOut
+      payload.amount_received = amountIn
+      payload.exchange_rate = (amountIn > 0 && amountOut > 0) ? (amountIn / amountOut).toFixed(8) : 1
       payload.buy_rate = null
       payload.received_rate = null
-      payload.delivered = form.delivered
-      payload.paid = form.paid
+
     } else if (operationType.value === 'exchange') {
       payload.operation_type = 'exchange'
-      payload.buy_rate = null
-      payload.received_rate = null
-      payload.provider_id = null
-      payload.broker_id = null
+      payload.amount_sent = form.amount_sent
+      payload.amount_received = form.amount_received
 
-      const sent = parseFloat(payload.amount_sent) || 0
-      const received = parseFloat(payload.amount_received) || 0
-      const userRate = parseFloat(payload.exchange_rate) || 0
+      const sent = parseFloat(form.amount_sent) || 0
+      const received = parseFloat(form.amount_received) || 0
+      const userRate = parseFloat(form.exchange_rate) || 0
 
       if (userRate > 0) {
         payload.exchange_rate = userRate
       } else if (sent > 0 && received > 0) {
-        const currencyFrom = sourceCurrency.value
-        const currencyTo = toAccount.value?.currency_code
-
-        if (currencyFrom === 'VES' && currencyTo === 'USD') {
+        const fromCurr = fromAccount.value?.currency_code
+        const toCurr = toAccount.value?.currency_code
+        if (fromCurr === 'VES' && toCurr === 'USD') {
           payload.exchange_rate = (sent / received).toFixed(8)
         } else {
           payload.exchange_rate = (received / sent).toFixed(8)
@@ -502,18 +515,16 @@ const handleConfirm = async () => {
       } else {
         payload.exchange_rate = 1
       }
+      payload.buy_rate = null
+      payload.received_rate = null
+
     } else {
       payload.operation_type = 'purchase'
-      payload.exchange_rate = null
-      payload.commission_admin_pct = 0
-      payload.commission_admin_amount = 0
-      payload.delivered = form.delivered
-      payload.paid = form.paid
-    }
-
-    if (!payload.broker_id) {
-      payload.commission_broker_pct = 0
-      payload.commission_broker_amount = 0
+      payload.amount_sent = form.amount_sent
+      payload.amount_received = form.amount_received
+      payload.buy_rate = form.buy_rate
+      payload.received_rate = form.received_rate
+      payload.exchange_rate = form.received_rate
     }
 
     const response = await transactionStore.createCurrencyExchange(payload)
@@ -525,9 +536,9 @@ const handleConfirm = async () => {
       confirmButtonColor: '#0ecb81',
     })
     router.push({ name: 'transaction_exchange_list' })
+
   } catch (error) {
     handleAxiosError(error)
-    currentStep.value = 1
   } finally {
     isSubmitting.value = false
   }
@@ -716,7 +727,8 @@ const handleConfirm = async () => {
                 <input v-else-if="operationType === 'exchange'" type="number" v-model="form.amount_received"
                   @input="onEditReceived" placeholder="0.00" class="big-input" />
 
-                <input v-else type="number" v-model="clientReceivesAmount" @input="onEditClientReceives" placeholder="0.00" class="big-input" />
+                <input v-else type="number" v-model="clientReceivesAmount" @input="onEditClientReceives"
+                  placeholder="0.00" class="big-input" />
               </div>
             </div>
 
@@ -773,7 +785,7 @@ const handleConfirm = async () => {
                   <input type="number" v-model="form.commission_charged_pct" placeholder="0" />
                   <span>%</span>
                 </div>
-                <div class="calc-result text-success">+ {{ form.commission_charged_amount }}</div>
+                <div class="calc-result text-success">+ {{ form.commission_charged_amount.toFixed(2) }}</div>
               </div>
 
               <div class="comm-card expense">
@@ -782,7 +794,7 @@ const handleConfirm = async () => {
                   <input type="number" v-model="form.commission_provider_pct" placeholder="0" />
                   <span>%</span>
                 </div>
-                <div class="calc-result text-danger">- {{ form.commission_provider_amount }}</div>
+                <div class="calc-result text-danger">- {{ form.commission_provider_amount.toFixed(2) }}</div>
               </div>
 
               <div class="comm-card expense">
@@ -791,7 +803,7 @@ const handleConfirm = async () => {
                   <input type="number" v-model="form.commission_broker_pct" placeholder="0" />
                   <span>%</span>
                 </div>
-                <div class="calc-result text-danger">- {{ form.commission_broker_amount }}</div>
+                <div class="calc-result text-danger">- {{ form.commission_broker_amount.toFixed(2) }}</div>
               </div>
 
               <div v-if="isComplexExchange" class="comm-card expense">
@@ -800,7 +812,7 @@ const handleConfirm = async () => {
                   <input type="number" v-model="form.commission_admin_pct" placeholder="0" />
                   <span>%</span>
                 </div>
-                <div class="calc-result text-danger">- {{ form.commission_admin_amount }}</div>
+                <div class="calc-result text-danger">- {{ form.commission_admin_amount.toFixed(2) }}</div>
               </div>
 
               <div v-if="form.capital_type === 'investor'" class="comm-card expense">
@@ -809,14 +821,14 @@ const handleConfirm = async () => {
                   <input type="number" v-model="form.investor_profit_pct" placeholder="0" />
                   <span>%</span>
                 </div>
-                <div class="calc-result text-danger">- {{ form.investor_profit_amount }}</div>
+                <div class="calc-result text-danger">- {{ form.investor_profit_amount.toFixed(2) }}</div>
               </div>
             </div>
 
             <div class="total-profit-bar">
               <span>Utilidad Real (Neta):</span>
               <strong :class="form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'">
-                {{ form.commission_net_after_investor }} {{ commissionCurrency }}
+                {{ form.commission_net_after_investor.toFixed(2) }} {{ commissionCurrency }}
               </strong>
             </div>
           </div>
@@ -879,26 +891,26 @@ const handleConfirm = async () => {
                 <div class="divider"></div>
                 <div class="row" v-if="form.commission_provider_amount > 0">
                   <span>Pago Proveedor (Estimado)</span>
-                  <span class="text-danger">- {{ form.commission_provider_amount }}</span>
+                  <span class="text-danger">- {{ form.commission_provider_amount.toFixed(2) }}</span>
                 </div>
                 <div class="row" v-if="form.commission_broker_amount > 0">
                   <span>Pago Corredor</span>
-                  <span class="text-danger">- {{ form.commission_broker_amount }}</span>
+                  <span class="text-danger">- {{ form.commission_broker_amount.toFixed(2) }}</span>
                 </div>
                 <div class="row" v-if="form.commission_admin_amount > 0">
                   <span>Pago Plataforma</span>
-                  <span class="text-danger">- {{ form.commission_admin_amount }}</span>
+                  <span class="text-danger">- {{ form.commission_admin_amount.toFixed(2) }}</span>
                 </div>
                 <div class="row" v-if="form.investor_profit_amount > 0">
                   <span>Pago Inversionista</span>
-                  <span class="text-danger">- {{ form.investor_profit_amount }}</span>
+                  <span class="text-danger">- {{ form.investor_profit_amount.toFixed(2) }}</span>
                 </div>
 
                 <div class="row total">
                   <span>Utilidad Real</span>
                   <span :class="form.commission_net_after_investor >= 0 ? 'text-success' : 'text-danger'
                     ">
-                    {{ form.commission_net_after_investor }} {{ commissionCurrency }}
+                    {{ form.commission_net_after_investor.toFixed(2) }} {{ commissionCurrency }}
                   </span>
                 </div>
               </template>
@@ -983,7 +995,6 @@ const handleConfirm = async () => {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  /* Permite wrap en móvil */
   gap: 15px;
 }
 
@@ -994,7 +1005,6 @@ const handleConfirm = async () => {
   border-radius: 8px;
   gap: 5px;
   flex-wrap: wrap;
-  /* Wrap en botones si es necesario */
 }
 
 .type-switcher button {
@@ -1007,7 +1017,6 @@ const handleConfirm = async () => {
   border-radius: 6px;
   transition: 0.3s;
   white-space: nowrap;
-  /* Evita que el texto del botón se parta */
 }
 
 .type-switcher button.active {
@@ -1095,7 +1104,6 @@ const handleConfirm = async () => {
   width: 100%;
   font-weight: bold;
   box-sizing: border-box;
-  /* Importante para que padding no rompa width */
 }
 
 .readonly {
@@ -1340,24 +1348,17 @@ const handleConfirm = async () => {
   color: #e74c3c;
 }
 
-/* ==========================================================================
-   MEDIA QUERIES PARA MÓVILES (<768px)
-   ========================================================================== */
 @media (max-width: 768px) {
-
-  /* 1. Reducir padding lateral para ganar espacio */
   .page-wrapper {
     padding: 10px;
   }
 
   .form-card {
     min-height: auto;
-    /* Altura automática en móvil */
   }
 
   .form-header {
     flex-direction: column;
-    /* Título arriba, botones abajo */
     align-items: flex-start;
     gap: 15px;
   }
@@ -1365,79 +1366,61 @@ const handleConfirm = async () => {
   .type-switcher-container {
     width: 100%;
     overflow-x: auto;
-    /* Permitir scroll si los botones no caben */
   }
 
   .type-switcher {
     width: 100%;
     justify-content: space-between;
-    /* Botones ocupan todo el ancho */
   }
 
   .type-switcher button {
     flex: 1;
-    /* Distribución equitativa */
     padding: 10px 5px;
-    /* Más área táctil */
     font-size: 0.85rem;
   }
 
-  /* 2. Colapsar Grillas a 1 Columna */
   .grid-2,
   .grid-2-nested,
   .grid-3 {
     grid-template-columns: 1fr !important;
-    /* Fuerza 1 sola columna */
     gap: 15px;
   }
 
   .col-span-2 {
     grid-column: span 1 !important;
-    /* Ya no expande 2 columnas porque solo hay 1 */
   }
 
-  /* 3. Panel de Calculadora en Columna */
   .calc-row {
     flex-direction: column;
-    /* Apilar inputs verticalmente */
     align-items: stretch;
-    /* Estirar inputs al 100% */
     gap: 10px;
   }
 
   .operator {
     display: none;
-    /* Ocultar operadores matemáticos en móvil para limpiar la vista */
   }
 
-  /* Ajustar grid interno de tasas */
   .grid-2-rates {
     grid-template-columns: 1fr;
-    /* Tasas una debajo de otra */
   }
 
   .big-input {
     font-size: 1.1rem;
-    /* Texto un poco más pequeño */
     padding: 10px;
   }
 
-  /* 4. Footer de Botones */
   .form-footer {
     padding: 15px;
     flex-direction: column-reverse;
-    /* Botón 'Siguiente' arriba */
     gap: 10px;
   }
 
   .form-footer button {
     width: 100%;
-    /* Botones ancho completo */
     justify-content: center;
     padding: 12px;
   }
 
-  /* Ajuste de checks */
   .delivery-check-group {
     flex-direction: column;
     gap: 15px;

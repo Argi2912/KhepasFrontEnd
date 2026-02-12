@@ -76,12 +76,7 @@ const goToLogin = () => router.push({ name: 'login' })
           </div>
           <div class="form-section">
             <label><font-awesome-icon icon="envelope" /> Email Admin</label>
-            <input
-              v-model="form.admin_email"
-              type="email"
-              placeholder="admin@correo.com"
-              required
-            />
+            <input v-model="form.admin_email" type="email" placeholder="admin@correo.com" required />
           </div>
         </div>
 
@@ -92,23 +87,14 @@ const goToLogin = () => router.push({ name: 'login' })
           </div>
           <div class="form-section">
             <label><font-awesome-icon icon="lock" /> Confirmar</label>
-            <input
-              v-model="form.password_confirmation"
-              type="password"
-              placeholder="••••••••"
-              required
-            />
+            <input v-model="form.password_confirmation" type="password" placeholder="••••••••" required />
           </div>
         </div>
 
         <div class="plans-container">
           <label class="section-title">Selecciona tu Plan</label>
           <div class="plan-cards">
-            <div
-              class="plan-card"
-              :class="{ active: form.plan === 'basic' }"
-              @click="form.plan = 'basic'"
-            >
+            <div class="plan-card" :class="{ active: form.plan === 'basic' }" @click="form.plan = 'basic'">
               <div class="plan-info">
                 <h3>Básico</h3>
                 <p>$10.00<span>/mes</span></p>
@@ -118,11 +104,7 @@ const goToLogin = () => router.push({ name: 'login' })
                 <li><font-awesome-icon icon="check" /> Gestión de Caja</li>
               </ul>
             </div>
-            <div
-              class="plan-card"
-              :class="{ active: form.plan === 'pro' }"
-              @click="form.plan = 'pro'"
-            >
+            <div class="plan-card" :class="{ active: form.plan === 'pro' }" @click="form.plan = 'pro'">
               <div class="plan-info">
                 <h3>Profesional</h3>
                 <p>$29.99<span>/mes</span></p>
@@ -162,9 +144,7 @@ const goToLogin = () => router.push({ name: 'login' })
 
 <style scoped>
 /* Contenedor de Planes */
-.plans-container {
-  margin: 20px 0;
-}
+
 .section-title {
   display: block;
   margin-bottom: 10px;
@@ -177,6 +157,7 @@ const goToLogin = () => router.push({ name: 'login' })
   grid-template-columns: 1fr 1fr;
   gap: 15px;
 }
+
 .plan-card {
   background: #1e2329;
   border: 2px solid #2b3139;
@@ -185,23 +166,28 @@ const goToLogin = () => router.push({ name: 'login' })
   cursor: pointer;
   transition: 0.3s;
 }
+
 .plan-card.active {
   border-color: #f0b90b;
   background: rgba(240, 185, 11, 0.05);
 }
+
 .plan-card h3 {
   font-size: 1rem;
   margin-bottom: 5px;
 }
+
 .plan-card p {
   font-size: 1.2rem;
   font-weight: bold;
   color: #f0b90b;
 }
+
 .plan-card p span {
   font-size: 0.8rem;
   color: #848e9c;
 }
+
 .plan-features {
   list-style: none;
   padding: 0;
@@ -215,6 +201,7 @@ const goToLogin = () => router.push({ name: 'login' })
   display: flex;
   gap: 10px;
 }
+
 .method-btn {
   flex: 1;
   display: flex;
@@ -229,24 +216,20 @@ const goToLogin = () => router.push({ name: 'login' })
   font-size: 0.9rem;
   border: 1px solid transparent;
 }
+
 .method-btn.selected {
   border-color: #f0b90b;
   color: #f0b90b;
   background: #1e2329;
 }
+
 .method-btn input {
   display: none;
 }
 
 /* Estilos de formulario base (manteniendo tu línea) */
-.auth-container {
-  display: flex;
-  justify-content: center;
-  padding: 40px 20px;
-  background: #0b0e11;
-  min-height: 100vh;
-  color: white;
-}
+
+
 .auth-card {
   background: #181a20;
   padding: 30px;
@@ -254,20 +237,24 @@ const goToLogin = () => router.push({ name: 'login' })
   width: 100%;
   max-width: 550px;
 }
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 15px;
 }
+
 .form-section {
   margin-bottom: 15px;
 }
+
 .form-section label {
   display: block;
   margin-bottom: 5px;
   font-size: 0.85rem;
   color: #848e9c;
 }
+
 input {
   width: 100%;
   background: #2b3139;
@@ -276,6 +263,7 @@ input {
   border-radius: 8px;
   color: white;
 }
+
 .btn-primary {
   width: 100%;
   padding: 15px;
@@ -287,15 +275,18 @@ input {
   cursor: pointer;
   margin-top: 20px;
 }
+
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .auth-footer {
   text-align: center;
   margin-top: 20px;
   color: #848e9c;
 }
+
 .auth-footer a {
   color: #f0b90b;
   cursor: pointer;

@@ -101,16 +101,7 @@ const logout = () => {
 <style scoped>
 /* REUTILIZANDO TUS ESTILOS EXACTOS DE REGISTER.VUE */
 
-.auth-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    /* Centrado vertical añadido */
-    padding: 40px 20px;
-    background: #0b0e11;
-    min-height: 100vh;
-    color: white;
-}
+
 
 .auth-card {
     background: #181a20;

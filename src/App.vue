@@ -5,25 +5,22 @@ import { useRoute } from 'vue-router'
 // Importamos los Layouts
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import AppLayout from '@/layouts/AppLayout.vue'
-import EmptyLayout from '@/layouts/EmptyLayout.vue' // Asegúrate de tener este archivo
+import EmptyLayout from '@/layouts/EmptyLayout.vue'
 
-// Importamos estilos globales
+// NUEVO: Importamos el formulario de soporte
+import SupportForm from './components/supportform.vue'
+
 import '@/assets/css/global.css'
 
 const route = useRoute()
 
-// 1. Selección dinámica del Layout
 const layoutComponent = computed(() => {
   const layout = route.meta.layout || 'AppLayout'
-
   if (layout === 'AuthLayout') return AuthLayout
-  if (layout === 'empty') return EmptyLayout // Para la Landing Page
-
+  if (layout === 'empty') return EmptyLayout
   return AppLayout
 })
 
-// 2. Lógica para animaciones inteligentes
-// Evita que el Sidebar parpadee al navegar DENTRO del sistema
 const transitionKey = computed(() => {
   const layout = route.meta.layout || 'AppLayout'
   return layout === 'AppLayout' ? 'dashboard-static' : route.fullPath
@@ -38,7 +35,11 @@ const transitionKey = computed(() => {
       </component>
     </Transition>
   </router-view>
+
+  <SupportForm />
 </template>
+
+
 
 <style>
 /* Animaciones globales */
