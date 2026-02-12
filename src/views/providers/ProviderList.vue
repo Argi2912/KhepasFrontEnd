@@ -35,7 +35,6 @@ const tableHeaders = [
   { key: 'financials', label: 'Por Pagar' },
   { key: 'contact', label: 'Contacto' },
   { key: 'status', label: 'Estado' },
-
 ]
 
 const fetchProviders = async (page = 1) => {
@@ -85,8 +84,12 @@ const deleteProvider = async (providerId, providerName) => {
   }
 }
 
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
+// ✅ CORRECCIÓN 1: Usamos un formateador SOLO de números, sin símbolo forzado.
+const formatNumber = (value) => {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value || 0)
 }
 
 watch(filters, () => fetchProviders(1), { deep: true })
@@ -117,9 +120,21 @@ onMounted(() => fetchProviders())
 
           <td>
             <div class="financial-cell">
-              <div class="row">
+              <div class="row header-row">
                 <span class="label">Por Pagar:</span>
-                <span class="amount debt">{{ formatCurrency(provider.current_balance) }}</span>
+              </div>
+
+              <div v-if="provider.balances && provider.balances.length > 0" class="balances-list">
+                <div v-for="(bal, idx) in provider.balances" :key="idx" class="balance-item">
+                  <span :class="['amount', bal.currency_code === 'USD' ? 'text-green' : 'text-blue']">
+                    {{ bal.symbol }} {{ formatNumber(bal.amount) }}
+                  </span>
+                  <span class="currency-tag">{{ bal.currency_code }}</span>
+                </div>
+              </div>
+
+              <div v-else class="row">
+                <span class="amount zero">0.00</span>
               </div>
             </div>
           </td>
@@ -167,8 +182,8 @@ onMounted(() => fetchProviders())
       @saved="fetchProviders(pagination.current_page)" />
 
     <BalanceFormModal :show="showBalanceModal" resource="providers" :entity-id="selectedProvider?.id"
-      :entity-name="selectedProvider?.name"
-      @close="showBalanceModal = false" @saved="fetchProviders(pagination.current_page)" />
+      :entity-name="selectedProvider?.name" @close="showBalanceModal = false"
+      @saved="fetchProviders(pagination.current_page)" />
   </div>
 </template>
 
@@ -218,43 +233,65 @@ onMounted(() => fetchProviders())
   margin-top: 2px;
 }
 
-/* 🔥 ESTILOS FINANCIEROS 🔥 */
+/* 🔥 ESTILOS FINANCIEROS CORREGIDOS 🔥 */
 .financial-cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   font-size: 0.9rem;
 }
 
-.financial-cell .row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+.header-row {
+  margin-bottom: 2px;
 }
 
-.financial-cell .label {
+.label {
   color: #888;
-  font-size: 0.8rem;
-}
-
-.financial-cell .debt {
-  color: #ccc;
+  font-size: 0.75rem;
+  text-transform: uppercase;
   font-weight: bold;
 }
 
-/* Deuda en Gris/Blanco */
-.financial-cell .positive {
+.balances-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.balance-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.amount {
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+/* Colores Dinámicos */
+.text-green {
   color: #27ae60;
-  font-weight: bold;
 }
 
-/* Disponible Verde */
-.financial-cell .negative {
-  color: #c0392b;
-  font-weight: bold;
+/* Dólares */
+.text-blue {
+  color: #3498db;
 }
 
-/* Disponible Rojo */
+/* Bolívares u otras */
+.zero {
+  color: #555;
+}
+
+.currency-tag {
+  font-size: 0.65rem;
+  color: #aaa;
+  background: #2c2f33;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid #444;
+}
 
 /* Badges */
 .status-badge {
@@ -293,7 +330,6 @@ onMounted(() => fetchProviders())
   color: #f1c40f;
 }
 
-/* Amarillo dinero */
 .btn-icon.money:hover {
   color: #f39c12;
   background: rgba(241, 196, 15, 0.1);

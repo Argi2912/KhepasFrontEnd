@@ -17,6 +17,7 @@ const emit = defineEmits(['close', 'saved'])
 const authStore = useAuthStore()
 const isSubmitting = ref(false)
 const myAccounts = ref([])
+const currencies = ref([])
 
 const form = reactive({
     amount: '',
@@ -24,19 +25,39 @@ const form = reactive({
     description: '',
     category: 'Carga de Saldo',
     transaction_date: new Date().toISOString().split('T')[0],
-    target_account_id: null
+    target_account_id: null,
+
+    // Campos exclusivos para Proveedores (Deuda)
+    percentage: '',
+    debt_currency_id: null
 })
 
-// Títulos dinámicos
+// --- COMPUTED PROPERTIES ---
+
 const isProvider = computed(() => props.resource === 'providers')
 
 const title = computed(() => {
     if (props.resource === 'investors') return 'Gestionar Capital'
-    if (isProvider.value) return 'Registrar Por Pagar'
+    if (isProvider.value) return 'Registrar Deuda / Financiamiento'
     return 'Ajuste de Saldo'
 })
 
+// Calcula cuánto vas a deber (Monto + Porcentaje)
+const calculatedDebt = computed(() => {
+    if (!form.amount) return 0
+    const amount = parseFloat(form.amount) || 0
+    const pct = parseFloat(form.percentage) || 0
+    return amount + (amount * (pct / 100))
+})
+
+// --- METHODS ---
+
 const updateCategory = () => {
+    if (isProvider.value) {
+        form.category = 'Financiamiento / Deuda'
+        return
+    }
+
     if (form.type === 'income') {
         form.category = props.resource === 'investors' ? 'Aporte de Capital' : 'Carga de Saldo'
     } else {
@@ -44,12 +65,17 @@ const updateCategory = () => {
     }
 }
 
-const fetchMyAccounts = async () => {
+const fetchData = async () => {
     try {
-        const { data } = await api.get('/accounts')
-        myAccounts.value = data.data || data
+        const [accRes, currRes] = await Promise.all([
+            api.get('/accounts'),
+            api.get('/currencies')
+        ])
+        myAccounts.value = accRes.data.data || accRes.data
+        currencies.value = currRes.data.data || currRes.data
     } catch (error) {
-        console.error('Error cargando cuentas', error)
+        console.error('Error cargando datos', error)
+        notify.error('Error cargando cuentas o monedas')
     }
 }
 
@@ -63,54 +89,67 @@ const formatMoney = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 }
 
-// Reemplaza SOLO la función handleSubmit en tu BalanceFormModal.vue
+// --- LIMPIEZA DEL FORMULARIO (CORREGIDO) ---
+const resetForm = () => {
+    form.amount = ''
+    form.description = ''
+    form.target_account_id = null
+    form.percentage = ''
+    form.debt_currency_id = null
+    form.type = 'income' // Resetear a default
+    form.transaction_date = new Date().toISOString().split('T')[0]
+}
+
+// --- SUBMIT HANDLE ---
 
 const handleSubmit = async () => {
-    // Validación: Proveedores requieren cuenta destino
-    if (isProvider.value && !form.target_account_id) {
-        notify.error('Debe seleccionar una cuenta destino')
-        return
-    }
-
-    // Validación de saldo para retiros (solo NO proveedores)
-    if (!isProvider.value && form.type === 'expense') {
-        if (Number(form.amount) > props.availableBalance) {
-            notify.error(`Saldo insuficiente. Disponible: ${formatMoney(props.availableBalance)}`)
-            return
-        }
-    }
-
     isSubmitting.value = true
     updateCategory()
 
     try {
-        let url = '/transactions/internal'
-
         // ============================================================
-        // CASO PROVEEDOR: Registrar "Por Pagar" vía endpoint del proveedor
+        // CASO PROVEEDOR: Operación Compuesta (Entrada + Deuda)
         // ============================================================
         if (isProvider.value) {
+            // Validaciones específicas
+            if (!form.target_account_id) throw new Error('Debes seleccionar la cuenta donde entra el dinero.')
+            if (!form.debt_currency_id) throw new Error('Debes seleccionar la moneda de la deuda.')
+            if (!form.amount || form.amount <= 0) throw new Error('El monto debe ser mayor a 0.')
+
             const payload = {
-                amount: Math.abs(form.amount),
-                type: 'income',
-                description: form.description || 'Registro por pagar a proveedor',
+                // 1. Datos de la Entrada de Dinero (Activo)
+                amount_received: form.amount,
                 target_account_id: form.target_account_id,
-                transaction_date: form.transaction_date
+
+                // 2. Datos de la Deuda (Pasivo)
+                interest_percentage: form.percentage || 0,
+                debt_amount: calculatedDebt.value,
+                debt_currency_id: form.debt_currency_id,
+
+                // 3. Generales
+                description: form.description || 'Financiamiento de proveedor',
+                transaction_date: form.transaction_date,
+                type: 'income' // Internamente para provider esto crea deuda
             }
 
             await api.post(`/providers/${props.entityId}/balance`, payload)
-            notify.success('Por pagar registrado con éxito')
+
+            notify.success('Financiamiento registrado con éxito')
             emit('saved')
             emit('close')
-            form.amount = ''
-            form.description = ''
-            form.target_account_id = null
             return
         }
 
         // ============================================================
-        // CASO: Inversionistas / Cuentas (sin cambios)
+        // CASO: Inversionistas / Cuentas (Lógica Original)
         // ============================================================
+
+        // Validación de saldo para retiros
+        if (form.type === 'expense' && Number(form.amount) > props.availableBalance) {
+            throw new Error(`Saldo insuficiente. Disponible: ${formatMoney(props.availableBalance)}`)
+        }
+
+        let url = '/transactions/internal'
         let payload = {
             account_id: props.entityId,
             user_id: authStore.authUser?.id,
@@ -136,32 +175,27 @@ const handleSubmit = async () => {
         emit('saved')
         emit('close')
 
-        // Limpiar campos
-        form.amount = ''
-        form.description = ''
-        form.target_account_id = null
-
     } catch (error) {
         console.error(error)
-        const msg = error.response?.data?.message || 'Error al guardar'
+        const msg = error.response?.data?.message || error.message || 'Error al guardar'
         notify.error(msg)
     } finally {
         isSubmitting.value = false
     }
 }
 
+// --- WATCHERS ---
+
+// ALERTA: Aquí estaba el error. Ahora solo reseteamos, NO emitimos cierre.
 watch(() => props.show, (val) => {
     if (val) {
-        form.amount = ''
-        form.description = ''
-        form.target_account_id = null
-        form.type = 'income'
+        resetForm()
         updateCategory()
     }
 })
 
 onMounted(() => {
-    fetchMyAccounts()
+    fetchData()
     updateCategory()
 })
 </script>
@@ -184,47 +218,82 @@ onMounted(() => {
 
                 <form @submit.prevent="handleSubmit">
 
-                    <!-- Selector SUMAR/RESTAR solo para NO proveedores -->
-                    <div v-if="!isProvider" class="type-selector">
-                        <label :class="{ active: form.type === 'income', income: true }" @click="updateCategory">
-                            <input type="radio" value="income" v-model="form.type">
-                            SUMAR (+)
-                        </label>
-                        <label :class="{ active: form.type === 'expense', expense: true }" @click="updateCategory">
-                            <input type="radio" value="expense" v-model="form.type">
-                            RESTAR (-)
-                        </label>
+                    <div v-if="isProvider">
+                        <div class="form-group section-box">
+                            <label class="section-label">1. Entrada de Dinero (Recibido)</label>
+
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label class="input-label">Cuenta Destino (¿Dónde entra el dinero?)</label>
+                                <select v-model="form.target_account_id" class="form-select" required>
+                                    <option :value="null" disabled>-- Selecciona tu Caja/Cuenta --</option>
+                                    <option v-for="acc in myAccounts" :key="acc.id" :value="acc.id">
+                                        {{ acc.name }} ({{ acc.currency?.code || 'USD' }})
+                                    </option>
+                                </select>
+                            </div>
+
+                            <BaseInput label="Monto Recibido" type="number" step="0.01" v-model="form.amount" required
+                                placeholder="Ej: 100" />
+                        </div>
+
+                        <div class="form-group section-box debt-box">
+                            <label class="section-label text-red">2. Registro de Deuda (A Pagar)</label>
+
+                            <div class="row-inputs">
+                                <div class="col">
+                                    <BaseInput label="% Interés" type="number" step="0.01" v-model="form.percentage"
+                                        placeholder="0" />
+                                </div>
+                                <div class="col">
+                                    <label class="input-label">Moneda a Deber</label>
+                                    <select v-model="form.debt_currency_id" class="form-select" required>
+                                        <option :value="null" disabled>-- Moneda --</option>
+                                        <option v-for="curr in currencies" :key="curr.id" :value="curr.id">
+                                            {{ curr.code }} - {{ curr.name }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="calculation-result">
+                                <span>Total a Deber:</span>
+                                <strong>{{ new Intl.NumberFormat('en-US', {
+                                    minimumFractionDigits: 2
+                                    }).format(calculatedDebt) }}</strong>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Cuenta destino para proveedores (siempre visible) -->
-                    <div v-if="isProvider" class="form-group account-destination-box">
-                        <label>¿A cuál cuenta va este dinero?</label>
-                        <select v-model="form.target_account_id" class="form-select" required>
-                            <option :value="null" disabled>-- Seleccione una cuenta --</option>
-                            <option v-for="acc in myAccounts" :key="acc.id" :value="acc.id">
-                                {{ acc.name }} ({{ acc.currency_code }})
-                            </option>
-                        </select>
-                    </div>
+                    <div v-else>
+                        <div class="type-selector">
+                            <label :class="{ active: form.type === 'income', income: true }" @click="updateCategory">
+                                <input type="radio" value="income" v-model="form.type">
+                                SUMAR (+)
+                            </label>
+                            <label :class="{ active: form.type === 'expense', expense: true }" @click="updateCategory">
+                                <input type="radio" value="expense" v-model="form.type">
+                                RESTAR (-)
+                            </label>
+                        </div>
 
-                    <!-- Cuenta destino para otros (solo al restar) -->
-                    <div v-if="!isProvider && form.type === 'expense'" class="form-group destination-box">
-                        <label>¿A dónde va el dinero? (Opcional)</label>
-                        <select v-model="form.target_account_id" class="form-select">
-                            <option :value="null">-- Solo descontar (Sin destino) --</option>
-                            <option v-for="acc in myAccounts" :key="acc.id" :value="acc.id">
-                                Enviar a: {{ acc.name }} ({{ acc.currency_code }})
-                            </option>
-                        </select>
-                    </div>
+                        <div v-if="form.type === 'expense'" class="form-group destination-box">
+                            <label>¿A dónde va el dinero? (Opcional)</label>
+                            <select v-model="form.target_account_id" class="form-select">
+                                <option :value="null">-- Solo descontar (Sin destino) --</option>
+                                <option v-for="acc in myAccounts" :key="acc.id" :value="acc.id">
+                                    Enviar a: {{ acc.name }} ({{ acc.currency?.code || 'USD' }})
+                                </option>
+                            </select>
+                        </div>
 
-                    <BaseInput label="Monto" type="number" step="0.01" v-model="form.amount" required
-                        placeholder="0.00" />
+                        <BaseInput label="Monto" type="number" step="0.01" v-model="form.amount" required
+                            placeholder="0.00" />
+                    </div>
 
                     <BaseInput label="Fecha" type="date" v-model="form.transaction_date" required />
 
                     <BaseInput label="Nota / Descripción" v-model="form.description"
-                        placeholder="Ej: Pago de factura, Retiro..." />
+                        placeholder="Ej: Préstamo recibido, Pago factura..." />
 
                     <div class="modal-actions">
                         <button type="button" @click="$emit('close')" class="btn-cancel">Cancelar</button>
@@ -239,7 +308,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* ESTILOS BASE (PC) */
+/* ESTILOS BASE */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -258,15 +327,13 @@ onMounted(() => {
     background: #1e2023;
     padding: 25px;
     border-radius: 12px;
-    width: 450px;
-    /* Un poco más ancho en PC */
+    width: 480px;
+    /* Un poco más ancho para acomodar las dos columnas */
     color: white;
     border: 1px solid #333;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     max-height: 90vh;
-    /* Evita que se salga si es muy alto */
     overflow-y: auto;
-    /* Scroll interno si hace falta */
 }
 
 .modal-header {
@@ -282,7 +349,6 @@ onMounted(() => {
     margin: 0;
     font-size: 1.2rem;
     color: #fbbf24;
-    /* Color de marca */
 }
 
 .close-btn {
@@ -313,13 +379,13 @@ onMounted(() => {
     font-weight: bold;
 }
 
+/* Selector Sumar/Restar */
 .type-selector {
     display: flex;
     margin-bottom: 20px;
     border-radius: 8px;
     overflow: hidden;
     gap: 5px;
-    /* Espacio entre botones */
 }
 
 .type-selector label {
@@ -360,37 +426,42 @@ onMounted(() => {
     box-shadow: 0 4px 10px rgba(192, 57, 43, 0.3);
 }
 
-.destination-box {
-    background: rgba(192, 57, 43, 0.1);
+/* Cajas de Sección (Proveedor) */
+.section-box {
+    background: #25282c;
     padding: 15px;
     border-radius: 8px;
-    border: 1px solid #c0392b;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    border: 1px solid #3f3f46;
 }
 
-.destination-box label {
+.debt-box {
+    border-color: #c0392b;
+    /* Rojo suave */
+    background: rgba(192, 57, 43, 0.05);
+}
+
+.section-label {
     display: block;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-    color: #ffadad;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
     font-weight: bold;
 }
 
-/* Estilo neutro para cuenta destino de proveedores */
-.account-destination-box {
-    background: rgba(251, 191, 36, 0.08);
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #fbbf24;
-    margin-bottom: 20px;
+.text-red {
+    color: #ff8a80;
 }
 
-.account-destination-box label {
+/* Inputs y Selects */
+.input-label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-size: 0.9rem;
-    color: #fbbf24;
-    font-weight: bold;
+    color: #ccc;
 }
 
 .form-select {
@@ -401,6 +472,33 @@ onMounted(() => {
     background: #121212;
     color: white;
     font-size: 1rem;
+}
+
+.row-inputs {
+    display: flex;
+    gap: 15px;
+}
+
+.col {
+    flex: 1;
+}
+
+/* Resultado del cálculo */
+.calculation-result {
+    margin-top: 15px;
+    text-align: right;
+    font-size: 1.1rem;
+    color: #ff8a80;
+    padding-top: 10px;
+    border-top: 1px dashed #555;
+}
+
+.destination-box {
+    background: rgba(192, 57, 43, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #c0392b;
+    margin-bottom: 20px;
 }
 
 .modal-actions {
@@ -444,48 +542,15 @@ onMounted(() => {
     color: white;
 }
 
-/* ==========================================================================
-   RESPONSIVIDAD (MÓVIL)
-   ========================================================================== */
 @media (max-width: 768px) {
-
-    /* Modal Ancho Completo */
     .modal-content {
         width: 95%;
-        max-height: 95vh;
         padding: 20px;
-        margin: 10px;
     }
 
-    /* Botones Tipo (+/-) Verticales si es muy estrecho */
-    .type-selector {
+    .row-inputs {
+        flex-direction: column;
         gap: 10px;
-    }
-
-    .type-selector label {
-        padding: 12px;
-        /* Táctil */
-    }
-
-    /* Inputs más grandes */
-    .form-select,
-    input {
-        height: 48px;
-        /* Altura touch */
-    }
-
-    /* Botones de Acción Apilados */
-    .modal-actions {
-        flex-direction: column-reverse;
-        /* Cancelar abajo */
-        gap: 10px;
-    }
-
-    .btn-primary,
-    .btn-cancel {
-        width: 100%;
-        justify-content: center;
-        padding: 14px;
     }
 }
 </style>
