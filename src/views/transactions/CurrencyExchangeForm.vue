@@ -33,9 +33,9 @@ const form = reactive({
   investor_id: '',
   investor_profit_pct: 0,
   investor_profit_amount: 0,
-  broker_id: '',
-  provider_id: '',
-  platform_id: '',
+  broker_id: null,   // 🔥 Ajustado a null para facilitar limpieza
+  provider_id: null, // 🔥 Ajustado a null
+  platform_id: null, // 🔥 Ajustado a null
   admin_user_id: authStore.authUser?.id,
 
   from_account_id: '',
@@ -400,8 +400,9 @@ watch(operationType, () => {
   form.exchange_rate = ''
   form.buy_rate = ''
   form.received_rate = ''
-  form.provider_id = ''
-  form.platform_id = ''
+  form.provider_id = null  // 🔥 Actualizado a null
+  form.platform_id = null  // 🔥 Actualizado a null
+  form.broker_id = null    // 🔥 Actualizado a null
   form.commission_charged_pct = 0
   form.commission_provider_pct = 0
   form.commission_admin_pct = 0
@@ -421,11 +422,10 @@ const nextStep = () => {
   if (currentStep.value === 1) {
     const isExternalCapital = ['investor'].includes(form.capital_type)
     const missingFrom = isExternalCapital ? false : !form.from_account_id
+
+    // 🔥 ELIMINADAS LAS RESTRICCIONES DE PLATAFORMA. Solo valida Cliente y Cuentas
     if (missingFrom || !form.to_account_id || !form.client_id) {
       return Swal.fire('Falta información', 'Complete los campos obligatorios (*).', 'warning')
-    }
-    if (operationType.value === 'exchange' && !form.platform_id) {
-      return Swal.fire('Falta información', 'Seleccione el Admin (Plataforma).', 'warning')
     }
   }
   if (currentStep.value < totalSteps) currentStep.value++
@@ -439,14 +439,7 @@ const handleConfirm = async () => {
   // 1. Validaciones Previas
   if (!hasSufficientBalance.value) return Swal.fire('Error', 'Saldo insuficiente', 'error')
 
-  if (isComplexExchange.value) {
-    if (!form.provider_id) return Swal.fire('Falta Datos', 'Seleccione el Proveedor', 'warning')
-    if (!form.platform_id) return Swal.fire('Falta Datos', 'Seleccione la Plataforma/Admin', 'warning')
-  }
-
-  if (operationType.value === 'exchange' && !form.platform_id) {
-    return Swal.fire('Falta Datos', 'Seleccione el Admin (Plataforma)', 'warning')
-  }
+  // 🔥 ELIMINADAS LAS VALIDACIONES DE PROVEEDOR Y PLATAFORMA OBLIGATORIOS
 
   if (operationType.value === 'purchase') {
     if (!form.buy_rate || !form.received_rate)
@@ -538,9 +531,21 @@ const handleConfirm = async () => {
     router.push({ name: 'transaction_exchange_list' })
 
   } catch (error) {
-    handleAxiosError(error)
+    // 🔥 AHORA SÍ LEEMOS LA VARIABLE "error" DEL JSON DEL BACKEND 🔥
+    const backendError = error.response?.data?.error;
+    const backendMessage = error.response?.data?.message;
+
+    // Priorizamos el detalle específico, si no hay, mostramos el general.
+    const finalExplanation = backendError || backendMessage || error.message || 'Ocurrió un error en el servidor.';
+
+    Swal.fire({
+      title: 'Operación Rechazada',
+      text: finalExplanation,
+      icon: 'error',
+      confirmButtonColor: '#e74c3c'
+    });
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
   }
 }
 </script>
@@ -599,29 +604,41 @@ const handleConfirm = async () => {
                 @update:modelValue="clearError('investor_id')" />
             </div>
 
-            <div v-if="operationType === 'exchange'">
-              <BaseSelectWithSearchAndCreate label="Admin (Plataforma) *" :options="transactionStore.getPlatforms"
-                v-model="form.platform_id" required create-endpoint="/platforms" :create-fields="{ name: '' }"
-                create-label="Plataforma" @saved="handleDataReload" :error="getError('platform_id')"
-                @update:modelValue="clearError('platform_id')" />
+            <div v-if="operationType === 'exchange'" style="position: relative;">
+              <a href="#" v-if="form.platform_id" @click.prevent="form.platform_id = null"
+                class="clear-link">Limpiar</a>
+              <BaseSelectWithSearchAndCreate label="Admin / Plataforma (Opcional)"
+                :options="transactionStore.getPlatforms" v-model="form.platform_id" create-endpoint="/platforms"
+                :create-fields="{ name: '' }" create-label="Plataforma" @saved="handleDataReload"
+                :error="getError('platform_id')" @update:modelValue="clearError('platform_id')" />
             </div>
 
             <template v-if="operationType !== 'exchange'">
-              <BaseSelectWithSearchAndCreate label="Corredor (Opcional)" :options="transactionStore.getBrokers"
-                v-model="form.broker_id" create-endpoint="/brokers" :create-fields="{ name: '' }"
-                create-label="Corredor" @saved="handleDataReload" :error="getError('broker_id')" />
+              <div class="col-span-2" style="position: relative;">
+                <a href="#" v-if="form.broker_id" @click.prevent="form.broker_id = null" class="clear-link">Limpiar</a>
+                <BaseSelectWithSearchAndCreate label="Corredor (Opcional)" :options="transactionStore.getBrokers"
+                  v-model="form.broker_id" create-endpoint="/brokers" :create-fields="{ name: '' }"
+                  create-label="Corredor" @saved="handleDataReload" :error="getError('broker_id')" />
+              </div>
 
               <div class="grid-2-nested col-span-2">
-                <BaseSelectWithSearchAndCreate label="Proveedor (Liquidez)" :options="transactionStore.getProviders"
-                  v-model="form.provider_id" :required="isComplexExchange" create-endpoint="/providers"
-                  :create-fields="{ name: '' }" create-label="Proveedor" @saved="handleDataReload"
-                  :error="getError('provider_id')" @update:modelValue="clearError('provider_id')" />
+                <div style="position: relative;">
+                  <a href="#" v-if="form.provider_id" @click.prevent="form.provider_id = null"
+                    class="clear-link">Limpiar</a>
+                  <BaseSelectWithSearchAndCreate label="Proveedor Liquidez (Opcional)"
+                    :options="transactionStore.getProviders" v-model="form.provider_id" create-endpoint="/providers"
+                    :create-fields="{ name: '' }" create-label="Proveedor" @saved="handleDataReload"
+                    :error="getError('provider_id')" @update:modelValue="clearError('provider_id')" />
+                </div>
 
-                <BaseSelectWithSearchAndCreate v-if="isComplexExchange" label="Plataforma / Admin"
-                  :options="transactionStore.getPlatforms" v-model="form.platform_id" :required="isComplexExchange"
-                  create-endpoint="/platforms" :create-fields="{ name: '' }" create-label="Plataforma"
-                  @saved="handleDataReload" :error="getError('platform_id')"
-                  @update:modelValue="clearError('platform_id')" />
+                <div v-if="isComplexExchange" style="position: relative;">
+                  <a href="#" v-if="form.platform_id" @click.prevent="form.platform_id = null"
+                    class="clear-link">Limpiar</a>
+                  <BaseSelectWithSearchAndCreate label="Plataforma / Admin (Opcional)"
+                    :options="transactionStore.getPlatforms" v-model="form.platform_id" create-endpoint="/platforms"
+                    :create-fields="{ name: '' }" create-label="Plataforma" @saved="handleDataReload"
+                    :error="getError('platform_id')" @update:modelValue="clearError('platform_id')" />
+                </div>
               </div>
               <div class="divider col-span-2"></div>
             </template>
@@ -780,7 +797,7 @@ const handleConfirm = async () => {
               <div class="comm-card income">
                 <label>{{
                   operationType === 'purchase' ? 'Ganancia Bruta (%)' : 'Comisión (%)'
-                  }}</label>
+                }}</label>
                 <div class="pct-input-wrapper">
                   <input type="number" v-model="form.commission_charged_pct" placeholder="0" />
                   <span>%</span>
@@ -846,7 +863,7 @@ const handleConfirm = async () => {
                 <span>Cliente</span>
                 <strong>{{
                   transactionStore.getClients.find((c) => c.id == form.client_id)?.name
-                  }}</strong>
+                }}</strong>
               </div>
 
               <div class="row" v-if="form.platform_id">
@@ -858,7 +875,7 @@ const handleConfirm = async () => {
                 <span>Corredor</span>
                 <span>{{
                   transactionStore.getBrokers.find((b) => b.id == form.broker_id)?.name
-                  }}</span>
+                }}</span>
               </div>
 
               <div class="row" v-if="form.provider_id">
@@ -1346,6 +1363,22 @@ const handleConfirm = async () => {
 
 .text-danger {
   color: #e74c3c;
+}
+
+/* 🔥 NUEVO ESTILO PARA EL BOTÓN LIMPIAR 🔥 */
+.clear-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: var(--color-danger);
+  font-size: 0.75rem;
+  text-decoration: none;
+  font-weight: bold;
+  z-index: 5;
+}
+
+.clear-link:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 768px) {

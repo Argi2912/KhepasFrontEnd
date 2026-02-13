@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  modelValue: [String, Number],
+  modelValue: [String, Number, null], // 👈 Añadimos null para soportar estados vacíos
   label: String,
   options: {
     type: Array,
@@ -30,9 +30,12 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const inputId = computed(() => props.name || `select-${Math.random().toString(36).substring(2, 9)}`)
 
 const handleUpdate = (event) => {
-  // Para select nativo, el valor siempre es el valor de la opción (string).
-  emit('update:modelValue', event.target.value)
-  emit('change', event.target.value) // Emitir evento change para validación
+  const value = event.target.value
+  // 🔥 MEJORA: Si el valor es una cadena vacía, enviamos null para limpiar la base de datos
+  const finalValue = value === "" ? null : value
+
+  emit('update:modelValue', finalValue)
+  emit('change', finalValue)
 }
 
 const displayOptions = computed(() => {
@@ -51,15 +54,10 @@ const displayOptions = computed(() => {
     </label>
 
     <div class="input-wrapper select-wrapper">
-      <select
-        :id="inputId"
-        :value="modelValue"
-        @change="handleUpdate"
-        :aria-invalid="!!error"
-        :required="required"
-        class="custom-select-native"
-      >
-        <option value="" disabled>{{ placeholder || 'Seleccione una opción' }}</option>
+      <select :id="inputId" :value="modelValue" @change="handleUpdate" :aria-invalid="!!error" :required="required"
+        class="custom-select-native">
+        <option value="">{{ placeholder || (required ? 'Seleccione una opción' : '--- Ninguno ---') }}</option>
+
         <option v-for="option in displayOptions" :key="option.value" :value="option.value">
           {{ option.text }}
         </option>
@@ -80,6 +78,7 @@ const displayOptions = computed(() => {
 .form-group {
   margin-bottom: 25px;
 }
+
 label {
   display: block;
   margin-bottom: 8px;
@@ -87,10 +86,12 @@ label {
   color: #ccc;
   font-weight: 500;
 }
+
 .required-star {
   color: var(--color-danger);
   margin-left: 5px;
 }
+
 .error-message {
   margin-top: 4px;
   font-size: 0.85rem;
@@ -102,7 +103,8 @@ label {
   display: flex;
   align-items: center;
   border: 1px solid var(--color-border);
-  background-color: var(--color-background); /* Fondo Oscuro */
+  background-color: var(--color-background);
+  /* Fondo Oscuro */
   border-radius: 6px;
   transition:
     border-color 0.2s,
@@ -115,15 +117,18 @@ label {
 }
 
 .custom-select-native {
-  appearance: none; /* Oculta la flecha nativa */
+  appearance: none;
+  /* Oculta la flecha nativa */
   background: transparent;
   border: none;
   padding: 12px 30px 12px 12px;
   width: 100%;
-  color: var(--color-text-light); /* 🚨 Texto Visible */
+  color: var(--color-text-light);
+  /* 🚨 Texto Visible */
   min-height: 44px;
   cursor: pointer;
 }
+
 /* Asegura que el color de la opción sea visible en Firefox */
 .custom-select-native option {
   background-color: var(--color-secondary);
