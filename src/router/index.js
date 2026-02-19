@@ -76,6 +76,28 @@ const router = createRouter({
       },
     },
     {
+      path: '/superadmin/users',
+      name: 'superadmin_users',
+      component: () => import('@/views/superadmin/SuperadminUserList.vue'),
+      meta: {
+        requiresAuth: true,
+        icon: 'fa-solid fa-users-gear',
+        label: 'Gestión de Usuarios',
+        permission: 'manage_tenants',
+      },
+    },
+    {
+      path: '/superadmin/profile',
+      name: 'superadmin_profile',
+      component: () => import('@/views/superadmin/SuperadminProfile.vue'),
+      meta: {
+        requiresAuth: true,
+        icon: 'fa-solid fa-user-shield',
+        label: 'Mi Perfil',
+        permission: 'manage_tenants',
+      },
+    },
+    {
       path: '/superadmin/logs',
       name: 'superadmin_logs',
       component: () => import('@/views/superadmin/SystemAuditLogs.vue'),
