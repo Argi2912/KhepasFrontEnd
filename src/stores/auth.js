@@ -13,6 +13,7 @@ export const useAuthStore = defineStore('auth', () => {
   // --- GETTERS (Computed) ---
   const isLoggedIn = computed(() => !!token.value)
   const authUser = computed(() => user.value)
+  const isSuperAdmin = computed(() => user.value?.tenant_id === null && !!user.value)
 
   /**
    * Verifica si el usuario tiene un permiso específico.
@@ -37,14 +38,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-async function register(data) {
-  try {
-    const response = await api.post('/register', data)
-    return response.data
-  } catch (error) {
-    throw error
+  async function register(data) {
+    try {
+      const response = await api.post('/register', data)
+      return response.data
+    } catch (error) {
+      throw error
+    }
   }
-}
 
   async function login(credentials) {
     const response = await api.post('/login', credentials)
@@ -134,6 +135,7 @@ async function register(data) {
     permissions, // La lista plana de permisos
     isLoggedIn,
     authUser,
+    isSuperAdmin,
     can, // La función que consume la lista plana
     login,
     register,
