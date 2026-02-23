@@ -83,12 +83,7 @@ const goToLogin = () => router.push({ name: 'login' })
           </div>
           <div class="form-section">
             <label><font-awesome-icon icon="envelope" /> Email Admin</label>
-            <input
-              v-model="form.admin_email"
-              type="email"
-              placeholder="admin@correo.com"
-              required
-            />
+            <input v-model="form.admin_email" type="email" placeholder="admin@correo.com" required />
           </div>
         </div>
 
@@ -99,26 +94,17 @@ const goToLogin = () => router.push({ name: 'login' })
           </div>
           <div class="form-section">
             <label><font-awesome-icon icon="lock" /> Confirmar</label>
-            <input
-              v-model="form.password_confirmation"
-              type="password"
-              placeholder="••••••••"
-              required
-            />
+            <input v-model="form.password_confirmation" type="password" placeholder="••••••••" required />
           </div>
         </div>
 
         <div class="plans-container">
           <label class="section-title">Selecciona tu Plan</label>
           <div class="plan-cards">
-            <div
-              class="plan-card"
-              :class="{ active: form.plan === 'free' }"
-              @click="form.plan = 'free'"
-            >
+            <div class="plan-card" :class="{ active: form.plan === 'free' }" @click="form.plan = 'free'">
               <div class="plan-info">
                 <h3>Gratis</h3>
-                <p>$0.00<span>/7 días</span></p>
+                <p>$0.00<span>/30 días</span></p>
               </div>
               <ul class="plan-features">
                 <li><font-awesome-icon icon="check" /> Prueba Full</li>
@@ -126,11 +112,7 @@ const goToLogin = () => router.push({ name: 'login' })
               </ul>
             </div>
 
-            <div
-              class="plan-card"
-              :class="{ active: form.plan === 'basic' }"
-              @click="form.plan = 'basic'"
-            >
+            <div class="plan-card" :class="{ active: form.plan === 'basic' }" @click="form.plan = 'basic'">
               <div class="plan-info">
                 <h3>Básico</h3>
                 <p>$10.00<span>/mes</span></p>
@@ -141,11 +123,7 @@ const goToLogin = () => router.push({ name: 'login' })
               </ul>
             </div>
 
-            <div
-              class="plan-card"
-              :class="{ active: form.plan === 'pro' }"
-              @click="form.plan = 'pro'"
-            >
+            <div class="plan-card" :class="{ active: form.plan === 'pro' }" @click="form.plan = 'pro'">
               <div class="plan-info">
                 <h3>Profesional</h3>
                 <p>$29.99<span>/mes</span></p>
@@ -329,7 +307,8 @@ const goToLogin = () => router.push({ name: 'login' })
 
 .plan-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* Cambio a 3 columnas */
+  grid-template-columns: repeat(3, 1fr);
+  /* Cambio a 3 columnas */
   gap: 12px;
 }
 
@@ -417,7 +396,8 @@ const goToLogin = () => router.push({ name: 'login' })
   padding: 30px;
   border-radius: 16px;
   width: 100%;
-  max-width: 600px; /* Un poco más ancho por las 3 columnas */
+  max-width: 600px;
+  /* Un poco más ancho por las 3 columnas */
 }
 
 .auth-header {
@@ -597,6 +577,7 @@ input:focus {
   .form-row {
     grid-template-columns: 1fr;
   }
+
   .plan-cards {
     grid-template-columns: 1fr;
   }
