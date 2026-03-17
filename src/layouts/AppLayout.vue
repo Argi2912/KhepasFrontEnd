@@ -1,9 +1,13 @@
 <script setup>
 import Sidebar from '@/components/layout/Sidebar.vue'
 import Navbar from '@/components/layout/Navbar.vue'
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 
-const isSidebarOpen = ref(true)
+const isSidebarOpen = ref(localStorage.getItem('sidebar_open') !== 'false')
+
+watch(isSidebarOpen, (val) => {
+  localStorage.setItem('sidebar_open', val.toString())
+})
 </script>
 
 <template>
@@ -36,7 +40,7 @@ const isSidebarOpen = ref(true)
 }
 
 .sidebar-closed {
-  padding-left: 80px;
+  padding-left: 0;
 }
 
 .page-wrapper {
@@ -47,7 +51,7 @@ const isSidebarOpen = ref(true)
 /* --- RESPONSIVE --- */
 @media (max-width: 992px) {
   .main-content {
-    padding-left: 80px;
+    padding-left: 0;
   }
 }
 </style>

@@ -4,9 +4,11 @@ import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { useRouter } from 'vue-router'
+import { useFormValidation } from '@/utils/useFormValidation'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { handleAxiosError, getError, clearError } = useFormValidation()
 
 const form = reactive({
   company_name: '',
@@ -47,12 +49,12 @@ const handleRegister = async () => {
       setTimeout(() => {
         window.location.href = url
       }, 1000)
-    } else {
-      notify.error('No se recibió la URL de redirección.')
     }
   } catch (error) {
-    const msg = error.response?.data?.error || 'Error al procesar el registro'
-    notify.error(msg)
+    if (!handleAxiosError(error)) {
+      const msg = error.response?.data?.error || 'Error al procesar el registro'
+      notify.error(msg)
+    }
     console.error(error)
   } finally {
     isLoading.value = false
@@ -73,28 +75,33 @@ const goToLogin = () => router.push({ name: 'login' })
       <form @submit.prevent="handleRegister" class="auth-form">
         <div class="form-section">
           <label><font-awesome-icon icon="building" /> Nombre de la Empresa</label>
-          <input v-model="form.company_name" type="text" placeholder="Ej. Cambio Seguro" required />
+          <input v-model="form.company_name" type="text" placeholder="Ej. Cambio Seguro" required :class="{ 'input-error': getError('company_name') }" @input="clearError('company_name')" />
+          <span v-if="getError('company_name')" class="error-msg">{{ getError('company_name') }}</span>
         </div>
 
         <div class="form-row">
           <div class="form-section">
             <label><font-awesome-icon icon="user" /> Nombre Admin</label>
-            <input v-model="form.admin_name" type="text" placeholder="Tu nombre" required />
+            <input v-model="form.admin_name" type="text" placeholder="Tu nombre" required :class="{ 'input-error': getError('admin_name') }" @input="clearError('admin_name')" />
+            <span v-if="getError('admin_name')" class="error-msg">{{ getError('admin_name') }}</span>
           </div>
           <div class="form-section">
             <label><font-awesome-icon icon="envelope" /> Email Admin</label>
-            <input v-model="form.admin_email" type="email" placeholder="admin@correo.com" required />
+            <input v-model="form.admin_email" type="email" placeholder="admin@correo.com" required :class="{ 'input-error': getError('admin_email') }" @input="clearError('admin_email')" />
+            <span v-if="getError('admin_email')" class="error-msg">{{ getError('admin_email') }}</span>
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-section">
             <label><font-awesome-icon icon="lock" /> Contraseña</label>
-            <input v-model="form.password" type="password" placeholder="••••••••" required />
+            <input v-model="form.password" type="password" placeholder="••••••••" required :class="{ 'input-error': getError('password') }" @input="clearError('password')" />
+            <span v-if="getError('password')" class="error-msg">{{ getError('password') }}</span>
           </div>
           <div class="form-section">
             <label><font-awesome-icon icon="lock" /> Confirmar</label>
-            <input v-model="form.password_confirmation" type="password" placeholder="••••••••" required />
+            <input v-model="form.password_confirmation" type="password" placeholder="••••••••" required :class="{ 'input-error': getError('password_confirmation') }" @input="clearError('password_confirmation')" />
+            <span v-if="getError('password_confirmation')" class="error-msg">{{ getError('password_confirmation') }}</span>
           </div>
         </div>
 
@@ -444,6 +451,17 @@ input {
 input:focus {
   border-color: #f0b90b;
   outline: none;
+}
+
+.input-error {
+  border-color: #ff4d4f !important;
+}
+
+.error-msg {
+  color: #ff4d4f;
+  font-size: 0.75rem;
+  margin-top: 4px;
+  display: block;
 }
 
 .btn-primary {

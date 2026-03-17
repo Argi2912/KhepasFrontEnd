@@ -4,9 +4,11 @@ import { useAuthStore } from '@/stores/auth'
 import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { useRouter } from 'vue-router'
+import { useFormValidation } from '@/utils/useFormValidation'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { handleAxiosError, getError, clearError } = useFormValidation()
 
 const form = reactive({
   email: '',
@@ -26,7 +28,10 @@ const handleLogin = async () => {
     await authStore.login(form)
     notify.success('¡Bienvenido de nuevo!')
   } catch (error) {
-    console.error('Login error:', error)
+    if (!handleAxiosError(error)) {
+      console.error('Login error:', error)
+      notify.error('Credenciales incorrectas o error de servidor')
+    }
   } finally {
     isLoading.value = false
   }
@@ -49,28 +54,32 @@ const goToRegister = () => router.push({ name: 'register' })
     <form @submit.prevent="handleLogin" class="auth-form">
       <div class="input-group">
         <label>Correo Electrónico</label>
-        <div class="input-field">
+        <div class="input-field" :class="{ 'input-error': getError('email') }">
           <font-awesome-icon icon="fa-solid fa-envelope" class="field-icon" />
           <input 
             v-model="form.email" 
             type="email" 
             placeholder="admin@empresa.com" 
             required 
+            @input="clearError('email')"
           />
         </div>
+        <span v-if="getError('email')" class="error-msg">{{ getError('email') }}</span>
       </div>
 
       <div class="input-group">
         <label>Contraseña</label>
-        <div class="input-field">
+        <div class="input-field" :class="{ 'input-error': getError('password') }">
           <font-awesome-icon icon="fa-solid fa-lock" class="field-icon" />
           <input 
             v-model="form.password" 
             type="password" 
             placeholder="••••••••" 
             required 
+            @input="clearError('password')"
           />
         </div>
+        <span v-if="getError('password')" class="error-msg">{{ getError('password') }}</span>
       </div>
 
       <button type="submit" class="primary-btn" :disabled="isLoading">
@@ -132,6 +141,20 @@ const goToRegister = () => router.push({ name: 'register' })
 }
 
 .input-field:focus-within { border-color: #f0b90b; box-shadow: 0 0 0 1px #f0b90b; }
+
+.input-error {
+  border-color: #ff4d4f !important;
+  box-shadow: 0 0 0 1px #ff4d4f !important;
+}
+
+.error-msg {
+  color: #ff4d4f;
+  font-size: 0.75rem;
+  margin-top: 8px;
+  display: block;
+  text-align: left;
+}
+
 .field-icon { color: #f0b90b; font-size: 0.9rem; opacity: 0.8; }
 
 input {
