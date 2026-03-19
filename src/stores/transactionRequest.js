@@ -89,6 +89,9 @@ export const useTransactionRequestStore = defineStore('transactionRequest', {
     },
 
     async fetchPendingCount() {
+      const authStore = useAuthStore()
+      if (!authStore.token) return
+
       try {
         const { data } = await api.get('/transactions/requests', {
           params: { status: 'pending', page: 1 }

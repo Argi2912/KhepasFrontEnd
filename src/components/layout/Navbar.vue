@@ -45,9 +45,14 @@ const toggleNotifications = () => {
 let pollingInterval = null
 
 onMounted(() => {
-  requestStore.fetchPendingCount()
-  pollingInterval = setInterval(() => {
+  if (authStore.isLoggedIn) {
     requestStore.fetchPendingCount()
+  }
+  
+  pollingInterval = setInterval(() => {
+    if (authStore.isLoggedIn) {
+      requestStore.fetchPendingCount()
+    }
   }, 60000) // Cada 60 segundos
 })
 
