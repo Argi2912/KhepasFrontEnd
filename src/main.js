@@ -10,13 +10,42 @@ import 'vue-select/dist/vue-select.css'
 import '@/assets/css/global.css'
 import './assets/css/responsive.css'
 
-// --- Font Awesome ---
+// --- Font Awesome (Selective Imports for Memory Optimization) ---
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { fas } from '@fortawesome/free-solid-svg-icons'
-import { fab } from '@fortawesome/free-brands-svg-icons'
+import { 
+  faGaugeHigh, faChartPie, faTableCells, faUserGear, faUserTie, 
+  faUsers, faTruckMoving, faHandshakeAngle, faServer, faGear, 
+  faBriefcase, faBolt, faPlus, faPen, faTrash, faSave, 
+  faCircleNotch, faChevronRight, faChevronLeft, faChevronUp, 
+  faChevronDown, faSearch, faUser, faKey, faWallet, 
+  faBank, faExchangeAlt, faArrowRight, faArrowLeft, faCheck, 
+  faTimes, faEye, faEyeSlash, faSignOutAlt, faChartLine, 
+  faHistory, faCog, faInfoCircle, faExclamationTriangle, faAward, 
+  faUniversity, faPiggyBank, faFileInvoiceDollar, faPowerOff, 
+  faIdCard, faUserSecret, faUsersGear, faHandHoldingDollar, 
+  faMoneyBillTransfer, faBuildingColumns, faCalculator, 
+  faCalendarCheck, faFileContract, faShieldHalved, faDatabase, 
+  faCloudArrowDown 
+} from '@fortawesome/free-solid-svg-icons'
+import { faWhatsapp, faTelegram } from '@fortawesome/free-brands-svg-icons'
 
-library.add(fas, fab)
+library.add(
+  faGaugeHigh, faChartPie, faTableCells, faUserGear, faUserTie, 
+  faUsers, faTruckMoving, faHandshakeAngle, faServer, faGear, 
+  faBriefcase, faBolt, faPlus, faPen, faTrash, faSave, 
+  faCircleNotch, faChevronRight, faChevronLeft, faChevronUp, 
+  faChevronDown, faSearch, faUser, faKey, faWallet, 
+  faBank, faExchangeAlt, faArrowRight, faArrowLeft, faCheck, 
+  faTimes, faEye, faEyeSlash, faSignOutAlt, faChartLine, 
+  faHistory, faCog, faInfoCircle, faExclamationTriangle, faAward, 
+  faUniversity, faPiggyBank, faFileInvoiceDollar, faPowerOff, 
+  faIdCard, faUserSecret, faUsersGear, faHandHoldingDollar, 
+  faMoneyBillTransfer, faBuildingColumns, faCalculator, 
+  faCalendarCheck, faFileContract, faShieldHalved, faDatabase, 
+  faCloudArrowDown,
+  faWhatsapp, faTelegram
+)
 
 const app = createApp(App)
 
