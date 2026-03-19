@@ -1,5 +1,4 @@
-<script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTransactionRequestStore } from '@/stores/transactionRequest'
@@ -12,6 +11,14 @@ const router = useRouter()
 const emit = defineEmits(['toggle-sidebar'])
 
 const userRole = authStore.authUser?.roles[0]?.name || 'Usuario'
+const showNotifications = ref(false)
+
+const toggleNotifications = () => {
+  showNotifications.value = !showNotifications.value
+  if (showNotifications.value) {
+    requestStore.fetchRequests(1) // Refrescar lista al abrir
+  }
+}
 
 let pollingInterval = null
 
@@ -73,21 +80,65 @@ const confirmLogout = async () => {
          <button class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5">
             <FontAwesomeIcon icon="fa-solid fa-expand" class="text-xs" />
          </button>
-         <button 
-           @click="goToRequests"
-           class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5 relative"
-           title="Solicitudes Pendientes"
-         >
-            <FontAwesomeIcon icon="fa-solid fa-bell" class="text-xs" />
-            
-            <!-- Badge de Notificación -->
-            <span 
-              v-if="requestStore.pendingCount > 0"
-              class="absolute -top-1 -right-1 w-4 h-4 bg-danger text-white text-[0.6rem] font-black flex items-center justify-center rounded-full shadow-[0_0_10px_rgba(246,70,93,0.5)] animate-bounce"
+         <div class="relative">
+            <button 
+              @click="toggleNotifications"
+              class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5 relative"
+              :class="{ 'bg-primary/10 text-primary border-primary/20': showNotifications }"
+              title="Solicitudes Pendientes"
             >
-              {{ requestStore.pendingCount > 9 ? '9+' : requestStore.pendingCount }}
-            </span>
-         </button>
+               <FontAwesomeIcon icon="fa-solid fa-bell" class="text-xs" />
+               
+               <!-- Badge de Notificación -->
+               <span 
+                 v-if="requestStore.pendingCount > 0"
+                 class="absolute -top-1 -right-1 w-4 h-4 bg-danger text-white text-[0.6rem] font-black flex items-center justify-center rounded-full shadow-[0_0_10px_rgba(246,70,93,0.5)] animate-bounce"
+               >
+                 {{ requestStore.pendingCount > 9 ? '9+' : requestStore.pendingCount }}
+               </span>
+            </button>
+
+            <!-- Panel Flotante de Notificaciones -->
+            <Transition name="support-slide">
+              <div v-if="showNotifications" class="absolute top-12 right-0 w-80 bg-secondary/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] overflow-hidden z-[1000]">
+                <div class="p-5 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+                  <h4 class="text-[0.65rem] font-black text-white/40 uppercase tracking-[0.2em]">Solicitudes Pendientes</h4>
+                  <span class="px-2 py-0.5 bg-primary/10 text-primary text-[0.55rem] font-black rounded-lg">{{ requestStore.pendingCount }} total</span>
+                </div>
+                
+                <div class="max-h-64 overflow-y-auto custom-scrollbar">
+                  <div v-if="requestStore.requests.length === 0" class="p-8 text-center">
+                    <FontAwesomeIcon icon="fa-solid fa-check-circle" class="text-white/10 text-2xl mb-2" />
+                    <p class="text-[0.65rem] text-white/30 font-bold uppercase tracking-widest">Todo al día</p>
+                  </div>
+                  
+                  <div 
+                    v-for="req in requestStore.requests.slice(0, 5)" 
+                    :key="req.id"
+                    class="p-4 border-b border-white/5 hover:bg-white/[0.03] transition-colors cursor-pointer group"
+                    @click="goToRequests(); showNotifications = false"
+                  >
+                    <div class="flex justify-between items-start mb-1">
+                      <span class="text-[0.65rem] font-black text-white group-hover:text-primary transition-colors">REQ-{{ req.id.toString().padStart(5, '0') }}</span>
+                      <span class="text-[0.55rem] font-black text-white/20 uppercase">{{ req.type }}</span>
+                    </div>
+                    <p class="text-[0.7rem] text-white/60 font-medium truncate">{{ req.client?.name || 'Cliente Desconocido' }}</p>
+                    <div class="flex justify-between items-center mt-2">
+                       <span class="text-[0.8rem] font-black text-primary">{{ req.amount.toLocaleString() }} {{ req.currency_code }}</span>
+                       <span class="text-[0.5rem] text-white/20 uppercase font-black">{{ new Date(req.created_at).toLocaleTimeString() }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  @click="goToRequests(); showNotifications = false"
+                  class="w-full p-4 text-[0.6rem] font-black text-primary uppercase tracking-[0.2em] hover:bg-white/[0.05] transition-all bg-white/[0.02]"
+                >
+                  Ver todo el buzón
+                </button>
+              </div>
+            </Transition>
+         </div>
       </div>
 
       <!-- Perfil Compacto Premium -->

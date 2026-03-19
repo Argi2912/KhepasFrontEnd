@@ -79,24 +79,6 @@ export function useTransactionRequestList() {
       
       closeActionModal()
       notify.success('Solicitud procesada exitosamente.')
-
-      // Abrir WhatsApp automáticamente si hay teléfono (opcional, aquí simulamos la intención)
-      // window.open(`https://wa.me/${req.client?.phone || ''}?text=${message}`, '_blank')
-
-      // Redirigir al flujo de intercambio
-      if (req.type === 'exchange') {
-        router.push({ 
-          name: 'transaction_exchange_create', 
-          query: { 
-            request_id: req.id,
-            client_id: req.client_id,
-            amount: req.amount,
-            currency: req.currency_code,
-            origin: req.source_origin,
-            target: req.destination_target
-          } 
-        })
-      }
     } catch (e) {
       notify.error('Fallo al procesar solicitud.')
     } finally {
