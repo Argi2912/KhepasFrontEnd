@@ -49,14 +49,40 @@ const {
             <FontAwesomeIcon icon="fa-solid fa-arrow-trend-down" /> EGRESO / GASTO
           </label>
         </div>
+        
+        <!-- Estado del Pago (Efectivo vs Deuda) -->
+        <div v-if="form.type === 'expense'" class="animate-fade-in">
+          <label class="text-[0.6rem] font-black uppercase tracking-[0.2em] text-white/30 mb-3 block ml-4">Estado del Pago</label>
+          <div class="flex p-1 bg-black/20 rounded-2xl border border-white/5 gap-2">
+            <button 
+              type="button"
+              @click="form.payment_status = 'paid'"
+              class="flex-1 py-3 rounded-xl font-bold text-[0.65rem] uppercase tracking-widest transition-all"
+              :class="form.payment_status === 'paid' ? 'bg-white/10 text-white border border-white/10 shadow-lg' : 'text-white/20 hover:text-white/40'"
+            >
+              🟢 Pago Inmediato
+            </button>
+            <button 
+              type="button"
+              @click="form.payment_status = 'pending'"
+              class="flex-1 py-3 rounded-xl font-bold text-[0.65rem] uppercase tracking-widest transition-all"
+              :class="form.payment_status === 'pending' ? 'bg-warning/20 text-warning border border-warning/20 shadow-lg' : 'text-white/20 hover:text-white/40'"
+            >
+              🟡 Registrar Deuda
+            </button>
+          </div>
+          <p class="text-[0.6rem] text-white/20 mt-2 ml-4 italic">
+            {{ form.payment_status === 'paid' ? 'El dinero se descontará de la caja seleccionada.' : 'Se generará un pasivo (Cuenta por Pagar) en el Libro Mayor.' }}
+          </p>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div class="space-y-6">
             <BaseSelect 
-              label="Cuenta Afectada (Caja/Banco)" 
+              :label="form.payment_status === 'paid' ? 'Cuenta Afectada (Caja/Banco)' : 'Cuenta Referencial (Opcional)'" 
               :options="transactionStore.getAccounts"
               v-model="form.account_id" 
-              required 
+              :required="form.payment_status === 'paid'" 
               :error="errors.account_id" 
             />
 

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 export function useDashboard() {
   const authStore = useAuthStore()
   const breakdown = ref([])
+  const accountsBreakdown = ref([])
   const isLoading = ref(true)
 
   // Chart state
@@ -17,6 +18,7 @@ export function useDashboard() {
     try {
       const response = await api.get('/dashboard/summary')
       breakdown.value = response.data.breakdown || []
+      accountsBreakdown.value = response.data.accounts_breakdown || []
       await fetchPerformance()
     } catch (error) {
       notify.error('No se pudieron cargar los datos del Dashboard.')
@@ -46,6 +48,7 @@ export function useDashboard() {
   return {
     authStore,
     breakdown,
+    accountsBreakdown,
     isLoading,
     chartData,
     currentPeriod,

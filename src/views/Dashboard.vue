@@ -219,6 +219,31 @@ const chartOptions = {
         </div>
       </div>
 
+      <!-- Distribución Física de Capital (NUEVO) -->
+      <div v-if="accountsBreakdown.length > 0" class="space-y-8 animate-fade-in">
+        <div class="flex items-center gap-3 border-l-4 border-primary pl-6">
+          <div class="flex flex-col">
+            <h3 class="text-xl font-black text-white tracking-tight italic">Distribución Física</h3>
+            <p class="text-[0.6rem] font-bold text-white/20 uppercase tracking-widest">Saldo real desglosado por bóveda / cuenta bancaria</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div v-for="acc in accountsBreakdown" :key="acc.bank_name" 
+               class="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-white/10 transition-all">
+            <div class="flex flex-col">
+              <span class="text-[0.6rem] font-black text-white/20 uppercase tracking-widest mb-1">{{ acc.bank_name }}</span>
+              <span class="text-lg font-black text-white group-hover:text-primary transition-colors">
+                {{ formatCurrency(acc.balance, acc.currency_code) }}
+              </span>
+            </div>
+            <div class="w-8 h-8 rounded-lg bg-black/40 flex items-center justify-center text-white/10 group-hover:text-primary/20">
+              <FontAwesomeIcon icon="fa-solid fa-building-columns" />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Sección de Gráficos de Rendimiento -->
       <div class="bg-secondary-light/30 backdrop-blur-[30px] border border-white/5 rounded-[3rem] p-8 lg:p-12 shadow-2xl relative overflow-hidden group">
         <div class="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary/5 blur-[150px] rounded-full pointer-events-none group-hover:bg-primary/10 transition-all duration-1000"></div>

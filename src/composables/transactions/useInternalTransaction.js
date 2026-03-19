@@ -37,6 +37,7 @@ export function useInternalTransaction() {
     amount: '',
     description: '',
     transaction_date: new Date().toISOString().split('T')[0],
+    payment_status: 'paid' 
   })
 
   const entityTypes = [
