@@ -112,10 +112,9 @@ const {
             <!-- Bloque Cliente -->
             <div class="space-y-6">
               <BaseSelectWithSearchAndCreate 
-                label="Entidad Cliente *" 
+                label="Entidad Cliente" 
                 :options="transactionStore.getClients"
                 v-model="form.client_id" 
-                required 
                 create-endpoint="/clients" 
                 :create-fields="{ name: '' }"
                 create-label="Cliente" 
@@ -194,10 +193,9 @@ const {
           <!-- Bloque Cuentas -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
             <BaseSelectWithSearchAndCreate 
-              label="Cuenta de Salida (Sale) *" 
+              label="Cuenta de Salida (Sale)" 
               :options="sourceAccounts"
               v-model="form.from_account_id" 
-              required 
               create-endpoint="/accounts" 
               :create-fields="{ name: '' }"
               create-label="Cuenta" 
@@ -207,10 +205,9 @@ const {
             />
             
             <BaseSelectWithSearchAndCreate 
-              label="Cuenta de Entrada (Recibe) *" 
+              label="Cuenta de Entrada (Recibe)" 
               :options="destinationAccounts"
               v-model="form.to_account_id" 
-              required 
               create-endpoint="/accounts" 
               :create-fields="{ name: '' }"
               create-label="Cuenta" 

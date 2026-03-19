@@ -414,14 +414,6 @@ export function useCurrencyExchange() {
 
   // --- NAVEGACIÓN ---
   const nextStep = () => {
-    if (currentStep.value === 1) {
-      const isExternalCapital = ['investor'].includes(form.capital_type)
-      const missingFrom = isExternalCapital ? false : !form.from_account_id
-
-      if (missingFrom || !form.to_account_id || !form.client_id) {
-        return Swal.fire('Falta información', 'Complete los campos obligatorios (*).', 'warning')
-      }
-    }
     if (currentStep.value < totalSteps) currentStep.value++
   }
   const prevStep = () => {
