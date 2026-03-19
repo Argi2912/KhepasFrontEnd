@@ -32,6 +32,7 @@ const { format: formatCurrency } = useCurrencyFormatter()
 const {
   authStore,
   breakdown,
+  accountsBreakdown,
   isLoading,
   chartData,
   currentPeriod,
