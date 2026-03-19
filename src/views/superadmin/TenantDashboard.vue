@@ -148,7 +148,7 @@ const headers = [
             <td class="py-5">
               <div class="flex flex-col">
                 <span class="text-base font-bold text-white group-hover:text-primary transition-colors leading-tight">{{ row.name }}</span>
-                <span class="text-[0.65rem] font-mono text-white/20 uppercase tracking-widest mt-0.5">UUID: {{ row.id.split('-')[0] }}...</span>
+                <span class="text-[0.65rem] font-mono text-white/20 uppercase tracking-widest mt-0.5">ID: {{ String(row.id).split('-')[0] }}...</span>
               </div>
             </td>
 
