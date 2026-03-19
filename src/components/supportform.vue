@@ -75,6 +75,7 @@
 <script setup>
 import { ref } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import notify from '@/services/notify'
 
 const isOpen = ref(false)
 const form = ref({ subject: '', message: '' })
@@ -100,8 +101,21 @@ const handleWhatsApp = () => {
         `_Enviado desde el Ecosistema TuConpay_`;
 
     const url = `https://wa.me/${phone}?text=${text}`
-    window.open(url, '_blank')
+    
+    // Abrir en una ventana emergente pequeña para no "salir" del sistema
+    const width = 600;
+    const height = 700;
+    const left = (window.innerWidth / 2) - (width / 2);
+    const top = (window.innerHeight / 2) - (height / 2);
+    
+    window.open(
+      url, 
+      'WhatsAppSupport', 
+      `width=${width},height=${height},top=${top},left=${left},toolbar=no,menubar=no,scrollbars=yes`
+    );
 
+    notify.info('Sincronizando con WhatsApp... El ticket se abrirá en una ventana emergente.')
+    
     form.value = { subject: '', message: '' }
     isOpen.value = false
 }
