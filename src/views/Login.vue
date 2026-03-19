@@ -41,6 +41,7 @@ const goBack = () => router.push({ name: 'landing' })
 const goToRegister = () => router.push({ name: 'register' })
 </script>
 
+<template>
   <div class="min-h-screen bg-secondary flex overflow-hidden font-sans relative">
     
     <!-- Lado Izquierdo: Branding & Atmósfera (Visible solo en desktop) -->
