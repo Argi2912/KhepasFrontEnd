@@ -205,6 +205,9 @@ onMounted(() => fetchClosing())
                   <p class="text-[0.8rem] font-bold text-white/60 truncate max-w-[250px] tracking-tight" :class="{ 'italic text-white/30': mov.type === 'info' }">
                     {{ mov.description }}
                   </p>
+                  <p class="text-[0.65rem] font-bold text-primary/80 mt-1 flex items-center gap-1 uppercase tracking-widest">
+                    <FontAwesomeIcon icon="fa-solid fa-wallet" class="text-primary/50" /> {{ mov.account }}
+                  </p>
                 </td>
                 <td class="py-4 px-2 text-[0.65rem] font-black text-primary/60 uppercase tracking-widest">{{ mov.person || 'NODO CENTRAL' }}</td>
                 <td class="py-4 px-2 text-right">

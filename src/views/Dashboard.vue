@@ -6,10 +6,78 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrencyFormatter } from '@/utils/formatCurrency'
 
+// Chart.js imports
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js'
+import { Line } from 'vue-chartjs'
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
+
 const authStore = useAuthStore()
 const { format: formatCurrency } = useCurrencyFormatter()
 const breakdown = ref([])
 const isLoading = ref(true)
+
+// Chart state
+const chartData = ref(null)
+const currentPeriod = ref('month')
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    mode: 'index',
+    intersect: false,
+  },
+  plugins: {
+    legend: {
+      labels: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        font: { family: 'sans-serif', weight: 'bold', size: 12 },
+        usePointStyle: true,
+        boxWidth: 8
+      }
+    },
+    tooltip: {
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      titleColor: 'rgba(255, 255, 255, 0.6)',
+      bodyColor: '#fff',
+      padding: 12,
+      cornerRadius: 8,
+      displayColors: true
+    }
+  },
+  scales: {
+    y: {
+      grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+      border: { display: false },
+      ticks: { color: 'rgba(255, 255, 255, 0.4)', font: { size: 11 } },
+      beginAtZero: true
+    },
+    x: {
+      grid: { display: false, drawBorder: false },
+      border: { display: false },
+      ticks: { color: 'rgba(255, 255, 255, 0.4)', font: { size: 11 } }
+    }
+  }
+}
 
 /**
  * Carga el resumen del dashboard desde la API.
@@ -19,12 +87,27 @@ const fetchSummary = async () => {
   try {
     const response = await api.get('/dashboard/summary')
     breakdown.value = response.data.breakdown || []
+    await fetchPerformance()
   } catch (error) {
     notify.error('No se pudieron cargar los datos del Dashboard.')
     console.error(error)
   } finally {
     isLoading.value = false
   }
+}
+
+const fetchPerformance = async () => {
+  try {
+    const { data } = await api.get('/statistics/performance', { params: { period: currentPeriod.value } })
+    chartData.value = data.chart_data
+  } catch (error) {
+    console.error('Error cargando gráfico:', error)
+  }
+}
+
+const changePeriod = (period) => {
+  currentPeriod.value = period
+  fetchPerformance()
 }
 
 onMounted(() => {
@@ -136,6 +219,37 @@ onMounted(() => {
                <div class="w-1 bg-white/5 h-8 mb-2"></div>
                <span class="text-[0.7rem] font-bold text-white/20 italic">Cartera de obligaciones limpia</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN DE GRÁFICOS (NUEVO) -->
+      <div class="bg-secondary-light/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 lg:p-8 shadow-2xl relative overflow-hidden">
+        <!-- Luces de fondo -->
+        <div class="absolute top-0 right-1/4 w-96 h-96 bg-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
+
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 relative z-10">
+          <div>
+            <h2 class="text-xl font-black text-white flex items-center gap-3">
+              <span class="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-primary border border-white/10 shadow-inner">
+                 <FontAwesomeIcon icon="fa-solid fa-chart-line" />
+              </span>
+              Rendimiento Operativo
+            </h2>
+            <p class="text-[0.7rem] font-bold text-white/30 uppercase tracking-widest mt-1 ml-13">Ingresos vs Gastos Netos</p>
+          </div>
+
+          <div class="flex bg-black/40 p-1 rounded-xl border border-white/5 shadow-inner">
+            <button @click="changePeriod('week')" :class="['px-4 py-1.5 text-xs font-bold rounded-lg transition-all', currentPeriod === 'week' ? 'bg-primary text-secondary shadow-md' : 'text-white/40 hover:text-white']">Semana</button>
+            <button @click="changePeriod('month')" :class="['px-4 py-1.5 text-xs font-bold rounded-lg transition-all', currentPeriod === 'month' ? 'bg-primary text-secondary shadow-md' : 'text-white/40 hover:text-white']">Mes</button>
+            <button @click="changePeriod('year')" :class="['px-4 py-1.5 text-xs font-bold rounded-lg transition-all', currentPeriod === 'year' ? 'bg-primary text-secondary shadow-md' : 'text-white/40 hover:text-white']">Año</button>
+          </div>
+        </div>
+
+        <div class="h-[350px] w-full relative z-10">
+          <Line v-if="chartData" :data="chartData" :options="chartOptions" />
+          <div v-else class="absolute inset-0 flex items-center justify-center">
+            <FontAwesomeIcon icon="fa-solid fa-spinner" spin class="text-3xl text-white/20" />
           </div>
         </div>
       </div>

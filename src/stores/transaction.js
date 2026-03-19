@@ -77,6 +77,13 @@ export const useTransactionStore = defineStore('transaction', () => {
     })),
   )
 
+  const getCurrencies = computed(() =>
+    currencies.value.map((c) => ({
+      id: c.code || c.id,
+      name: c.name || c.code,
+    })),
+  )
+
   // --- ACTIONS ---
 
   async function fetchAllSupportData() {
@@ -160,8 +167,10 @@ export const useTransactionStore = defineStore('transaction', () => {
     getPlatforms,
     getInvestors,
     getAccounts,
+    getCurrencies,
     currencies,
     fetchAllSupportData,
+    fetchCurrencies: fetchAllSupportData,
     fetchProfitMatrixReport, // 👈 Don't forget to export the function here
     createCurrencyExchange,
     createInternalTransaction,

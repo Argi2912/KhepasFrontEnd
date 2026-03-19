@@ -160,48 +160,48 @@ const goToLogin = () => router.push({ name: 'login' })
             >
               <div v-if="form.plan === 'free'" class="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full shadow-[0_0_10px_rgba(247,166,0,1)]"></div>
               <div class="relative z-10">
-                <div class="text-[0.65rem] font-black text-white/20 uppercase mb-6 tracking-[0.2em] group-hover:text-primary transition-colors">EXPLORER</div>
-                <h3 class="text-xl font-black text-white mb-1 tracking-tight">Prueba</h3>
-                <p class="text-3xl font-black text-primary">$0<span class="text-[0.65rem] text-white/20 font-bold ml-2 lowercase tracking-tighter">/siempre</span></p>
+                <h3 class="text-xl font-black text-white mb-1 tracking-tight">Gratis</h3>
+                <p class="text-3xl font-black text-primary">$0.00<span class="text-[0.65rem] text-white/20 font-bold ml-2 lowercase tracking-tighter">/30 días</span></p>
                 <div class="h-px bg-white/5 my-6"></div>
                 <ul class="space-y-3">
-                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 uppercase tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check-double" class="text-primary mr-2" /> 30 Días Full</li>
+                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check" class="text-primary mr-2" /> Prueba Full</li>
+                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check" class="text-primary mr-2" /> Acceso Total</li>
                 </ul>
               </div>
             </div>
 
-            <!-- Otros planes simplificados para el ejemplo -->
+            <!-- Plan Básico -->
             <div 
+              class="relative bg-white/[0.03] border border-white/10 p-8 rounded-[32px] cursor-pointer transition-all hover:border-primary/40 group overflow-hidden"
+              :class="{ '!border-primary/50 !bg-primary/5 shadow-2xl': form.plan === 'basic' }" 
+              @click="form.plan = 'basic'"
+            >
+              <div v-if="form.plan === 'basic'" class="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full shadow-[0_0_10px_rgba(247,166,0,1)]"></div>
+              <div class="relative z-10">
+                <h3 class="text-xl font-black text-white mb-1 tracking-tight">Básico</h3>
+                <p class="text-3xl font-black text-primary">$10.00<span class="text-[0.65rem] text-white/20 font-bold ml-2 lowercase tracking-tighter">/mes</span></p>
+                <div class="h-px bg-white/5 my-6"></div>
+                <ul class="space-y-3">
+                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check" class="text-primary mr-2" /> 1 Usuario</li>
+                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check" class="text-primary mr-2" /> Gestión de Caja</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Plan Profesional -->
+             <div 
               class="relative bg-white/[0.03] border border-white/10 p-8 rounded-[32px] cursor-pointer transition-all hover:border-primary/40 group overflow-hidden"
               :class="{ '!border-primary/50 !bg-primary/5 shadow-2xl': form.plan === 'pro' }" 
               @click="form.plan = 'pro'"
             >
               <div v-if="form.plan === 'pro'" class="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full shadow-[0_0_10px_rgba(247,166,0,1)]"></div>
               <div class="relative z-10">
-                <div class="text-[0.65rem] font-black text-white/20 uppercase mb-6 tracking-[0.2em] group-hover:text-primary transition-colors">ELITE</div>
-                <h3 class="text-xl font-black text-white mb-1 tracking-tight">Especialista</h3>
-                <p class="text-3xl font-black text-primary">$19<span class="text-[0.65rem] text-white/20 font-bold ml-2 lowercase tracking-tighter">/mensual</span></p>
+                <h3 class="text-xl font-black text-white mb-1 tracking-tight">Profesional</h3>
+                <p class="text-3xl font-black text-primary">$29.99<span class="text-[0.65rem] text-white/20 font-bold ml-2 lowercase tracking-tighter">/mes</span></p>
                 <div class="h-px bg-white/5 my-6"></div>
                 <ul class="space-y-3">
-                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 uppercase tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check-double" class="text-primary mr-2" /> Usuarios ilim.</li>
-                </ul>
-              </div>
-            </div>
-
-            <!-- Master -->
-             <div 
-              class="relative bg-white/[0.03] border border-primary/20 p-8 rounded-[32px] cursor-pointer transition-all hover:border-primary/40 group overflow-hidden"
-              :class="{ '!border-primary !bg-primary/10 shadow-2xl': form.plan === 'master' }" 
-              @click="form.plan = 'pro'"
-            >
-               <div class="absolute top-0 right-0 bg-primary text-secondary text-[0.6rem] font-black px-4 py-1 rounded-bl-xl uppercase tracking-[0.1em]">MASTER</div>
-              <div class="relative z-10">
-                <div class="text-[0.65rem] font-black text-white/20 uppercase mb-6 tracking-[0.2em] group-hover:text-primary transition-colors">HOLDING</div>
-                <h3 class="text-xl font-black text-white mb-1 tracking-tight">Corporativo</h3>
-                <p class="text-3xl font-black text-primary">$49<span class="text-[0.65rem] text-white/20 font-bold ml-2 lowercase tracking-tighter">/mensual</span></p>
-                <div class="h-px bg-white/5 my-6"></div>
-                <ul class="space-y-3">
-                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 uppercase tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-crown" class="text-primary mr-2" /> Soporte VIP</li>
+                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check" class="text-primary mr-2" /> Usuarios ilimitados</li>
+                  <li class="flex items-center text-[0.65rem] font-bold text-white/40 tracking-tighter"><FontAwesomeIcon icon="fa-solid fa-check" class="text-primary mr-2" /> Multi-divisa PRO</li>
                 </ul>
               </div>
             </div>

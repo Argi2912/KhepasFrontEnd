@@ -8,6 +8,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
+import { useCategories } from '@/composables/useCategories'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -23,7 +24,12 @@ const lists = reactive({
   providers: [],
   brokers: [],
   platforms: [],
-  investors: [] // <--- AGREGADO: Lista de Inversionistas
+  investors: [] 
+})
+
+const { getCategoriesByType } = useCategories()
+const categoryOptions = computed(() => {
+  return getCategoriesByType(form.type).map(cat => ({ id: cat, name: cat }))
 })
 
 // Opciones para el primer selector
@@ -225,8 +231,8 @@ const handleSubmit = async () => {
           </div>
         </div>
 
-        <BaseInput label="Categoría (Ej: Nómina, Servicios, Alquiler)" v-model="form.category" required
-          :error="errors.category" class="mt-4" />
+        <BaseSelect label="Categoría" :options="categoryOptions" v-model="form.category" required
+          :error="errors.category" class="mt-4" placeholder="Seleccione una categoría..." />
 
         <BaseInput label="Descripción / Notas" v-model="form.description" class="mt-4" />
 

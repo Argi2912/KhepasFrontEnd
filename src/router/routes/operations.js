@@ -62,6 +62,21 @@ export default [
           permission: 'manage_internal_transactions',
         },
       },
+      {
+        path: 'requests',
+        name: 'transaction_requests_list',
+        component: () => import('@/views/transactions/TransactionRequestListView.vue'),
+        meta: {
+          label: 'Solicitudes',
+          permission: 'manage_transaction_requests',
+        },
+      },
+      {
+        path: 'requests/create',
+        name: 'transaction_requests_create',
+        component: () => import('@/views/transactions/TransactionRequestForm.vue'),
+        meta: { hiddenInMenu: true, permission: 'manage_transaction_requests' },
+      },
     ],
   },
 ]
