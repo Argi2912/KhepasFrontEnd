@@ -50,7 +50,7 @@ const confirmLogout = async () => {
 </script>
 
 <template>
-  <header class="h-[80px] bg-secondary/40 backdrop-blur-[40px] border-b border-white/5 flex justify-between items-center px-10 sticky top-0 z-[900] transition-all duration-700 shadow-[0_10px_40px_rgba(0,0,0,0.15)] overflow-hidden">
+  <header class="h-[80px] bg-secondary/40 backdrop-blur-[40px] border-b border-white/5 flex justify-between items-center px-10 sticky top-0 z-[900] transition-all duration-700 shadow-[0_10px_40px_rgba(0,0,0,0.15)]">
     
     <!-- Efecto ambiental sutil -->
     <div class="absolute -top-10 left-1/4 w-32 h-32 bg-primary/5 blur-[60px] pointer-events-none"></div>
