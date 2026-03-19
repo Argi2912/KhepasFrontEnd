@@ -528,6 +528,20 @@ export function useCurrencyExchange() {
 
   onMounted(async () => {
     await transactionStore.fetchAllSupportData()
+
+    // Lógica para autocompletar desde una solicitud (REQ)
+    const query = router.currentRoute.value.query
+    if (query.request_id) {
+       form.client_id = query.client_id || ''
+       form.amount_sent = query.amount || ''
+       // Si es exchange, intentamos predecir el tipo
+       operationType.value = 'exchange'
+       
+       // Seteamos cuentas si vienen en el query (opcional)
+       // form.from_account_id = ...
+       
+       notify.success(`Datos cargados desde Solicitud REQ-${query.request_id.toString().padStart(6, '0')}`)
+    }
   })
 
   return {

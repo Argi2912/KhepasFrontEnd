@@ -72,8 +72,31 @@ export function useTransactionRequestList() {
     isProcessing.value = true
     try {
       await requestStore.updateRequestStatus(selectedRequest.value.id, 'processed', actionForm.value.notes)
+      
+      const req = selectedRequest.value
+      const message = `*✅ SOLICITUD APROBADA*%0A` +
+                      `Tu solicitud REQ-${req.id.toString().padStart(6, '0')} por *${formatCurrency(req.amount, req.currency_code)}* ha sido aprobada y está siendo procesada.`
+      
       closeActionModal()
       notify.success('Solicitud procesada exitosamente.')
+
+      // Abrir WhatsApp automáticamente si hay teléfono (opcional, aquí simulamos la intención)
+      // window.open(`https://wa.me/${req.client?.phone || ''}?text=${message}`, '_blank')
+
+      // Redirigir al flujo de intercambio
+      if (req.type === 'exchange') {
+        router.push({ 
+          name: 'currency_exchanges_create', 
+          query: { 
+            request_id: req.id,
+            client_id: req.client_id,
+            amount: req.amount,
+            currency: req.currency_code,
+            origin: req.source_origin,
+            target: req.destination_target
+          } 
+        })
+      }
     } catch (e) {
       notify.error('Fallo al procesar solicitud.')
     } finally {
@@ -82,15 +105,22 @@ export function useTransactionRequestList() {
   }
 
   const handleReject = async () => {
-    if (!actionForm.value.notes) {
-      notify.error('Debe indicar un motivo en las notas para rechazar')
-      return
-    }
     isProcessing.value = true
     try {
       await requestStore.updateRequestStatus(selectedRequest.value.id, 'rejected', actionForm.value.notes)
+      
+      const req = selectedRequest.value
+      const reason = actionForm.value.notes ? `%0A*Motivo:* ${actionForm.value.notes}` : ''
+      const message = `*❌ SOLICITUD RECHAZADA*%0A` +
+                      `Lo sentimos, tu solicitud REQ-${req.id.toString().padStart(6, '0')} por *${formatCurrency(req.amount, req.currency_code)}* ha sido rechazada.${reason}`
+      
       closeActionModal()
       notify.success('Solicitud rechazada.')
+      
+      // Intentar notificar por WhatsApp
+      if (req.client?.phone) {
+         window.open(`https://wa.me/${req.client.phone}?text=${message}`, '_blank')
+      }
     } catch (e) {
       notify.error('Fallo al rechazar solicitud.')
     } finally {

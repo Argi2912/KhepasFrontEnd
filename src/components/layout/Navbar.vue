@@ -1,12 +1,34 @@
 <script setup>
+import { onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useTransactionRequestStore } from '@/stores/transactionRequest'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import alert from '@/services/alert'
 
 const authStore = useAuthStore()
+const requestStore = useTransactionRequestStore()
+const router = useRouter()
 const emit = defineEmits(['toggle-sidebar'])
 
 const userRole = authStore.authUser?.roles[0]?.name || 'Usuario'
+
+let pollingInterval = null
+
+onMounted(() => {
+  requestStore.fetchPendingCount()
+  pollingInterval = setInterval(() => {
+    requestStore.fetchPendingCount()
+  }, 60000) // Cada 60 segundos
+})
+
+onUnmounted(() => {
+  if (pollingInterval) clearInterval(pollingInterval)
+})
+
+const goToRequests = () => {
+  router.push({ name: 'transaction_requests' })
+}
 
 const confirmLogout = async () => {
   const confirmed = await alert.confirm(
@@ -51,8 +73,20 @@ const confirmLogout = async () => {
          <button class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5">
             <FontAwesomeIcon icon="fa-solid fa-expand" class="text-xs" />
          </button>
-         <button class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5">
+         <button 
+           @click="goToRequests"
+           class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5 relative"
+           title="Solicitudes Pendientes"
+         >
             <FontAwesomeIcon icon="fa-solid fa-bell" class="text-xs" />
+            
+            <!-- Badge de Notificación -->
+            <span 
+              v-if="requestStore.pendingCount > 0"
+              class="absolute -top-1 -right-1 w-4 h-4 bg-danger text-white text-[0.6rem] font-black flex items-center justify-center rounded-full shadow-[0_0_10px_rgba(246,70,93,0.5)] animate-bounce"
+            >
+              {{ requestStore.pendingCount > 9 ? '9+' : requestStore.pendingCount }}
+            </span>
          </button>
       </div>
 
