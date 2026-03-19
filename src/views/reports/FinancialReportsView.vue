@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import api from '@/services/api'
 import notify from '@/services/notify'
+import BaseCard from '@/components/shared/BaseCard.vue'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -15,8 +16,8 @@ import {
   ArcElement,
 } from 'chart.js'
 import { Bar, Doughnut } from 'vue-chartjs'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
-// Registrar componentes de Chart.js
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -30,8 +31,8 @@ ChartJS.register(
 )
 
 // === FILTROS ===
-const period = ref('year') // 'day' | 'week' | 'month' | 'year'
-const selectedDate = ref(new Date().toISOString().split('T')[0]) // Hoy por defecto
+const period = ref('year')
+const selectedDate = ref(new Date().toISOString().split('T')[0])
 
 // === DATOS ===
 const isLoading = ref(false)
@@ -42,36 +43,64 @@ const stats = ref({
   period_info: {},
 })
 
-// === OPCIONES GRÁFICOS ===
-const barOptions = {
+// === OPCIONES GRÁFICOS PREMIUM ===
+const getChartOptions = (title) => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'top' },
-    title: {
-      display: true,
-      text: 'Flujo de Caja',
-      font: { size: 16 },
+    legend: { 
+      position: 'top',
+      labels: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        font: { family: 'Inter', weight: 'bold', size: 10 },
+        usePointStyle: true,
+        padding: 20
+      }
     },
+    title: {
+      display: false
+    },
+    tooltip: {
+      backgroundColor: 'rgba(10, 10, 12, 0.9)',
+      titleFont: { size: 14, weight: 'bold' },
+      bodyFont: { size: 13 },
+      padding: 12,
+      cornerRadius: 12,
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+      borderWidth: 1
+    }
   },
-}
+  scales: title === 'Evolution' ? {
+    y: {
+      grid: { color: 'rgba(255, 255, 255, 0.03)', drawBorder: false },
+      ticks: { color: 'rgba(255, 255, 255, 0.3)', font: { size: 10 } }
+    },
+    x: {
+      grid: { display: false },
+      ticks: { color: 'rgba(255, 255, 255, 0.3)', font: { size: 10 } }
+    }
+  } : {}
+})
 
-const doughnutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
+const barOptions = computed(() => getChartOptions('Evolution'))
+const doughnutOptions = computed(() => ({
+  ...getChartOptions('Distribution'),
   plugins: {
-    legend: { position: 'right' },
-  },
-}
+    ...getChartOptions('Distribution').plugins,
+    legend: { position: 'bottom', labels: { color: 'rgba(255, 255, 255, 0.5)', font: { size: 10 }, padding: 15 } }
+  }
+}))
 
-// === DONA - Datos dinámicos ===
+// === DONA - Datos dinámicos v5 ===
 const categoryChartData = computed(() => {
   const categories = stats.value.expenses_by_category || []
   return {
-    labels: categories.map((c) => c.category || 'Sin categoría'),
+    labels: categories.map((c) => c.category || 'Otros'),
     datasets: [
       {
-        backgroundColor: ['#3B82F6', '#F59E0B', '#10B981', '#6366F1', '#EF4444', '#8B5CF6'],
+        backgroundColor: ['#f7a600', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#6366f1'],
+        borderWidth: 0,
+        hoverOffset: 20,
         data: categories.map((c) => c.total || 0),
       },
     ],
@@ -83,237 +112,172 @@ const fetchStats = async () => {
   isLoading.value = true
   try {
     const response = await api.get('/statistics/performance', {
-      params: {
-        period: period.value,
-        date: selectedDate.value,
-      },
+      params: { period: period.value, date: selectedDate.value },
     })
     stats.value = response.data
   } catch (error) {
-    console.error(error)
-    notify.error('Error al cargar estadísticas')
+    notify.error('Fallo al sincronizar inteligencia financiera.')
   } finally {
     isLoading.value = false
   }
 }
 
-// === REACTIVIDAD ===
-watch([period, selectedDate], () => {
-  fetchStats()
-})
+watch([period, selectedDate], () => fetchStats())
+onMounted(() => fetchStats())
 
-// Carga inicial
-onMounted(() => {
-  fetchStats()
-})
-
-// === FORMATEO MONEDA ===
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(value || 0)
+const formatMoney = (value) => {
+  return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(value || 0)
 }
 </script>
 
 <template>
-  <div class="reports-container">
-    <div class="header-actions">
-      <h2>Reportes Financieros</h2>
-      <div class="filters">
-        <select v-model="period" class="year-select">
-          <option value="day">Hoy</option>
-          <option value="week">Esta semana</option>
-          <option value="month">Este mes</option>
-          <option value="year">Este año</option>
-        </select>
+  <div class="space-y-10 animate-premium-in pb-12 overflow-hidden">
+    
+    <!-- Header Central de Inteligencia -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+          <span class="w-1.5 h-10 bg-primary rounded-full"></span>
+          Inteligencia <span class="text-gradient-primary">Financiera</span>
+        </h1>
+        <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Análisis de rendimiento y flujo de caja estratégico</p>
+      </div>
 
+      <div class="flex items-center gap-3 bg-white/[0.04] p-1.5 rounded-2xl border border-white/5 shadow-inner">
+        <select v-model="period" class="bg-transparent text-white/60 text-[0.7rem] font-black uppercase tracking-widest px-4 py-2 outline-none cursor-pointer hover:text-white transition-colors">
+          <option value="day">Diario</option>
+          <option value="week">Semanal</option>
+          <option value="month">Mensual</option>
+          <option value="year">Anual</option>
+        </select>
+        <div class="w-px h-4 bg-white/10"></div>
         <input
           type="date"
           v-model="selectedDate"
           :max="new Date().toISOString().split('T')[0]"
-          class="year-select date-input"
-          style="margin-left: 10px"
+          class="bg-transparent text-white/60 text-[0.7rem] font-black uppercase tracking-widest px-4 py-2 outline-none cursor-pointer hover:text-white transition-colors"
         />
       </div>
     </div>
 
-    <!-- SUMMARY CARDS -->
-    <div class="summary-cards">
-      <div class="card income">
-        <div class="card-title">Ingresos Totales</div>
-        <div class="card-amount">{{ formatCurrency(stats.summary.total_income) }}</div>
-        <div class="card-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
-      </div>
-      <div class="card expense">
-        <div class="card-title">Gastos Totales</div>
-        <div class="card-amount">{{ formatCurrency(stats.summary.total_expense) }}</div>
-        <div class="card-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
-      </div>
-      <div class="card profit">
-        <div class="card-title">Utilidad Neta</div>
-        <div class="card-amount" :class="{ 'text-danger': stats.summary.total_profit < 0 }">
-          {{ formatCurrency(stats.summary.total_profit) }}
+    <!-- Panel de KPIs Premium -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="premium-card p-6 border-success/5 bg-success/[0.01] group">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center text-success border border-success/10 group-hover:scale-110 transition-transform duration-500">
+            <FontAwesomeIcon icon="fa-solid fa-arrow-up-right-dots" class="text-xl" />
+          </div>
+          <div>
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 block mb-1">Entradas de Capital</span>
+            <span class="text-xs font-bold text-success/60">Ingresos brutos del periodo</span>
+          </div>
         </div>
-        <div class="card-icon"><i class="fa-solid fa-wallet"></i></div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-xs font-black text-success/60 mr-1">$</span>
+          <span class="text-4xl font-black text-white tracking-tighter">{{ formatMoney(stats.summary.total_income).split(',')[0] }}</span>
+          <span class="text-lg font-bold text-white/20 tracking-tighter">.{{ formatMoney(stats.summary.total_income).split(',')[1] }}</span>
+        </div>
+      </div>
+
+      <div class="premium-card p-6 border-danger/5 bg-danger/[0.01] group">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-danger/10 flex items-center justify-center text-danger border border-danger/10 group-hover:scale-110 transition-transform duration-500">
+            <FontAwesomeIcon icon="fa-solid fa-arrow-down-right-dots" class="text-xl" />
+          </div>
+          <div>
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 block mb-1">Fuga de Capital</span>
+            <span class="text-xs font-bold text-danger/60">Gastos y egresos operativos</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-xs font-black text-danger/60 mr-1">$</span>
+          <span class="text-4xl font-black text-white tracking-tighter">{{ formatMoney(stats.summary.total_expense).split(',')[0] }}</span>
+          <span class="text-lg font-bold text-white/20 tracking-tighter">.{{ formatMoney(stats.summary.total_expense).split(',')[1] }}</span>
+        </div>
+      </div>
+
+      <div class="premium-card p-6 border-primary/5 bg-primary/[0.01] group">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/10 group-hover:scale-110 transition-transform duration-500">
+            <FontAwesomeIcon icon="fa-solid fa-shield-halved" class="text-xl" />
+          </div>
+          <div>
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 block mb-1">Margen de Seguridad</span>
+            <span class="text-xs font-bold text-primary/60">Utilidad neta capturada</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-xs font-black text-primary/60 mr-1">$</span>
+          <span class="text-4xl font-black text-white tracking-tighter" :class="{ 'text-danger': stats.summary.total_profit < 0 }">
+            {{ formatMoney(stats.summary.total_profit).split(',')[0] }}
+          </span>
+          <span class="text-lg font-bold text-white/20 tracking-tighter">.{{ formatMoney(stats.summary.total_profit).split(',')[1] }}</span>
+        </div>
       </div>
     </div>
 
-    <!-- CHARTS -->
-    <div class="charts-grid">
-      <div class="chart-box main-chart">
-        <h3>
-          Evolución
-          <small v-if="period === 'day'">por Hora</small>
-          <small v-else-if="period === 'week'">por Día</small>
-          <small v-else-if="period === 'month'">Mensual</small>
-          <small v-else>Anual</small>
-        </h3>
-        <div class="chart-wrapper">
+    <!-- Visualización de Datos Pro -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Evolución Temporal -->
+      <BaseCard 
+        class="lg:col-span-2" 
+        title="Dinámica de Rendimiento" 
+        :subtitle="`Fluctuación operativa filtrada por ${period === 'day' ? 'horas' : 'periodos'}`"
+      >
+        <div class="h-[400px] w-full mt-6 relative">
+          <div v-if="isLoading" class="absolute inset-0 z-20 bg-secondary/10 backdrop-blur-sm flex items-center justify-center rounded-2xl">
+             <FontAwesomeIcon icon="fa-solid fa-circle-notch" spin class="text-primary text-3xl" />
+          </div>
           <Bar
-            v-if="!isLoading && stats.chart_data.labels?.length"
+            v-if="stats.chart_data.labels?.length"
             :data="stats.chart_data"
             :options="barOptions"
           />
-          <p v-else class="no-data">No hay datos para mostrar</p>
+          <div v-else class="h-full flex items-center justify-center text-white/10 font-black uppercase tracking-widest text-xs">
+             Sin registros para este nodo temporal
+          </div>
         </div>
-      </div>
+      </BaseCard>
 
-      <!-- Dona solo en mes/año -->
-      <div class="chart-box side-chart" v-if="period === 'month' || period === 'year'">
-        <h3>Distribución de Gastos</h3>
-        <div class="chart-wrapper">
-          <Doughnut
-            v-if="stats.expenses_by_category?.length"
-            :data="categoryChartData"
-            :options="doughnutOptions"
-          />
-          <p v-else class="no-data">Sin datos de gastos</p>
+      <!-- Distribución de Egresos -->
+      <BaseCard 
+        title="Matriz de Costos" 
+        subtitle="Desglose por categoría de gasto"
+      >
+        <div class="h-[400px] w-full mt-6 flex flex-col items-center justify-center relative">
+          <div v-if="isLoading" class="absolute inset-0 z-20 bg-secondary/10 backdrop-blur-sm flex items-center justify-center rounded-2xl">
+              <FontAwesomeIcon icon="fa-solid fa-circle-notch" spin class="text-primary text-2xl" />
+          </div>
+          <div class="w-full h-[300px]">
+            <Doughnut
+              v-if="stats.expenses_by_category?.length"
+              :data="categoryChartData"
+              :options="doughnutOptions"
+            />
+             <div v-else class="h-full flex items-center justify-center text-white/10 font-black uppercase tracking-widest text-[0.6rem]">
+               Nodo de gastos vacío
+            </div>
+          </div>
+          
+          <!-- Leyenda Pro -->
+          <div class="mt-8 w-full space-y-2">
+             <div v-for="(cat, idx) in stats.expenses_by_category?.slice(0, 3)" :key="idx" class="flex justify-between items-center bg-white/[0.02] p-2 rounded-xl border border-white/5">
+                <span class="text-[0.65rem] font-bold text-white/40 truncate">{{ cat.category || 'Otros' }}</span>
+                <span class="text-xs font-black text-white tracking-tighter">{{ formatMoney(cat.total) }}</span>
+             </div>
+          </div>
         </div>
-      </div>
+      </BaseCard>
+
     </div>
   </div>
 </template>
 
 <style scoped>
-.reports-container {
-  padding: 20px;
-}
-
-.header-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.filters {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.year-select,
-.date-input {
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid #444;
-  background: #1f1f1f;
-  color: white;
-  font-size: 0.95rem;
-  min-width: 160px;
-}
-
-.date-input {
-  min-width: 180px;
-}
-
-/* SUMMARY CARDS */
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.card {
-  background: var(--color-secondary);
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  position: relative;
-  overflow: hidden;
-}
-
-.card-title {
-  font-size: 0.9rem;
-  color: #888;
-  margin-bottom: 10px;
-}
-
-.card-amount {
-  font-size: 1.8rem;
-  font-weight: bold;
-  color: var(--color-text);
-}
-
-.card-icon {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  font-size: 2rem;
-  opacity: 0.1;
-}
-
-.card.income .card-amount {
-  color: #10b981;
-}
-.card.expense .card-amount {
-  color: #ef4444;
-}
-.card.profit .card-amount.text-danger {
-  color: #ef4444;
-}
-
-/* CHARTS */
-.charts-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 20px;
-}
-
-@media (max-width: 900px) {
-  .charts-grid {
-    grid-template-columns: 1fr;
-  }
-  .header-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .filters {
-    justify-content: center;
-  }
-}
-
-.chart-box {
-  background: var(--color-secondary);
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-
-.chart-wrapper {
-  position: relative;
-  height: 350px;
-  width: 100%;
-}
-
-.no-data {
-  text-align: center;
-  margin-top: 50px;
-  color: #888;
-  font-size: 1.1rem;
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #f0b90b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 </style>

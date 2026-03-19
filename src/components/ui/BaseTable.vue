@@ -18,24 +18,33 @@ defineProps({
 </script>
 
 <template>
-  <div class="table-container">
-    <table class="data-table">
+  <div class="overflow-x-auto mt-2 -mx-4 md:mx-0">
+    <table class="w-full border-separate border-spacing-y-2">
       <thead>
         <tr>
-          <th v-for="header in headers" :key="header.key">{{ header.label }}</th>
-          <th>Acciones</th>
-          <!-- ← Mantenemos esta para el resto de tablas -->
+          <th v-for="header in headers" :key="header.key" 
+              class="text-left px-6 py-4 text-[0.7rem] uppercase font-black tracking-[0.2em] text-white/30">
+            {{ header.label }}
+          </th>
+          <th class="text-left px-6 py-4 text-[0.7rem] uppercase font-black tracking-[0.2em] text-white/30 text-right">
+            Acciones
+          </th>
         </tr>
       </thead>
-      <tbody>
-        <tr v-if="isLoading" class="loading-row">
-          <td :colspan="headers.length + 1">
-            <FontAwesomeIcon icon="fa-solid fa-spinner" spin /> Cargando datos...
+      <tbody class="relative">
+        <tr v-if="isLoading">
+          <td :colspan="headers.length + 1" class="py-20 text-center">
+            <div class="flex flex-col items-center gap-4">
+               <div class="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+               <span class="text-[0.65rem] font-bold uppercase tracking-widest text-primary/40">Sincronizando datos...</span>
+            </div>
           </td>
         </tr>
 
-        <tr v-else-if="data.length === 0" class="no-data-row">
-          <td :colspan="headers.length + 1">No hay registros disponibles.</td>
+        <tr v-else-if="data.length === 0">
+          <td :colspan="headers.length + 1" class="py-20 text-center text-white/10 font-black uppercase tracking-[0.3em] text-xs">
+            No se encontraron registros
+          </td>
         </tr>
 
         <slot v-else />
@@ -45,56 +54,37 @@ defineProps({
 </template>
 
 <style scoped>
-/* Tus estilos originales se mantienen igual */
-.table-container {
-  overflow-x: auto;
-  margin-top: 20px;
-  border-radius: 8px;
-  background-color: var(--color-secondary);
+:deep(tbody tr) {
+  background: rgba(255, 255, 255, 0.02);
+  transition: var(--transition-premium);
+  position: relative;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
+:deep(tbody tr:hover) {
+  background: rgba(255, 255, 255, 0.05);
+  transform: scale(1.005);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+  z-index: 10;
 }
 
-.data-table th,
-.data-table td {
-  padding: 15px;
-  text-align: left;
+:deep(tbody td) {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  font-size: 0.875rem;
+  color: #eaeeef;
 }
 
-.data-table thead tr {
-  border-bottom: 2px solid var(--color-border);
+:deep(tbody td:first-child) {
+  border-left: 1px solid rgba(255,255,255,0.03);
+  border-top-left-radius: 1rem;
+  border-bottom-left-radius: 1rem;
 }
 
-.data-table th {
-  background-color: var(--color-secondary);
-  color: var(--color-primary);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.data-table tbody tr {
-  border-bottom: 1px solid var(--color-border);
-  transition: background-color 0.2s;
-}
-
-.data-table tbody tr:hover {
-  background-color: var(--color-hover);
-}
-
-.data-table td {
-  color: var(--color-text-light);
-  font-size: 0.95rem;
-}
-
-.loading-row td,
-.no-data-row td {
-  text-align: center !important;
-  font-style: italic;
-  opacity: 0.7;
-  padding: 30px;
+:deep(tbody td:last-child) {
+  border-right: 1px solid rgba(255,255,255,0.03);
+  border-top-right-radius: 1rem;
+  border-bottom-right-radius: 1rem;
+  text-align: right;
 }
 </style>

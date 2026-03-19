@@ -107,95 +107,18 @@ watch(
 
 <template>
   <BaseModal :show="show" :title="modalTitle" @close="emit('close')">
-    
-    <!-- 🚨 8. ESTRUCTURA DE TEMPLATE IDÉNTICA A CLIENT -->
-    <form class="modal-form">
-      <BaseInput
-        v-model="form.name"
-        label="Nombre de la Plataforma"
-        name="name"
-        :error="getError('name')"
-        placeholder="Nombre de la plataforma"
-        required
-        @input="clearError('name')"
-      />
-
-      <BaseInput
-        v-model="form.email"
-        label="Email"
-        name="email"
-        type="email"
-        :error="getError('email')"
-        placeholder="contacto@plataforma.com"
-        @input="clearError('email')"
-      />
-
-      <BaseInput
-        v-model="form.phone"
-        label="Teléfono"
-        name="phone"
-        :error="getError('phone')"
-        placeholder="+XX XXX XXX XX XX"
-        @input="clearError('phone')"
-      />
-
-      <!-- (Quitamos el textarea de "details" que no se usa aquí) -->
-      
+    <form>
+      <BaseInput v-model="form.name" label="Nombre de la Plataforma" name="name" :error="getError('name')" placeholder="Nombre de la plataforma" required @input="clearError('name')" />
+      <BaseInput v-model="form.email" label="Email" name="email" type="email" :error="getError('email')" placeholder="contacto@plataforma.com" @input="clearError('email')" />
+      <BaseInput v-model="form.phone" label="Teléfono" name="phone" :error="getError('phone')" placeholder="+XX XXX XXX XX XX" @input="clearError('phone')" />
     </form>
 
     <template #footer>
-      <button @click="emit('close')" type="button" class="btn-cancel-modal">Cancelar</button>
-      <button
-        @click="handleSubmit"
-        type="button"
-        class="btn-submit-modal"
-        :disabled="isSubmitting || isLoading"
-      >
-        <!-- 
-          🚨 9. USANDO isSubmitting y isLoading
-          (Esto arregla los errores de consola)
-        -->
+      <button @click="emit('close')" type="button" class="bg-transparent border-none text-white/50 py-2.5 px-4 cursor-pointer mr-2 hover:text-white transition-colors">Cancelar</button>
+      <button @click="handleSubmit" type="button" class="py-2.5 px-5 bg-primary text-secondary border-none rounded-lg font-bold cursor-pointer transition-colors hover:bg-primary-dark disabled:opacity-60 disabled:cursor-not-allowed" :disabled="isSubmitting || isLoading">
         <span v-if="isSubmitting">Guardando...</span>
         <span v-else>{{ isEditing ? 'Guardar Cambios' : 'Crear Plataforma' }}</span>
       </button>
     </template>
   </BaseModal>
 </template>
-
-<style scoped>
-/* 🚨 10. ESTILOS IDÉNTICOS A CLIENT */
-.modal-form {
-  /* (no se necesita nada especial, los BaseInput fluyen) */
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.btn-cancel-modal {
-  background: none;
-  border: none;
-  color: #aaa;
-  padding: 10px 15px;
-  cursor: pointer;
-  margin-right: 10px;
-}
-
-.btn-submit-modal {
-  padding: 10px 20px;
-  background-color: var(--color-primary); /* Usamos el color primario */
-  color: var(--color-secondary);
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.btn-submit-modal:hover:not(:disabled) {
-  background-color: #ffc424; /* El hover primario */
-}
-.btn-submit-modal:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</style>

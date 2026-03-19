@@ -1,80 +1,34 @@
 <script setup>
 defineProps({
-  title: {
-    type: String,
-    default: null,
-  },
-  subtitle: {
-    type: String,
-    default: null,
-  },
-  shadow: {
-    type: Boolean,
-    default: true,
-  },
+  title: { type: String, default: null },
+  subtitle: { type: String, default: null },
+  variant: { type: String, default: 'default' }, // 'default' or 'glass'
 })
 </script>
 
 <template>
-  <div :class="['base-card', { 'no-shadow': !shadow }]">
-    <header v-if="title" class="card-header">
-      <h3 class="card-title">{{ title }}</h3>
-      <p v-if="subtitle" class="card-subtitle">{{ subtitle }}</p>
+  <div 
+    class="premium-card p-6 md:p-8 animate-premium-in shadow-2xl"
+    :class="[variant === 'glass' ? 'glass border-white/5' : 'bg-card border-white/5']"
+  >
+    <header v-if="title" class="flex flex-col gap-1 mb-6 border-b border-white/5 pb-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xl md:text-2xl font-black tracking-tight text-white">
+          <span class="text-gradient-primary">{{ title }}</span>
+        </h3>
+        <slot name="header-actions" />
+      </div>
+      <p v-if="subtitle" class="text-xs md:text-sm text-white/30 font-medium uppercase tracking-widest leading-relaxed">
+        {{ subtitle }}
+      </p>
     </header>
 
-    <div class="card-content">
+    <div class="relative z-10">
       <slot />
     </div>
 
-    <footer v-if="$slots.footer" class="card-footer">
+    <footer v-if="$slots.footer" class="mt-8 pt-6 border-t border-white/5">
       <slot name="footer" />
     </footer>
   </div>
 </template>
-
-<style scoped>
-.base-card {
-  background-color: var(--color-secondary);
-  padding: 25px;
-  border-radius: 10px;
-  border: 1px solid #333;
-  transition: box-shadow 0.3s ease;
-}
-
-.base-card:hover {
-  /* Efecto sutil al pasar el ratón */
-  box-shadow: 0 0 15px rgba(240, 185, 11, 0.1);
-}
-
-.no-shadow {
-  box-shadow: none;
-}
-
-.card-header {
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 15px;
-  margin-bottom: 20px;
-}
-
-.card-title {
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: var(--color-primary);
-  margin-bottom: 5px;
-}
-
-.card-subtitle {
-  font-size: 0.9rem;
-  color: #aaa;
-}
-
-.card-content {
-  /* Estilos para el contenido inyectado */
-}
-
-.card-footer {
-  margin-top: 20px;
-  padding-top: 15px;
-  border-top: 1px solid var(--color-border);
-}
-</style>

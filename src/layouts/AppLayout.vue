@@ -1,7 +1,7 @@
 <script setup>
 import Sidebar from '@/components/layout/Sidebar.vue'
 import Navbar from '@/components/layout/Navbar.vue'
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 
 const isSidebarOpen = ref(localStorage.getItem('sidebar_open') !== 'false')
 
@@ -11,13 +11,16 @@ watch(isSidebarOpen, (val) => {
 </script>
 
 <template>
-  <div class="app-layout">
-    <Sidebar :is-open="isSidebarOpen" />
+  <div class="flex min-h-screen bg-background text-white">
+    <Sidebar :is-open="isSidebarOpen" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
 
-    <main :class="['main-content', { 'sidebar-closed': !isSidebarOpen }]">
+    <main 
+      class="flex-grow flex flex-col transition-[padding-left] duration-300 ease-in-out md:pl-[280px]"
+      :class="{ 'md:!pl-[85px] !pl-0': !isSidebarOpen }"
+    >
       <Navbar @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
 
-      <div class="page-wrapper">
+      <div class="p-6 flex-grow">
         <slot />
       </div>
     </main>
@@ -25,33 +28,7 @@ watch(isSidebarOpen, (val) => {
 </template>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-  background-color: var(--color-background);
-}
-
-.main-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  transition: padding-left 0.3s ease;
-  padding-left: 280px;
-}
-
-.sidebar-closed {
-  padding-left: 0;
-}
-
-.page-wrapper {
-  padding: 25px;
-  flex-grow: 1;
-}
-
-/* --- RESPONSIVE --- */
-@media (max-width: 992px) {
-  .main-content {
-    padding-left: 0;
-  }
+main {
+  will-change: padding-left;
 }
 </style>

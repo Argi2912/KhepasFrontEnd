@@ -7,6 +7,7 @@ import { useFormValidation } from '@/utils/useFormValidation'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import BaseButton from '@/components/shared/BaseButton.vue'
 
 const props = defineProps({
   show: Boolean,
@@ -15,7 +16,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saved'])
 
-const { errors, handleAxiosError, getError, clearError } = useFormValidation()
+const { handleAxiosError, getError, clearError } = useFormValidation()
 
 // --- ESTADO LOCAL DE DIVISAS ---
 const currencies = ref([])
@@ -38,7 +39,7 @@ const isLoading = ref(false)
 const isSubmitting = ref(false)
 
 const isEditing = computed(() => !!props.accountId)
-const modalTitle = computed(() => (isEditing.value ? 'Editar Cuenta' : 'Crear Nueva Cuenta (Caja)'))
+const modalTitle = computed(() => (isEditing.value ? 'Editar Cuenta Operativa' : 'Nueva Entidad de Caja'))
 
 // --- ACCIONES ---
 const fetchCurrencies = async () => {
@@ -50,8 +51,7 @@ const fetchCurrencies = async () => {
       form.currency_code = currencies.value[0].code
     }
   } catch (error) {
-    notify.error('Error al cargar la lista de divisas.')
-    console.error(error)
+    notify.error('Fallo al sincronizar divisas.')
   } finally {
     isLoading.value = false
   }
@@ -63,7 +63,7 @@ const fetchAccount = async (id) => {
     const response = await api.get(`/accounts/${id}`)
     Object.assign(form, response.data)
   } catch (error) {
-    notify.error('No se pudo cargar la cuenta para edición.')
+    notify.error('Fallo al recuperar datos de la cuenta.')
     emit('close')
   } finally {
     isLoading.value = false
@@ -77,10 +77,10 @@ const handleSubmit = async () => {
   try {
     if (isEditing.value) {
       await api.put(`/accounts/${props.accountId}`, form)
-      notify.success('Cuenta actualizada exitosamente.')
+      notify.success('Caja actualizada exitosamente.')
     } else {
       await api.post('/accounts', form)
-      notify.success('Cuenta creada exitosamente.')
+      notify.success('Entidad creada correctamente.')
     }
     emit('saved')
     emit('close')
@@ -120,159 +120,77 @@ onMounted(() => {
 </script>
 
 <template>
-  <BaseModal :show="show" :title="modalTitle" @close="emit('close')" :is-loading="isLoading">
-    <form @submit.prevent="handleSubmit" class="account-form">
-      <div class="form-group">
-        <BaseInput v-model="form.name" label="Nombre de la Cuenta (Ej: Zelle, Banesco VES)" name="name"
-          :error="getError('name')" placeholder="Nombre descriptivo" icon="fa-solid fa-file-invoice-dollar" required
-          @input="clearError('name')" />
+  <BaseModal :show="show" :title="modalTitle" @close="emit('close')">
+    <div v-if="isLoading" class="py-20 flex flex-col items-center justify-center gap-4">
+       <div class="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+       <p class="text-[0.65rem] font-bold uppercase tracking-widest text-primary/40">Recuperando registros...</p>
+    </div>
+
+    <form v-else @submit.prevent="handleSubmit" class="space-y-6">
+      <BaseInput 
+        v-model="form.name" 
+        label="Identificador de la Cuenta" 
+        name="name" 
+        :error="getError('name')" 
+        placeholder="Ej: Banesco Corriente o Zelle Operativo" 
+        icon="fa-solid fa-file-invoice-dollar" 
+        required 
+        @input="clearError('name')" 
+      />
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <BaseSelect 
+          v-model="form.currency_code" 
+          label="Divisa" 
+          name="currency_code" 
+          :options="currencyOptions" 
+          :error="getError('currency_code')" 
+          placeholder="Seleccione..." 
+          required 
+          @change="clearError('currency_code')" 
+        />
+
+        <BaseInput 
+          v-model.number="form.balance" 
+          label="Saldo de Apertura" 
+          name="balance" 
+          type="number" 
+          step="0.01" 
+          :error="getError('balance')" 
+          icon="fa-solid fa-coins" 
+          placeholder="0.00" 
+          :disabled="isEditing" 
+          required 
+          @input="clearError('balance')" 
+        />
       </div>
 
-      <div class="form-group">
-        <BaseSelect v-model="form.currency_code" label="Divisa de la Cuenta" name="currency_code"
-          :options="currencyOptions" :error="getError('currency_code')" placeholder="Seleccione una divisa" required
-          @change="clearError('currency_code')" :disabled="isLoading" />
-      </div>
-
-      <div class="form-group">
-        <BaseInput v-model.number="form.balance" label="Balance Inicial (Sólo para Creación)" name="balance"
-          type="number" step="0.01" :error="getError('balance')" icon="fa-solid fa-coins" placeholder="0.00"
-          :disabled="isEditing || isLoading" required @input="clearError('balance')" />
-      </div>
-
-      <div class="form-group">
-        <label for="details">Detalles / Descripción (Opcional)</label>
-        <textarea id="details" v-model="form.details" name="details" class="custom-textarea" rows="3"
-          :class="{ 'input-error': getError('details') }" @input="clearError('details')"></textarea>
-        <p v-if="getError('details')" class="error-message">{{ getError('details') }}</p>
+      <div class="space-y-2 group">
+        <label for="details" class="inline-block text-[0.7rem] font-black uppercase tracking-[0.15em] text-white/40 group-focus-within:text-primary transition-colors">
+          Detalles Técnicos / Observaciones
+        </label>
+        <textarea 
+          id="details" 
+          v-model="form.details" 
+          name="details" 
+          rows="3" 
+          class="w-full bg-white/[0.03] border border-white/5 p-4 text-sm text-white rounded-xl outline-none focus:bg-white/[0.05] focus:border-primary/50 transition-all placeholder:text-white/10" 
+          placeholder="Anotaciones extra sobre la cuenta..."
+          :class="{ '!border-danger': getError('details') }" 
+          @input="clearError('details')"
+        ></textarea>
+        <p v-if="getError('details')" class="text-[0.65rem] font-bold text-danger uppercase tracking-wider ml-1">{{ getError('details') }}</p>
       </div>
     </form>
 
     <template #footer>
-      <div class="modal-buttons">
-        <button @click="emit('close')" type="button" class="btn-cancel-modal">Cancelar</button>
-        <button @click="handleSubmit" type="button" class="btn-submit-modal" :disabled="isSubmitting || isLoading">
-          <span v-if="isSubmitting">Guardando...</span>
-          <span v-else>{{ isEditing ? 'Guardar Cambios' : 'Crear Cuenta' }}</span>
-        </button>
+      <div class="flex flex-col-reverse md:flex-row justify-end gap-3 w-full">
+        <BaseButton variant="secondary" outline @click="emit('close')" :disabled="isSubmitting">Cancelar</BaseButton>
+        <BaseButton variant="primary" @click="handleSubmit" :disabled="isSubmitting">
+          <span v-if="isSubmitting">Procesando...</span>
+          <span v-else>{{ isEditing ? 'Guardar Cambios' : 'Registrar Entidad' }}</span>
+        </BaseButton>
       </div>
     </template>
   </BaseModal>
 </template>
-
-<style scoped>
-.form-group {
-  margin-bottom: 20px;
-}
-
-label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
-  color: #ccc;
-}
-
-.custom-textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-background);
-  color: var(--color-text-light);
-  border-radius: 6px;
-  resize: vertical;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-sizing: border-box;
-  /* Importante para width: 100% */
-}
-
-.custom-textarea:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary);
-  outline: none;
-}
-
-.input-error {
-  border-color: #ef4444;
-}
-
-.error-message {
-  color: #ef4444;
-  font-size: 0.8rem;
-  margin-top: 4px;
-}
-
-/* Botones Footer (Contenedor Flex) */
-.modal-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  width: 100%;
-}
-
-.btn-cancel-modal {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: #aaa;
-  padding: 10px 20px;
-  cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.btn-cancel-modal:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-}
-
-.btn-submit-modal {
-  background-color: var(--color-primary);
-  color: #111;
-  /* Contraste negro sobre amarillo */
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.btn-submit-modal:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ==========================================================================
-   RESPONSIVE (MÓVIL)
-   ========================================================================== */
-@media (max-width: 768px) {
-
-  /* En móvil, los botones se apilan verticalmente */
-  .modal-buttons {
-    flex-direction: column-reverse;
-    /* Cancelar abajo */
-    gap: 12px;
-  }
-
-  .btn-cancel-modal,
-  .btn-submit-modal {
-    width: 100%;
-    /* Botones anchos */
-    padding: 14px;
-    /* Más altos para el dedo */
-    font-size: 1rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  /* Ajuste de formulario */
-  .form-group {
-    margin-bottom: 15px;
-  }
-
-  .custom-textarea {
-    font-size: 16px;
-    /* Evita zoom en iOS */
-  }
-}
-</style>

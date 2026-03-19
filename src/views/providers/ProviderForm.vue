@@ -76,95 +76,89 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="provider-form-view">
-    <h2>{{ pageTitle }}</h2>
+  <div class="space-y-8 animate-fade-in max-w-3xl">
+    <div class="flex items-center gap-4">
+      <router-link 
+        :to="{ name: 'providers_list' }" 
+        class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all"
+      >
+        <FontAwesomeIcon icon="fa-solid fa-arrow-left" />
+      </router-link>
+      <h1 class="text-3xl font-black text-white tracking-tight">{{ pageTitle }}</h1>
+    </div>
 
-    <form @submit.prevent="handleSubmit" class="form-card">
-      <BaseInput
-        v-model="form.name"
-        label="Nombre / Razón Social"
-        name="name"
-        :error="errors.name ? errors.name[0] : ''"
-        placeholder="Nombre del proveedor o empresa"
-        required
-      />
+    <form @submit.prevent="handleSubmit" class="space-y-8">
+      <BaseCard
+        title="Información del Proveedor"
+        subtitle="Datos básicos y persona de contacto clave para la relación comercial."
+        class="border border-white/5 shadow-2xl"
+      >
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <BaseInput
+            v-model="form.name"
+            label="Nombre / Razón Social"
+            name="name"
+            :error="errors.name ? errors.name[0] : ''"
+            icon="fa-solid fa-building"
+            placeholder="Nombre de la empresa"
+            required
+            class="md:col-span-2"
+          />
 
-      <BaseInput
-        v-model="form.contact_person"
-        label="Persona de Contacto"
-        name="contact_person"
-        :error="errors.contact_person ? errors.contact_person[0] : ''"
-        placeholder="Nombre de la persona clave"
-      />
+          <BaseInput
+            v-model="form.contact_person"
+            label="Persona de Contacto"
+            name="contact_person"
+            :error="errors.contact_person ? errors.contact_person[0] : ''"
+            icon="fa-solid fa-user-tie"
+            placeholder="Nombre del ejecutivo"
+          />
 
-      <BaseInput
-        v-model="form.email"
-        label="Email"
-        name="email"
-        type="email"
-        :error="errors.email ? errors.email[0] : ''"
-        placeholder="contacto@proveedor.com"
-      />
+          <BaseInput
+            v-model="form.email"
+            label="Correo Electrónico"
+            name="email"
+            type="email"
+            :error="errors.email ? errors.email[0] : ''"
+            icon="fa-solid fa-envelope"
+            placeholder="contacto@proveedor.com"
+          />
 
-      <BaseInput
-        v-model="form.phone"
-        label="Teléfono"
-        name="phone"
-        :error="errors.phone ? errors.phone[0] : ''"
-        placeholder="+58 412 XXX XX XX"
-      />
+          <BaseInput
+            v-model="form.phone"
+            label="Teléfono de Contacto"
+            name="phone"
+            :error="errors.phone ? errors.phone[0] : ''"
+            icon="fa-solid fa-phone"
+            placeholder="+58 412 XXX XX XX"
+          />
+        </div>
 
-      <div class="form-actions">
-        <button type="submit" class="submit-btn" :disabled="isLoading">
-          <span v-if="isLoading">Guardando...</span>
-          <span v-else>{{ isEditing ? 'Actualizar Proveedor' : 'Crear Proveedor' }}</span>
-        </button>
-        <router-link :to="{ name: 'providers_list' }" class="btn-cancel"> Cancelar </router-link>
-      </div>
+        <template #footer>
+          <div class="flex items-center justify-end gap-5">
+            <router-link 
+              :to="{ name: 'providers_list' }" 
+              class="text-sm font-bold text-white/40 hover:text-white transition-colors"
+            > 
+              Cancelar 
+            </router-link>
+            <button 
+              type="submit" 
+              class="bg-primary hover:bg-primary-dark text-secondary px-8 py-3 rounded-xl font-black text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50" 
+              :disabled="isLoading"
+            >
+              <span v-if="isLoading" class="flex items-center gap-2">
+                <FontAwesomeIcon icon="fa-solid fa-circle-notch" spin /> Procesando...
+              </span>
+              <span v-else>{{ isEditing ? 'Actualizar Proveedor' : 'Registrar Proveedor' }}</span>
+            </button>
+          </div>
+        </template>
+      </BaseCard>
     </form>
   </div>
 </template>
 
 <style scoped>
-.form-card {
-  background-color: var(--color-secondary);
-  padding: 30px;
-  border-radius: 8px;
-  max-width: 600px;
-  margin-top: 20px;
-}
-
-.form-actions {
-  margin-top: 30px;
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
-
-.submit-btn {
-  padding: 12px 20px;
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
-  border: none;
-  border-radius: 4px;
-  font-weight: bold;
-  cursor: pointer;
-  transition:
-    background-color 0.2s,
-    opacity 0.2s;
-}
-
-.submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-cancel {
-  color: var(--color-text-light);
-  text-decoration: none;
-  opacity: 0.8;
-}
-.btn-cancel:hover {
-  opacity: 1;
-}
+/* Los estilos ahora vienen de global.css y Tailwind */
 </style>

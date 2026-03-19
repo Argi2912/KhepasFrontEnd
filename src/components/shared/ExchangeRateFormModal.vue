@@ -123,66 +123,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <BaseModal
-    :show="show"
-    title="Registrar Nueva Tasa de Cambio"
-    @close="emit('close')"
-    :is-loading="isLoadingCurrencies"
-  >
-    <p class="subtitle">
-      Aquí se registran las tasas de conversión entre las divisas activas. Se creará automáticamente
-      la tasa inversa.
+  <BaseModal :show="show" title="Registrar Nueva Tasa de Cambio" @close="emit('close')" :is-loading="isLoadingCurrencies">
+    <p class="opacity-80 mb-5 text-sm text-white/70">
+      Aquí se registran las tasas de conversión entre las divisas activas. Se creará automáticamente la tasa inversa.
     </p>
 
     <form @submit.prevent="handleSubmit">
-      <div class="form-grid">
-        <BaseSelect
-          v-model="form.from_currency"
-          label="Divisa Origen (De)"
-          name="from_currency"
-          :options="currencyOptions"
-          :error="getError('from_currency')"
-          placeholder="Ej: USD"
-          required
-          @change="clearError('from_currency')"
-          :disabled="isLoadingCurrencies"
-        />
-
-        <BaseSelect
-          v-model="form.to_currency"
-          label="Divisa Destino (A)"
-          name="to_currency"
-          :options="currencyOptions"
-          :error="getError('to_currency')"
-          placeholder="Ej: VES"
-          required
-          @change="clearError('to_currency')"
-          :disabled="isLoadingCurrencies"
-        />
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+        <BaseSelect v-model="form.from_currency" label="Divisa Origen (De)" name="from_currency" :options="currencyOptions" :error="getError('from_currency')" placeholder="Ej: USD" required @change="clearError('from_currency')" :disabled="isLoadingCurrencies" />
+        <BaseSelect v-model="form.to_currency" label="Divisa Destino (A)" name="to_currency" :options="currencyOptions" :error="getError('to_currency')" placeholder="Ej: VES" required @change="clearError('to_currency')" :disabled="isLoadingCurrencies" />
       </div>
 
-      <BaseInput
-        v-model.number="form.rate"
-        label="Tasa de Cambio (Valor de 1 unidad de Origen)"
-        name="rate"
-        type="number"
-        step="0.0001"
-        :error="getError('rate')"
-        icon="fa-solid fa-calculator"
-        placeholder="Ej: 40.50 (1 USD = 40.50 VES)"
-        required
-        @input="clearError('rate')"
-      />
+      <BaseInput v-model.number="form.rate" label="Tasa de Cambio (Valor de 1 unidad de Origen)" name="rate" type="number" step="0.0001" :error="getError('rate')" icon="fa-solid fa-calculator" placeholder="Ej: 40.50 (1 USD = 40.50 VES)" required @input="clearError('rate')" />
     </form>
 
     <template #footer>
-      <button @click="emit('close')" type="button" class="btn-cancel-modal">Cancelar</button>
-      <button
-        @click="handleSubmit"
-        type="button"
-        class="btn-submit-modal"
-        :disabled="isSubmitting || isLoadingCurrencies"
-      >
+      <button @click="emit('close')" type="button" class="bg-transparent border-none text-white/50 py-2.5 px-4 cursor-pointer hover:text-white transition-colors">Cancelar</button>
+      <button @click="handleSubmit" type="button" class="py-2.5 px-4 bg-primary text-secondary rounded-lg border-none font-bold cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isSubmitting || isLoadingCurrencies">
         <span v-if="isSubmitting">Registrando...</span>
         <span v-else>Guardar Tasa</span>
       </button>
@@ -190,37 +147,3 @@ onMounted(() => {
   </BaseModal>
 </template>
 
-<style scoped>
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-.subtitle {
-  opacity: 0.8;
-  margin-bottom: 20px;
-}
-/* Estilos para los botones del footer (Reutilizados del modal base) */
-.btn-cancel-modal {
-  background: none;
-  border: none;
-  color: #aaa;
-  padding: 10px 15px;
-  cursor: pointer;
-}
-.btn-submit-modal {
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
-  padding: 10px 15px;
-  border-radius: 6px;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.btn-submit-modal:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-</style>

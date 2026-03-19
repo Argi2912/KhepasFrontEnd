@@ -85,141 +85,37 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div v-if="show" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Trasladar Fondos a Mis Cuentas</h3>
-        <button @click="$emit('close')" class="close-btn">&times;</button>
+  <div v-if="show" class="fixed inset-0 bg-black/60 flex justify-center items-center z-[1000]">
+    <div class="bg-background p-6 rounded-xl w-[450px] text-white border border-white/10">
+      <div class="flex justify-between items-center mb-5 border-b border-white/10 pb-3">
+        <h3 class="text-lg font-bold text-primary">Trasladar Fondos a Mis Cuentas</h3>
+        <button @click="$emit('close')" class="bg-transparent border-none text-white/50 text-2xl cursor-pointer hover:text-white">&times;</button>
       </div>
 
-      <div class="modal-body">
-        <div class="info-box">
-          <p>Origen: <strong>{{ investor?.name }}</strong></p>
-          <p>Saldo Disponible: <strong class="text-green">{{ maxAvailable.toLocaleString('en-US', {
-            style: 'currency',
-            currency: 'USD' }) }}</strong></p>
-          <p class="note">Nota: Esto solo afecta la liquidez, no el Capital Base.</p>
+      <div class="bg-white/5 p-4 rounded-lg mb-5 text-sm">
+        <p>Origen: <strong class="text-white">{{ investor?.name }}</strong></p>
+        <p>Saldo Disponible: <strong class="text-success">{{ maxAvailable.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) }}</strong></p>
+        <p class="text-xs text-white/40 mt-1 italic">Nota: Esto solo afecta la liquidez, no el Capital Base.</p>
+      </div>
+
+      <form @submit.prevent="handleSubmit">
+        <BaseSelect label="Destino (Tu Cuenta/Caja)" :options="transactionStore.getAccounts" v-model="form.destination_account_id" required placeholder="Selecciona tu cuenta..." />
+        <BaseInput label="Monto a Mover" type="number" step="0.01" v-model="form.amount" required />
+
+        <p v-if="hasInsufficientFunds" class="text-danger text-sm -mt-3 mb-3">
+          ⚠️ El monto excede el saldo disponible ({{ maxAvailable }})
+        </p>
+
+        <BaseInput label="Fecha" type="date" v-model="form.transaction_date" required />
+        <BaseInput label="Nota (Opcional)" v-model="form.description" />
+
+        <div class="flex justify-end gap-3 mt-5">
+          <button type="button" @click="$emit('close')" class="bg-transparent border border-white/20 text-white/70 py-2.5 px-5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">Cancelar</button>
+          <button type="submit" class="bg-primary text-black py-2.5 px-5 border-none rounded-lg font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors" :disabled="isSubmitting || hasInsufficientFunds">
+            {{ isSubmitting ? 'Procesando...' : 'Transferir' }}
+          </button>
         </div>
-
-        <form @submit.prevent="handleSubmit">
-          <BaseSelect label="Destino (Tu Cuenta/Caja)" :options="transactionStore.getAccounts"
-            v-model="form.destination_account_id" required placeholder="Selecciona tu cuenta..." />
-
-          <BaseInput label="Monto a Mover" type="number" step="0.01" v-model="form.amount" required />
-
-          <p v-if="hasInsufficientFunds" class="error-text">
-            ⚠️ El monto excede el saldo disponible ({{ maxAvailable }})
-          </p>
-
-          <BaseInput label="Fecha" type="date" v-model="form.transaction_date" required />
-          <BaseInput label="Nota (Opcional)" v-model="form.description" />
-
-          <div class="modal-actions">
-            <button type="button" @click="$emit('close')" class="btn-cancel">Cancelar</button>
-            <button type="submit" class="btn-primary" :disabled="isSubmitting || hasInsufficientFunds">
-              {{ isSubmitting ? 'Procesando...' : 'Transferir' }}
-            </button>
-          </div>
-        </form>
-      </div>
+      </form>
     </div>
   </div>
-</template>
-
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: #1e2023;
-  padding: 25px;
-  border-radius: 12px;
-  width: 450px;
-  color: white;
-  border: 1px solid #333;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 10px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #aaa;
-  font-size: 1.5rem;
-  cursor: pointer;
-}
-
-.info-box {
-  background: rgba(255, 255, 255, 0.05);
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  font-size: 0.9rem;
-}
-
-.text-green {
-  color: #27ae60;
-}
-
-.note {
-  font-size: 0.8rem;
-  color: #888;
-  margin-top: 5px;
-  font-style: italic;
-}
-
-.error-text {
-  color: #e74c3c;
-  font-size: 0.85rem;
-  margin-top: -10px;
-  margin-bottom: 10px;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.btn-primary {
-  background: #fcd535;
-  color: black;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-cancel {
-  background: transparent;
-  border: 1px solid #555;
-  color: #ccc;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-</style>
+</template>

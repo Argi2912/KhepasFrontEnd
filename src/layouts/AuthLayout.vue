@@ -1,55 +1,25 @@
 <template>
-  <div class="auth-layout">
-    <div class="ambient-light gold-light"></div>
-    <div class="ambient-light blue-light"></div>
-
-    <div class="auth-content">
+  <div class="min-h-screen w-full bg-[#05070a] flex justify-center items-center relative overflow-hidden p-5 font-sans">
+    <!-- Luces Ambientales Premium -->
+    <div class="absolute -top-[10%] -right-[5%] w-[600px] h-[600px] bg-primary/10 blur-[150px] rounded-full pointer-events-none"></div>
+    <div class="absolute -bottom-[10%] -left-[5%] w-[600px] h-[600px] bg-secondary-light/10 blur-[150px] rounded-full pointer-events-none"></div>
+    
+    <div class="relative z-10 w-full flex justify-center">
       <slot />
     </div>
   </div>
 </template>
 
+<script setup>
+/* Layout para vistas de autenticación */
+</script>
+
 <style scoped>
-.auth-layout {
-  min-height: 100vh;
-  width: 100%;
-  background-color: #05070a; /* Fondo oscuro profundo */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  overflow: hidden; /* Evita que las luces generen scroll */
-  padding: 20px;
+/* Transiciones suaves para la entrada */
+.auth-layout-fade-enter-active {
+  transition: opacity 0.6s ease-out;
 }
-
-.ambient-light {
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  filter: blur(140px);
-  opacity: 0.12;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.gold-light {
-  top: -150px;
-  right: -150px;
-  background: #f0b90b;
-}
-
-.blue-light {
-  bottom: -150px;
-  left: -150px;
-  background: #0062ff;
-}
-
-.auth-content {
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  display: flex;
-  justify-content: center;
+.auth-layout-fade-enter-from {
+  opacity: 0;
 }
 </style>

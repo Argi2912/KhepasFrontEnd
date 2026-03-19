@@ -88,139 +88,43 @@ const submit = async () => {
 
 <template>
   <BaseModal :show="show" :title="title" @close="emit('close')">
-
     <form @submit.prevent="submit" id="investorForm">
-
       <BaseInput v-model="form.name" label="Nombre Completo" required placeholder="Ej: Juan Pérez" />
 
-      <div class="form-row">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <BaseInput v-model="form.alias" label="Alias (Opcional)" placeholder="Ej: Socio Juan" />
         <BaseInput v-model="form.phone" label="Teléfono" placeholder="+58 412..." />
       </div>
 
       <BaseInput v-model="form.email" label="Email" type="email" placeholder="correo@ejemplo.com" />
 
-      <div class="interest-section">
-        <h4><i class="fas fa-chart-line"></i> Configuración de Rendimiento</h4>
-
-        <div class="form-row">
-          <BaseInput v-model="form.interest_rate" label="Tasa de Interés (%)" required type="number" step="0.01" min="0"
-            placeholder="Ej: 5.00" />
-
-          <BaseInput v-model="form.payout_day" label="Día de Corte Mensual" required type="number" min="1" max="31"
-            placeholder="Ej: 30" />
+      <div class="p-4 rounded-lg border border-white/10 mb-5 mt-3">
+        <h4 class="text-primary font-semibold text-[0.95rem] mb-4"><i class="fas fa-chart-line mr-2"></i>Configuración de Rendimiento</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <BaseInput v-model="form.interest_rate" label="Tasa de Interés (%)" required type="number" step="0.01" min="0" placeholder="Ej: 5.00" />
+          <BaseInput v-model="form.payout_day" label="Día de Corte Mensual" required type="number" min="1" max="31" placeholder="Ej: 30" />
         </div>
-
-        <p class="info-text">
-          El sistema sumará automáticamente el <strong>{{ form.interest_rate }}%</strong>
-          al saldo total cada día <strong>{{ form.payout_day }}</strong> del mes.
+        <p class="text-sm text-white/40 mt-3 italic leading-snug">
+          El sistema sumará automáticamente el <strong class="text-white/60">{{ form.interest_rate }}%</strong>
+          al saldo total cada día <strong class="text-white/60">{{ form.payout_day }}</strong> del mes.
         </p>
       </div>
 
-      <div class="checkbox-group">
-        <label>
-          <input v-model="form.is_active" type="checkbox" />
-          <span class="ml-2">Inversionista Activo</span>
+      <div class="mt-4 flex items-center">
+        <label class="flex items-center cursor-pointer">
+          <input v-model="form.is_active" type="checkbox" class="w-4 h-4 accent-primary" />
+          <span class="ml-2 font-medium text-white/80">Inversionista Activo</span>
         </label>
       </div>
-
     </form>
 
     <template #footer>
-      <div class="modal-actions">
-        <button type="button" @click="emit('close')" class="btn-secondary" :disabled="loading">
-          Cancelar
-        </button>
-        <button type="submit" form="investorForm" class="btn-primary" :disabled="loading">
+      <div class="flex gap-3">
+        <button type="button" @click="emit('close')" class="py-2.5 px-5 bg-transparent border border-white/20 text-white/70 rounded-lg cursor-pointer hover:bg-white/5 transition-colors" :disabled="loading">Cancelar</button>
+        <button type="submit" form="investorForm" class="py-2.5 px-5 bg-primary text-black rounded-lg font-bold cursor-pointer hover:opacity-90 disabled:bg-white/20 disabled:cursor-not-allowed transition-all" :disabled="loading">
           {{ loading ? 'Guardando...' : 'Guardar Datos' }}
         </button>
       </div>
     </template>
-
   </BaseModal>
 </template>
-
-<style scoped>
-/* Estilos para el grid de 2 columnas */
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-/* Sección visual para destacar la configuración de intereses */
-.interest-section {
-
-  padding: 15px;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-  margin-bottom: 20px;
-  margin-top: 10px;
-}
-
-.interest-section h4 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 0.95rem;
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.info-text {
-  font-size: 0.85rem;
-  color: #6c757d;
-  margin: 10px 0 0 0;
-  font-style: italic;
-  line-height: 1.4;
-}
-
-.checkbox-group {
-  margin-top: 15px;
-  display: flex;
-  align-items: center;
-}
-
-.ml-2 {
-  margin-left: 8px;
-  font-weight: 500;
-}
-
-/* Botones alineados con tu tema */
-.modal-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  font-size: 0.95rem;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-}
-
-.btn-primary:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #e2e6ea;
-  color: #495057;
-}
-
-.btn-secondary:hover {
-  background: #dbe2e8;
-}
-</style>

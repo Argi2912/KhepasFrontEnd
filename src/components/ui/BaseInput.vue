@@ -5,22 +5,13 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 const props = defineProps({
   modelValue: [String, Number],
   label: String,
-  type: {
-    type: String,
-    default: 'text',
-  },
+  type: { type: String, default: 'text' },
   placeholder: String,
-  error: String, // Prop para recibir el error de validación
-  required: {
-    type: Boolean,
-    default: false,
-  },
-  name: String, // Nombre del campo para el ID y errores
-  icon: {
-    // Icono opcional para el input
-    type: String,
-    default: null,
-  },
+  error: String,
+  required: { type: Boolean, default: false },
+  name: String,
+  icon: { type: String, default: null },
+  disabled: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -28,101 +19,55 @@ const emit = defineEmits(['update:modelValue'])
 const inputId = computed(() => props.name || `input-${Math.random().toString(36).substring(2, 9)}`)
 
 const handleInput = (event) => {
-  // Al emitir el evento, el componente padre puede llamar a clearError()
   emit('update:modelValue', event.target.value)
 }
 </script>
 
 <template>
-  <div :class="['form-group', { 'has-error': error }]">
-    <label v-if="label" :for="inputId">
+  <div class="space-y-2 group w-full">
+    <label v-if="label" :for="inputId" 
+           class="inline-block text-[0.7rem] font-black uppercase tracking-[0.15em] text-white/40 group-focus-within:text-primary transition-colors">
       {{ label }}
-      <span v-if="required" class="required-star">*</span>
+      <span v-if="required" class="text-danger ml-0.5">*</span>
     </label>
 
-    <div class="input-wrapper">
-      <FontAwesomeIcon v-if="icon" :icon="icon" class="input-icon" />
+    <div 
+      class="relative flex items-center bg-white/[0.03] border border-white/5 rounded-xl transition-all duration-300 focus-within:border-primary/50 focus-within:bg-white/[0.05] focus-within:shadow-[0_0_20px_rgba(247,166,0,0.05)]"
+      :class="[
+        error ? '!border-danger !shadow-[0_0_20px_rgba(231,76,60,0.1)]' : '',
+        disabled ? 'opacity-50 grayscale pointer-events-none' : ''
+      ]"
+    >
+      <div v-if="icon" class="pl-4 flex items-center justify-center text-white/20 group-focus-within:text-primary transition-colors">
+        <FontAwesomeIcon :icon="icon" class="text-sm" />
+      </div>
+
       <input
         :id="inputId"
         :type="type"
         :placeholder="placeholder"
         :value="modelValue"
+        :disabled="disabled"
         @input="handleInput"
         :aria-invalid="!!error"
         :aria-describedby="error ? `${inputId}-error` : null"
         :required="required"
+        class="w-full bg-transparent py-3.5 px-4 text-sm text-white placeholder:text-white/10 outline-none font-medium"
       />
+
+      <!-- Barra de progreso / Acento inferior -->
+      <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-[2px] bg-primary transition-all duration-500 group-focus-within:w-[80%] opacity-50"></div>
     </div>
 
-    <p v-if="error" :id="`${inputId}-error`" class="error-message">
-      {{ error }}
-    </p>
+    <Transition name="fade">
+      <p v-if="error" :id="`${inputId}-error`" class="text-[0.65rem] font-bold text-danger uppercase tracking-wider ml-1">
+        {{ error }}
+      </p>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
-.form-group {
-  margin-bottom: 25px;
-}
-
-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 0.95rem;
-  color: #ccc;
-  font-weight: 500;
-}
-
-.required-star {
-  color: var(--color-danger);
-  margin-left: 5px;
-}
-
-.input-wrapper {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-background);
-  border-radius: 6px;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-
-.input-wrapper:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary);
-}
-
-.input-icon {
-  color: var(--color-primary);
-  margin: 0 12px;
-  font-size: 1rem;
-  opacity: 0.7;
-}
-
-input {
-  flex-grow: 1;
-  padding: 12px 10px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-light);
-  min-height: 44px; /* Altura mínima para accesibilidad */
-}
-
-input:focus {
-  outline: none;
-}
-
-/* Estilo de Error */
-.has-error .input-wrapper {
-  border-color: var(--color-danger);
-  box-shadow: 0 0 0 1px var(--color-danger);
-}
-
-.error-message {
-  margin-top: 4px;
-  font-size: 0.85rem;
-  color: var(--color-danger);
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

@@ -1,18 +1,33 @@
+/**
+ * Utility for formatting currency values consistent with Khepas business logic.
+ */
 export function useCurrencyFormatter() {
-  const format = (amount, currencyCode = 'USD', showSign = false) => {
-    if (amount === null || amount === undefined || amount === '') return '—'
+  const format = (value, currency = 'USD') => {
+    if (value === null || value === undefined) value = 0
 
-    const num = parseFloat(amount)
-    if (isNaN(num)) return '—'
+    // 1. Normalizar código (USDT -> USD)
+    let currencyCode = currency === 'USDT' ? 'USD' : currency
 
-    const formatted = new Intl.NumberFormat('es-VE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(num))
+    // 2. Especial para 'BS' o 'VES'
+    if (currencyCode === 'BS' || currencyCode === 'VES') {
+      return `Bs. ${new Intl.NumberFormat('es-VE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value)}`
+    }
 
-    const sign = showSign ? (num > 0 ? '+' : num < 0 ? '-' : '') : num < 0 ? '-' : ''
-
-    return `${sign}${formatted} ${currencyCode.toUpperCase()}`
+    // 3. Intento estándar
+    try {
+      return new Intl.NumberFormat('es-VE', {
+        style: 'currency',
+        currency: currencyCode,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value)
+    } catch (error) {
+      console.warn('Moneda desconocida:', currencyCode)
+      return `${currencyCode} ${Number(value).toFixed(2)}`
+    }
   }
 
   return { format }

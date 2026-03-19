@@ -187,28 +187,30 @@ onMounted(() => {
 
 <template>
   <BaseModal :show="show" :title="modalTitle" @close="emit('close')" :is-loading="isLoading">
-    <form class="modal-form" @submit.prevent="handleSubmit">
-      <BaseInput
-        v-model="form.name"
-        label="Nombre Completo"
-        name="name"
-        :error="getError('name')"
-        icon="fa-solid fa-user"
-        placeholder="Nombre del empleado"
-        required
-        @input="clearError('name')"
-      />
-      <BaseInput
-        v-model="form.email"
-        label="Email (Único)"
-        name="email"
-        type="email"
-        :error="getError('email')"
-        icon="fa-solid fa-envelope"
-        placeholder="ejemplo@tenant.com"
-        required
-        @input="clearError('email')"
-      />
+    <form class="space-y-6 py-2" @submit.prevent="handleSubmit">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <BaseInput
+          v-model="form.name"
+          label="Nombre Completo"
+          name="name"
+          :error="getError('name')"
+          icon="fa-solid fa-user"
+          placeholder="Nombre del empleado"
+          required
+          @input="clearError('name')"
+        />
+        <BaseInput
+          v-model="form.email"
+          label="Email (Único)"
+          name="email"
+          type="email"
+          :error="getError('email')"
+          icon="fa-solid fa-envelope"
+          placeholder="ejemplo@tenant.com"
+          required
+          @input="clearError('email')"
+        />
+      </div>
 
       <BaseSelect
         v-model="form.role"
@@ -223,78 +225,61 @@ onMounted(() => {
         @change="clearError('role')"
       />
 
-      <h4 class="password-title">
-        {{ isEditing ? 'Cambiar Contraseña (Opcional)' : 'Contraseña' }}
-      </h4>
+      <div class="pt-4 border-t border-white/5">
+        <h4 class="text-xs font-black uppercase tracking-[0.2em] text-primary mb-6">
+          {{ isEditing ? 'Seguridad (Opcional)' : 'Seguridad y Acceso' }}
+        </h4>
 
-      <BaseInput
-        v-model="form.password"
-        label="Contraseña"
-        name="password"
-        type="password"
-        :error="getError('password')"
-        icon="fa-solid fa-lock"
-        :required="!isEditing"
-        @input="clearError('password')"
-      />
-      <BaseInput
-        v-model="form.password_confirmation"
-        label="Confirmar Contraseña"
-        name="password_confirmation"
-        type="password"
-        :error="getError('password_confirmation')"
-        icon="fa-solid fa-lock"
-        :required="!isEditing"
-        @input="clearError('password_confirmation')"
-      />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <BaseInput
+            v-model="form.password"
+            label="Contraseña"
+            name="password"
+            type="password"
+            :error="getError('password')"
+            icon="fa-solid fa-lock"
+            :required="!isEditing"
+            @input="clearError('password')"
+          />
+          <BaseInput
+            v-model="form.password_confirmation"
+            label="Confirmar"
+            name="password_confirmation"
+            type="password"
+            :error="getError('password_confirmation')"
+            icon="fa-solid fa-lock"
+            :required="!isEditing"
+            @input="clearError('password_confirmation')"
+          />
+        </div>
+      </div>
     </form>
 
     <template #footer>
-      <button @click="emit('close')" type="button" class="btn-cancel-modal">Cancelar</button>
-      <button
-        @click="handleSubmit"
-        type="submit"
-        class="btn-submit-modal"
-        :disabled="isSubmitting || isLoading"
-      >
-        <span v-if="isSubmitting">Guardando...</span>
-        <span v-else>{{ isEditing ? 'Guardar Cambios' : 'Crear Usuario' }}</span>
-      </button>
+      <div class="flex items-center gap-3">
+        <button 
+          @click="emit('close')" 
+          type="button" 
+          class="px-5 py-2.5 text-sm font-bold text-white/40 hover:text-white transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          @click="handleSubmit"
+          type="submit"
+          class="bg-primary hover:bg-primary-dark text-secondary px-6 py-2.5 rounded-xl font-black text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+          :disabled="isSubmitting || isLoading"
+        >
+          <span v-if="isSubmitting" class="flex items-center gap-2">
+            <FontAwesomeIcon icon="fa-solid fa-circle-notch" spin /> Guardando...
+          </span>
+          <span v-else>{{ isEditing ? 'Actualizar Usuario' : 'Crear Usuario' }}</span>
+        </button>
+      </div>
     </template>
   </BaseModal>
 </template>
 
 <style scoped>
-.password-title {
-  margin-top: 20px;
-  margin-bottom: 15px;
-  font-size: 1.1rem;
-  color: var(--color-primary);
-}
-/* Estilos de botones reutilizados */
-.btn-cancel-modal {
-  background: none;
-  border: none;
-  color: #aaa;
-  padding: 10px 15px;
-  cursor: pointer;
-  margin-right: 10px;
-}
-.btn-submit-modal {
-  padding: 10px 20px;
-  background-color: var(--color-success);
-  color: var(--color-secondary);
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.btn-submit-modal:hover:not(:disabled) {
-  background-color: #0dcf92;
-}
-.btn-submit-modal:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+/* Los estilos ahora vienen de global.css y Tailwind */
 </style>

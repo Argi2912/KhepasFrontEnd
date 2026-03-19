@@ -104,47 +104,23 @@ const handleSubmit = async () => {
 
 <template>
   <BaseModal :show="show" :title="modalTitle" @close="emit('close')">
-    <div v-if="isLoadingData" class="loading-state">
+    <div v-if="isLoadingData" class="text-center py-8 text-white/40">
       <p>Cargando información...</p>
     </div>
 
-    <form v-else @submit.prevent="handleSubmit" class="broker-form">
-      <BaseInput
-        label="Nombre del Corredor / Empresa *"
-        v-model="form.name"
-        placeholder="Ej: Juan Pérez o Inversiones XYZ"
-        required
-      />
+    <form v-else @submit.prevent="handleSubmit" class="flex flex-col gap-5">
+      <BaseInput label="Nombre del Corredor / Empresa *" v-model="form.name" placeholder="Ej: Juan Pérez o Inversiones XYZ" required />
 
-      <div class="grid-2">
-        <BaseInput
-          label="Documento ID (Opcional)"
-          v-model="form.document_id"
-          placeholder="V-12345678"
-        />
-
-        <BaseInput
-          label="Correo Electrónico"
-          type="email"
-          v-model="form.email"
-          placeholder="contacto@ejemplo.com"
-        />
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <BaseInput label="Documento ID (Opcional)" v-model="form.document_id" placeholder="V-12345678" />
+        <BaseInput label="Correo Electrónico" type="email" v-model="form.email" placeholder="contacto@ejemplo.com" />
       </div>
 
-      <div class="commission-section">
-        <BaseInput
-          label="Tasa de Comisión Base (%)"
-          type="number"
-          step="0.01"
-          v-model="form.default_commission_rate"
-          placeholder="0.00"
-          hint="Esta comisión se sugerirá automáticamente en las operaciones."
-        />
-      </div>
+      <BaseInput label="Tasa de Comisión Base (%)" type="number" step="0.01" v-model="form.default_commission_rate" placeholder="0.00" />
 
-      <div class="modal-actions">
-        <button type="button" class="btn-cancel" @click="emit('close')">Cancelar</button>
-        <button type="submit" class="btn-save" :disabled="isSubmitting">
+      <div class="flex justify-end gap-4 mt-5 pt-5 border-t border-white/10">
+        <button type="button" class="bg-transparent border border-white/20 text-white/70 py-2.5 px-5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors" @click="emit('close')">Cancelar</button>
+        <button type="submit" class="bg-primary text-black border-none py-2.5 px-6 rounded-lg font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-colors" :disabled="isSubmitting">
           {{ isSubmitting ? 'Guardando...' : 'Guardar Datos' }}
         </button>
       </div>
@@ -152,57 +128,3 @@ const handleSubmit = async () => {
   </BaseModal>
 </template>
 
-<style scoped>
-.broker-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.loading-state {
-  text-align: center;
-  padding: 30px;
-  color: #888;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 15px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn-cancel {
-  background: transparent;
-  border: 1px solid #555;
-  color: #ccc;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.btn-cancel:hover {
-  background: #333;
-}
-
-.btn-save {
-  background: var(--color-primary);
-  color: #000; /* Texto oscuro para contraste con amarillo */
-  border: none;
-  padding: 10px 25px;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-}
-.btn-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</style>

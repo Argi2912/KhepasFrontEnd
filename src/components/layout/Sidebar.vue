@@ -5,7 +5,6 @@ import { useAuthStore } from '@/stores/auth'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const props = defineProps({ isOpen: Boolean })
-// 1. CAMBIO: Unificamos el nombre del evento a 'toggle-sidebar'
 const emit = defineEmits(['toggle-sidebar'])
 
 const router = useRouter()
@@ -30,24 +29,14 @@ const toggleGroup = (path) => {
   openGroups.value.has(path) ? openGroups.value.delete(path) : openGroups.value.add(path)
 }
 
-// 2. LÓGICA: Cerrar menú al hacer clic en un enlace (solo en móvil)
 const handleItemClick = () => {
   if (window.innerWidth < 768) {
     emit('toggle-sidebar')
   }
 }
 
-// MENÚ AUTOMÁTICO
-// Sidebar.vue
-
-// ... (todo lo anterior sigue igual)
-
-// MENÚ AUTOMÁTICO
 const menuItems = computed(() => {
   const items = []
-
-  // 1. Usamos 'router.options.routes' para respetar la jerarquía (Padres e Hijos)
-  // En lugar de 'router.getRoutes()' que aplana todo y causa duplicados.
   const allRoutes = router.options.routes
 
   if (authStore.isSuperAdmin) {
@@ -62,7 +51,6 @@ const menuItems = computed(() => {
     (r) => r.meta?.label && r.meta?.icon && !r.meta?.hidden && !r.meta?.hiddenInMenu && r.path !== '/' && !r.path.includes('/:'),
   )
 
-  // Agregamos '/tools' a la lista de orden para que sepa dónde ponerlo
   const order = [
     '/dashboard',
     '/reports',
@@ -71,24 +59,22 @@ const menuItems = computed(() => {
     '/clients',
     '/providers',
     '/brokers',
-    '/admi-platforms',
+    '/admin-platforms',
     '/financial-config',
     '/transactions',
-    '/tools', // <--- Importante
-    '/Dailyngclosing'
+    '/tools',
+    '/daily-closing'
   ]
 
   visibleRoutes.sort((a, b) => {
     const ia = order.indexOf(a.path)
     const ib = order.indexOf(b.path)
-    // Si no está en la lista, lo manda al final (99)
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
   })
 
   visibleRoutes.forEach((route) => {
     if (route.meta?.permission && !authStore.can(route.meta.permission)) return
 
-    // Si tiene hijos visibles, es un GRUPO
     if (route.children?.length) {
       const visibleChildren = route.children.filter((c) => c.meta?.label && !c.meta?.hidden && (!c.meta?.permission || authStore.can(c.meta.permission)))
 
@@ -98,7 +84,6 @@ const menuItems = computed(() => {
           path: route.path,
           label: route.meta.label,
           icon: route.meta.icon,
-          // Mapeamos los hijos correctamente
           children: visibleChildren.map((c) => ({
             name: c.name,
             label: c.meta.label
@@ -106,7 +91,6 @@ const menuItems = computed(() => {
         })
       }
     }
-    // Si NO tiene hijos, es un ITEM suelto
     else if (route.name) {
       items.push({ type: 'item', name: route.name, label: route.meta.label, icon: route.meta.icon })
     }
@@ -116,284 +100,145 @@ const menuItems = computed(() => {
 </script>
 
 <template>
-  <div class="sidebar-overlay" :class="{ 'show': isOpen }" @click="$emit('toggle-sidebar')"></div>
+  <!-- Overlay para móvil -->
+  <div 
+    class="fixed inset-0 bg-black/80 z-[999] transition-all duration-500 backdrop-blur-md md:hidden"
+    :class="[isOpen ? 'opacity-100 visible' : 'opacity-0 invisible']"
+    @click="$emit('toggle-sidebar')"
+  ></div>
 
-  <aside :class="['sidebar', { 'is-closed': !isOpen }]">
-    <div class="logo-section">
-      <span v-if="isOpen" class="logo-text">TuConpay</span>
-      <FontAwesomeIcon v-else icon="fa-solid fa-bolt" class="logo-icon-closed" />
+  <aside 
+    class="fixed top-0 left-0 h-full bg-secondary z-[1000] flex flex-col shadow-[20px_0_50px_rgba(0,0,0,0.4)] transition-all duration-700 cubic-bezier(0.4, 0, 0.2, 1) border-r border-white/5"
+    :class="[isOpen ? 'w-[290px] translate-x-0' : 'w-0 overflow-hidden md:w-[90px] -translate-x-full md:translate-x-0']"
+  >
+    <!-- Logo Section Premium -->
+    <div class="h-[80px] flex items-center justify-center border-b border-white/5 shrink-0 px-6 bg-secondary/30 backdrop-blur-xl relative overflow-hidden group">
+      <div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
+      
+      <transition name="fade">
+        <div v-if="isOpen" class="flex items-center gap-3 relative z-10 transition-all duration-500">
+          <div class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-[0_0_25px_rgba(247,166,0,0.4)] group-hover:scale-110 transition-transform duration-500">
+             <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-secondary text-lg" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-xl font-black text-white tracking-tighter leading-none">TuConpay<span class="text-primary">.</span></span>
+            <span class="text-[0.6rem] font-bold text-white/20 uppercase tracking-[0.3em] mt-1">Ecosistema Pro</span>
+          </div>
+        </div>
+        <div v-else class="w-11 h-11 bg-white/[0.03] rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-primary/30 transition-all duration-500 shadow-inner">
+          <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-xl text-primary drop-shadow-[0_0_8px_rgba(247,166,0,0.5)]" />
+        </div>
+      </transition>
     </div>
 
-    <nav class="menu">
+    <!-- Menú de Navegación v5 -->
+    <nav class="p-4 grow overflow-y-auto space-y-2.5 scrollbar-none hover:scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
       <template v-for="item in menuItems" :key="item.path || item.name">
-        <div v-if="item.type === 'group'" class="menu-group" :class="{ active: route.path.startsWith(item.path) }">
-          <div class="menu-item menu-parent" @click="toggleGroup(item.path)">
-            <FontAwesomeIcon :icon="item.icon" class="menu-icon" />
-            <span v-if="isOpen" class="menu-label">{{ item.label }}</span>
-            <FontAwesomeIcon v-if="isOpen"
-              :icon="openGroups.has(item.path) ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"
-              class="chevron" />
+        <!-- Grupo con Submenú -->
+        <div v-if="item.type === 'group'" class="space-y-1.5">
+          <div 
+            class="group flex items-center text-white/50 p-3 rounded-2xl cursor-pointer transition-all duration-500 hover:bg-white/[0.04] hover:text-white relative overflow-hidden"
+            :class="{ 'bg-primary/5 !text-white shadow-[inset_0_0_20px_rgba(247,166,0,0.03)] border border-white/5': route.path.startsWith(item.path) }"
+            @click="toggleGroup(item.path)"
+          >
+            <!-- Indicador activo sutil -->
+            <div v-if="route.path.startsWith(item.path)" class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full shadow-[0_0_15px_rgba(247,166,0,0.5)]"></div>
+
+            <div class="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl transition-all duration-500 group-hover:bg-primary/5 group-hover:text-primary shadow-inner"
+                 :class="{ 'text-primary bg-primary/10 border border-primary/10 shadow-[0_0_15px_rgba(247,166,0,0.1)]': route.path.startsWith(item.path) }">
+              <FontAwesomeIcon :icon="item.icon" class="text-lg" />
+            </div>
+            
+            <div v-if="isOpen" class="ml-3 grow flex items-center justify-between">
+              <span class="font-bold text-[0.9rem] tracking-tight">{{ item.label }}</span>
+              <FontAwesomeIcon 
+                :icon="openGroups.has(item.path) ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"
+                class="text-[0.65rem] opacity-20 group-hover:opacity-100 transition-all duration-500" 
+              />
+            </div>
           </div>
 
+          <!-- Submenú Premium -->
           <Transition name="slide-fade">
-            <div v-if="isOpen && openGroups.has(item.path)" class="submenu">
-              <router-link v-for="child in item.children" :key="child.name" :to="{ name: child.name }"
-                class="menu-sub-item" active-class="sub-active" @click="handleItemClick">
+            <div v-if="isOpen && openGroups.has(item.path)" class="ml-10 py-1 space-y-1 relative border-l border-white/5">
+              <router-link 
+                v-for="child in item.children" 
+                :key="child.name" 
+                :to="{ name: child.name }"
+                class="flex items-center py-2.5 px-4 text-[0.8rem] font-bold text-white/30 hover:text-white transition-all rounded-r-xl hover:bg-white/5 relative group/sub"
+                active-class="!text-white !bg-gradient-to-r !from-primary/10 !to-transparent before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[2px] before:h-4 before:bg-primary shadow-sm"
+                @click="handleItemClick"
+              >
+                <span class="opacity-40 group-hover/sub:opacity-100 transition-opacity mr-2">•</span>
                 {{ child.label }}
               </router-link>
             </div>
           </Transition>
         </div>
 
-        <router-link v-else :to="{ name: item.name }" class="menu-item" active-class="active" @click="handleItemClick">
-          <FontAwesomeIcon :icon="item.icon" class="menu-icon" />
-          <span v-if="isOpen" class="menu-label">{{ item.label }}</span>
+        <!-- Item Individual Premium -->
+        <router-link 
+          v-else 
+          :to="{ name: item.name }" 
+          class="group flex items-center text-white/50 p-3 rounded-2xl transition-all duration-500 hover:bg-white/[0.04] hover:text-white relative overflow-hidden border border-transparent"
+          active-class="bg-primary/5 !text-white !border-white/5 shadow-[inset_0_0_20px_rgba(247,166,0,0.03)] font-bold"
+          @click="handleItemClick"
+        >
+          <!-- Indicador activo sutil -->
+          <div v-if="route.name === item.name" class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full shadow-[0_0_15px_rgba(247,166,0,0.5)]"></div>
+
+          <div class="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl transition-all duration-500 group-hover:bg-primary/5 group-hover:text-primary shadow-inner"
+               :class="{ 'text-primary bg-primary/10 border border-primary/10 shadow-[0_0_15px_rgba(247,166,0,0.1)]': route.name === item.name }">
+            <FontAwesomeIcon :icon="item.icon" class="text-lg" />
+          </div>
+          <span v-if="isOpen" class="ml-3 font-bold text-[0.9rem] tracking-tight truncate">{{ item.label }}</span>
         </router-link>
       </template>
     </nav>
 
-    <div class="user-footer" v-if="isOpen">
-      <span class="tenant-name">Tenant: {{ authStore.authUser?.tenant?.name || 'SuperAdmin' }}</span>
+    <!-- Footer de Usuario v5 (Premium Glass) -->
+    <div v-if="isOpen" class="p-6 border-t border-white/5 bg-black/40 backdrop-blur-3xl shrink-0 group/footer">
+      <div class="flex items-center gap-4 p-3 rounded-2xl bg-white/[0.02] border border-white/5 group-hover/footer:bg-white/[0.04] group-hover/footer:border-white/10 transition-all duration-500 shadow-2xl">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black border border-primary/10 shadow-inner group-hover/footer:scale-110 transition-transform duration-500">
+          {{ authStore.authUser?.name?.charAt(0) || 'U' }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-[0.85rem] font-black text-white truncate tracking-tight leading-none mb-1">{{ authStore.authUser?.name }}</p>
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(46,204,113,0.5)]"></span>
+            <p class="text-[0.6rem] text-primary/60 truncate uppercase tracking-[0.15em] font-black">
+              {{ authStore.isSuperAdmin ? 'SUPER ADMIN' : authStore.authUser?.tenant?.name || 'OPERADOR' }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Collapsed mini footer -->
+    <div v-else class="h-[80px] flex items-center justify-center border-t border-white/5 bg-black/40">
+       <div class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20 border border-white/5 hover:bg-primary/10 hover:text-primary transition-all duration-500 cursor-pointer">
+          <FontAwesomeIcon icon="fa-solid fa-power-off" class="text-xs" />
+       </div>
     </div>
   </aside>
 </template>
 
 <style scoped>
-/* (El CSS se mantiene igual que en tu versión responsiva anterior) */
-:root {
-  --color-dark-bg: #1f2937;
-  --color-secondary: #1f2937;
-  --color-primary: #fbbf24;
-  --color-active-bg: #374151;
-  --color-hover: #374151;
-  --color-text-light: #e5e7eb;
-  --color-border: #374151;
-  --color-dropdown-bg: #111827;
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 
-.sidebar-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(2px);
-}
-
-.sidebar-overlay.show {
-  opacity: 1;
-  visibility: visible;
-}
-
-@media (min-width: 769px) {
-  .sidebar-overlay {
-    display: none;
-  }
-}
-
-.sidebar {
-  width: 280px;
-  background-color: var(--color-secondary);
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100%;
-  padding: 0;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
-}
-
-.is-closed {
-  width: 0;
+.slide-fade-enter-active, .slide-fade-leave-active {
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 800px;
   overflow: hidden;
 }
-
-@media (max-width: 768px) {
-  .sidebar {
-    width: 280px;
-    transform: translateX(0);
-  }
-
-  .is-closed {
-    width: 280px;
-    transform: translateX(-100%);
-  }
-
-  .logo-section {
-    justify-content: center;
-  }
-
-  .is-closed .menu-label {
-    display: block;
-  }
-}
-
-.logo-section {
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.logo-text {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--color-primary);
-  letter-spacing: 2px;
-}
-
-.logo-icon-closed {
-  font-size: 1.5rem;
-  color: var(--color-primary);
-}
-
-.menu {
-  padding: 10px 15px;
-  flex-grow: 1;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-  color: var(--color-text-light);
-  padding: 12px 15px;
-  margin: 5px 0;
-  border-radius: 6px;
-  white-space: nowrap;
-  opacity: 0.8;
-  transition: background-color 0.2s, opacity 0.2s;
-  cursor: pointer;
-}
-
-.menu-item:hover {
-  background-color: var(--color-hover);
-  opacity: 1;
-}
-
-.active {
-  background-color: var(--color-active-bg);
-  color: var(--color-primary) !important;
-  opacity: 1;
-  font-weight: 600;
-}
-
-.menu-icon {
-  min-width: 30px;
-  font-size: 1.1rem;
-  text-align: center;
-  margin-right: 15px;
-}
-
-@media (min-width: 769px) {
-
-  .is-closed .menu-label,
-  .is-closed .chevron,
-  .is-closed .tenant-name {
-    display: none;
-  }
-
-  .is-closed .menu-icon {
-    margin-right: 0;
-  }
-
-  .is-closed .menu-item {
-    justify-content: center;
-    padding: 12px 0;
-  }
-}
-
-.menu-group {
-  margin-bottom: 10px;
-}
-
-.menu-parent {
-  opacity: 0.9;
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-
-.menu-group.active .menu-parent {
-  background: var(--color-active-bg);
-  color: var(--color-primary);
-  border-radius: 8px;
-}
-
-.chevron {
-  margin-left: auto;
-  font-size: 0.8rem;
-  opacity: 0.6;
-}
-
-.submenu {
-  background-color: var(--color-dropdown-bg);
-  border-radius: 0 0 8px 8px;
-  padding-left: 50px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-  margin-top: 0;
-  margin-bottom: 5px;
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-sub-item {
-  text-decoration: none;
-  color: var(--color-text-light);
-  padding: 8px 0;
-  border-radius: 6px;
-  padding-left: 12px;
-  font-size: 0.93rem;
-  transition: all 0.2s;
-}
-
-.menu-sub-item:hover,
-.sub-active {
-  color: var(--color-primary);
-  background: var(--color-hover);
-  font-weight: 600;
-}
-
-.user-footer {
-  padding: 15px;
-  border-top: 1px solid var(--color-border);
-  flex-shrink: 0;
-  text-align: center;
-  background: var(--color-secondary);
-}
-
-.tenant-name {
-  font-size: 0.85rem;
-  color: #aaa;
-}
-
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.3s ease-out;
-  overflow: hidden;
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
+.slide-fade-enter-from, .slide-fade-leave-to {
   max-height: 0;
   opacity: 0;
+  transform: translateY(-20px);
 }
 
-.slide-fade-enter-to,
-.slide-fade-leave-from {
-  max-height: 500px;
-}
+/* Hide scrollbar by default */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 </style>

@@ -6,15 +6,13 @@ import alert from '@/services/alert'
 const authStore = useAuthStore()
 const emit = defineEmits(['toggle-sidebar'])
 
-// Usamos el nombre del rol principal para mostrar
 const userRole = authStore.authUser?.roles[0]?.name || 'Usuario'
 
 const confirmLogout = async () => {
   const confirmed = await alert.confirm(
-    'Cerrar Sesión',
-    '¿Estás seguro de que deseas cerrar tu sesión actual?',
+    'Cerrar Sesión Segura',
+    '¿Estás seguro de que deseas finalizar tu jornada de trabajo actual?',
   )
-
   if (confirmed) {
     authStore.logout()
   }
@@ -22,145 +20,72 @@ const confirmLogout = async () => {
 </script>
 
 <template>
-  <header class="navbar">
-    <div class="nav-left">
-      <button @click="emit('toggle-sidebar')" class="toggle-btn">
-        <FontAwesomeIcon icon="fa-solid fa-bars" />
-      </button>
+  <header class="h-[80px] bg-secondary/40 backdrop-blur-[40px] border-b border-white/5 flex justify-between items-center px-10 sticky top-0 z-[900] transition-all duration-700 shadow-[0_10px_40px_rgba(0,0,0,0.15)] overflow-hidden">
+    
+    <!-- Efecto ambiental sutil -->
+    <div class="absolute -top-10 left-1/4 w-32 h-32 bg-primary/5 blur-[60px] pointer-events-none"></div>
 
-      <span class="page-title">{{ $route.meta.label || 'Sistema Kephas' }}</span>
+    <div class="flex items-center flex-1 min-w-0 relative z-10">
+      <button 
+        @click="emit('toggle-sidebar')" 
+        class="bg-white/5 border border-white/10 text-white/50 text-lg cursor-pointer transition-all mr-8 w-11 h-11 rounded-2xl flex items-center justify-center hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:shadow-[0_0_20px_rgba(247,166,0,0.15)] active:scale-90 group transition-all duration-500"
+      >
+        <FontAwesomeIcon icon="fa-solid fa-bars-staggered" class="group-hover:scale-110 transition-transform" />
+      </button>
+      
+      <div class="flex flex-col">
+        <div class="flex items-center gap-2 mb-0.5">
+           <span class="w-1 h-3 bg-primary/50 rounded-full"></span>
+           <span class="text-[0.6rem] text-white/30 uppercase tracking-[0.4em] font-black leading-none">Console / Core</span>
+        </div>
+        <span class="text-xl font-black text-white whitespace-nowrap overflow-hidden text-ellipsis leading-tight tracking-tight">
+          {{ $route.meta.label || 'Sistemas Khepas' }}
+        </span>
+      </div>
     </div>
 
-    <div class="user-profile">
-      <div class="user-info">
-        <span class="user-name">{{ authStore.authUser?.name || 'Cargando...' }}</span>
-        <span class="user-role">{{ userRole.toUpperCase() }}</span>
+    <div class="flex items-center gap-8 shrink-0 relative z-10">
+      
+      <!-- Utilidades Rápidas -->
+      <div class="hidden lg:flex items-center gap-2 pr-6 border-r border-white/5">
+         <button class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5">
+            <FontAwesomeIcon icon="fa-solid fa-expand" class="text-xs" />
+         </button>
+         <button class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5">
+            <FontAwesomeIcon icon="fa-solid fa-bell" class="text-xs" />
+         </button>
       </div>
 
-      <button @click="confirmLogout" class="logout-btn" title="Cerrar Sesión">
-        <FontAwesomeIcon icon="fa-solid fa-right-from-bracket" />
+      <!-- Perfil Compacto Premium -->
+      <div class="flex items-center gap-4 bg-white/[0.02] py-2 pl-5 pr-2.5 rounded-[22px] border border-white/5 transition-all hover:bg-white/[0.04] group cursor-pointer shadow-inner">
+        <div class="flex flex-col items-end mr-1">
+          <span class="text-[0.85rem] font-bold text-white leading-none mb-1 group-hover:text-primary transition-colors">{{ authStore.authUser?.name || 'Usuario' }}</span>
+          <div class="flex items-center gap-1.5">
+            <span class="w-1 w-1 bg-success/60 rounded-full"></span>
+            <span class="text-[0.6rem] text-white/30 font-black tracking-widest uppercase">{{ userRole }}</span>
+          </div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-secondary font-black text-xs shadow-[0_5px_15px_rgba(247,166,0,0.3)] group-hover:scale-105 group-hover:rotate-3 transition-all duration-500">
+          {{ authStore.authUser?.name?.charAt(0) || 'U' }}
+        </div>
+      </div>
+
+      <!-- Logout Sophisticated -->
+      <button 
+        @click="confirmLogout" 
+        class="bg-danger/10 border border-danger/10 text-danger w-11 h-11 rounded-2xl cursor-pointer flex items-center justify-center transition-all hover:bg-danger hover:text-white hover:shadow-[0_10px_25px_rgba(246,70,93,0.3)] active:scale-90 group duration-500" 
+        title="Cerrar Seguridad"
+      >
+        <FontAwesomeIcon icon="fa-solid fa-power-off" class="group-hover:rotate-12 transition-transform" />
       </button>
     </div>
   </header>
 </template>
 
 <style scoped>
-.navbar {
-  height: 60px;
-  background-color: var(--color-background);
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 25px;
-  position: sticky;
-  top: 0;
-  z-index: 900;
-  /* Menor que el sidebar (1000) */
-  transition: padding 0.3s ease;
-}
-
-.nav-left {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  /* Permite que el texto se trunque si es necesario */
-}
-
-.toggle-btn {
-  background: none;
-  border: none;
-  color: var(--color-text-light);
-  font-size: 1.4rem;
-  cursor: pointer;
-  transition: color 0.2s;
-  margin-right: 15px;
-  padding: 5px;
-  /* Área de toque más grande */
-}
-
-.toggle-btn:hover {
-  color: var(--color-primary);
-}
-
-.page-title {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--color-text-light);
-  opacity: 0.9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* Puntos suspensivos si es muy largo */
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  /* Evita que se aplaste */
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  margin-right: 15px;
-}
-
-.user-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.user-role {
-  font-size: 0.75rem;
-  color: var(--color-primary);
-  opacity: 0.8;
-  margin-top: 2px;
-}
-
-.logout-btn {
-  background-color: var(--color-secondary);
-  border: 1px solid var(--color-border);
-  color: var(--color-danger);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.logout-btn:hover {
-  background-color: var(--color-danger);
-  color: white;
-  border-color: var(--color-danger);
-  transform: scale(1.05);
-}
-
-/* === RESPONSIVIDAD (MÓVIL) === */
-@media (max-width: 768px) {
-  .navbar {
-    padding: 0 15px;
-    /* Menos padding en los bordes */
-  }
-
-  /* Ocultar nombre y rol en móvil para ahorrar espacio */
-  .user-info {
-    display: none;
-  }
-
-  .page-title {
-    font-size: 1rem;
-  }
-
-  .toggle-btn {
-    font-size: 1.3rem;
-    margin-right: 10px;
-  }
+/* Glassmorphism optimized */
+header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 }
 </style>

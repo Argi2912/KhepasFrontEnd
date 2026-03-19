@@ -1,16 +1,11 @@
 <script setup>
-import { computed, useSlots } from 'vue' // 🚨 CORRECCIÓN: Importar useSlots
+import { computed, useSlots } from 'vue'
 
 const props = defineProps({
-  modelValue: {
-    // El paso actual (v-model)
-    type: Number,
-    default: 0,
-  },
+  modelValue: { type: Number, default: 0 },
   title: String,
 })
 
-// Contar cuántos pasos (slots) se han proporcionado
 const slots = useSlots()
 const steps = computed(() => {
   return Object.keys(slots).filter((s) => s.startsWith('step-')).length
@@ -18,68 +13,24 @@ const steps = computed(() => {
 </script>
 
 <template>
-  <div class="form-wizard">
-    <div class="wizard-header">
-      <h1 class="wizard-title">{{ title }}</h1>
-      <div class="step-indicator">
+  <div class="bg-secondary rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+    <div class="py-5 px-6 border-b border-white/10 flex justify-between items-center">
+      <h1 class="text-2xl text-primary font-semibold">{{ title }}</h1>
+      <div class="flex gap-2">
         <span
           v-for="i in steps"
           :key="i"
-          :class="['step-dot', { active: modelValue === i - 1 }]"
+          :class="['w-3 h-3 rounded-full transition-colors duration-300', modelValue === i - 1 ? 'bg-primary' : 'bg-white/10']"
         ></span>
       </div>
     </div>
 
-    <div class="wizard-body">
+    <div class="p-6">
       <slot :name="`step-${modelValue}`" />
     </div>
 
-    <div class="wizard-footer">
+    <div class="py-5 px-6 border-t border-white/10 bg-background rounded-b-lg">
       <slot name="footer" />
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Estilos del Wizard (Tema Oscuro/Binance) */
-.form-wizard {
-  background-color: var(--color-secondary);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-.wizard-header {
-  padding: 20px 25px;
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.wizard-title {
-  font-size: 1.5rem;
-  color: var(--color-primary);
-}
-.step-indicator {
-  display: flex;
-  gap: 8px;
-}
-.step-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: var(--color-border);
-  transition: background-color 0.3s;
-}
-.step-dot.active {
-  background-color: var(--color-primary);
-}
-.wizard-body {
-  padding: 25px;
-}
-.wizard-footer {
-  padding: 20px 25px;
-  border-top: 1px solid var(--color-border);
-  background-color: var(--color-background); /* Un poco más oscuro para el footer */
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-</style>

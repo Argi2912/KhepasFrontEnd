@@ -104,39 +104,71 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="broker-list">
-    <div class="header-actions">
-      <h1>Corredores (Brokers)</h1>
-      <button v-if="authStore.can(permissionKey)" @click="openCreateModal" class="btn-primary">
-        <FontAwesomeIcon icon="fa-solid fa-user-plus" /> Registrar Corredor
+  <div class="space-y-6 animate-fade-in">
+    <div class="flex justify-between items-center mb-8">
+      <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight">
+        Gestión de <span class="text-primary">Corredores</span>
+      </h1>
+      <button 
+        v-if="authStore.can(permissionKey)" 
+        @click="openCreateModal" 
+        class="bg-primary hover:bg-primary-dark text-secondary px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center gap-2 group"
+      >
+        <FontAwesomeIcon icon="fa-solid fa-user-plus" class="group-hover:rotate-12 transition-transform" /> 
+        <span>Registrar Corredor</span>
       </button>
     </div>
 
     <FilterBar @update:filters="filters = $event" />
 
-    <BaseCard title="Listado y Tasa de Comisión">
+    <BaseCard title="Corredores Asociados" subtitle="Gestión de comisiones base y datos de identificación." class="mt-8">
       <BaseTable :headers="tableHeaders" :data="brokers" :is-loading="isLoading">
-        <tr v-for="broker in brokers" :key="broker.id">
-          <td>
-            <strong>{{ broker.name }}</strong>
-            <div v-if="broker.document_id" class="sub-text">{{ broker.document_id }}</div>
+        <tr v-for="broker in brokers" :key="broker.id" class="hover:bg-white/5 transition-colors group">
+          
+          <td class="py-4 px-4">
+            <div class="flex flex-col">
+              <span class="font-bold text-white group-hover:text-primary transition-colors text-sm">{{ broker.name }}</span>
+              <span v-if="broker.document_id" class="text-[0.65rem] font-black tracking-widest text-white/30 uppercase mt-0.5">
+                ID: {{ broker.document_id }}
+              </span>
+            </div>
           </td>
-          <td>{{ broker.email || '---' }}</td>
-          <td>
-            <span class="badge-commission">{{ broker.default_commission_rate }}%</span>
-          </td>
-          <td>{{ new Date(broker.created_at).toLocaleDateString() }}</td>
 
-          <td class="action-buttons">
-            <template v-if="authStore.can(permissionKey)">
-              <button @click="openEditModal(broker.id)" class="btn-icon edit" title="Editar Corredor">
-                <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
-              </button>
-              <button @click="deleteBroker(broker.id, broker.name)" class="btn-icon delete" title="Eliminar Corredor">
-                <FontAwesomeIcon icon="fa-solid fa-trash" />
-              </button>
-            </template>
-            <span v-else class="no-actions">No autorizado</span>
+          <td class="py-4 px-4 text-sm text-white/60 font-mono">
+            {{ broker.email || '---' }}
+          </td>
+
+          <td class="py-4 px-4">
+            <div class="inline-flex items-center gap-2 bg-info/10 text-info px-2.5 py-1 rounded-lg border border-info/20 shadow-sm">
+              <span class="text-xs font-black">{{ broker.default_commission_rate }}%</span>
+              <span class="text-[0.6rem] uppercase tracking-tighter opacity-50">Base</span>
+            </div>
+          </td>
+
+          <td class="py-4 px-4 text-[0.7rem] font-bold text-white/40 uppercase tracking-wider">
+            {{ new Date(broker.created_at).toLocaleDateString() }}
+          </td>
+
+          <td class="py-4 px-4">
+            <div class="flex items-center gap-2">
+              <template v-if="authStore.can(permissionKey)">
+                <button 
+                  @click="openEditModal(broker.id)" 
+                  class="w-8 h-8 rounded-lg bg-info/10 text-info flex items-center justify-center transition-all hover:bg-info hover:text-white"
+                  title="Editar Corredor"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
+                </button>
+                <button 
+                  @click="deleteBroker(broker.id, broker.name)" 
+                  class="w-8 h-8 rounded-lg bg-danger/10 text-danger flex items-center justify-center transition-all hover:bg-danger hover:text-white"
+                  title="Eliminar Corredor"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-trash" />
+                </button>
+              </template>
+              <span v-else class="text-[0.6rem] font-black text-white/10 uppercase tracking-[0.2em]">Restringido</span>
+            </div>
           </td>
         </tr>
       </BaseTable>
@@ -152,80 +184,5 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.header-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-}
-
-.header-actions h1 {
-  font-size: 1.6rem;
-  color: var(--color-primary);
-}
-
-.btn-primary {
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
-  padding: 10px 15px;
-  border-radius: 6px;
-  text-decoration: none;
-  font-weight: bold;
-  transition: background-color 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: none;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  background-color: #ffc424;
-}
-
-.sub-text {
-  font-size: 0.75rem;
-  color: #888;
-}
-
-.badge-commission {
-  background: rgba(52, 152, 219, 0.1);
-  color: #3498db;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-weight: bold;
-  font-size: 0.9rem;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 5px;
-  transition: transform 0.2s;
-}
-
-.btn-icon:hover {
-  transform: scale(1.1);
-}
-
-.btn-icon.edit {
-  color: #3498db;
-}
-
-.btn-icon.delete {
-  color: var(--color-danger);
-}
-
-.no-actions {
-  font-size: 0.85rem;
-  opacity: 0.5;
-  font-style: italic;
-}
+/* Estilos migrados a Tailwind y global.css */
 </style>

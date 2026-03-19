@@ -1,21 +1,21 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-
 import api from '@/services/api'
 import notify from '@/services/notify'
 import { useFormValidation } from '@/utils/useFormValidation'
 
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import BaseButton from '@/components/shared/BaseButton.vue'
 
 const props = defineProps({
   show: Boolean,
-  clientId: [Number, String, null], // ID del cliente a editar (null para crear)
+  clientId: [Number, String, null],
 })
 
 const emit = defineEmits(['close', 'saved'])
 
-const { errors, handleAxiosError, getError, clearError } = useFormValidation()
+const { handleAxiosError, getError, clearError } = useFormValidation()
 
 const initialForm = {
   name: '',
@@ -29,44 +29,38 @@ const isLoading = ref(false)
 const isSubmitting = ref(false)
 
 const isEditing = computed(() => !!props.clientId)
-const modalTitle = computed(() => (isEditing.value ? 'Editar Cliente' : 'Nuevo Cliente'))
+const modalTitle = computed(() => (isEditing.value ? 'Configurar Perfil de Cliente' : 'Nueva Alta de Cliente'))
 
 const resetForm = () => {
   Object.assign(form, initialForm)
-  errors.value = {}
+  clearError()
 }
 
 const fetchClient = async (id) => {
   if (!id) return
-
   isLoading.value = true
   try {
     const response = await api.get(`/clients/${id}`)
     Object.assign(form, response.data)
   } catch (error) {
-    notify.error('No se pudo cargar el cliente para edición.')
+    notify.error('Fallo al recuperar datos del perfil.')
     emit('close')
   } finally {
     isLoading.value = false
   }
 }
 
-/**
- * Envía el formulario (Crear o Actualizar).
- * Llamado directamente por el botón en el footer.
- */
 const handleSubmit = async () => {
   isSubmitting.value = true
-
+  clearError()
   try {
     if (isEditing.value) {
       await api.put(`/clients/${props.clientId}`, form)
-      notify.success(`Cliente "${form.name}" actualizado.`)
+      notify.success(`Perfil de "${form.name}" actualizado correctamente.`)
     } else {
       await api.post('/clients', form)
-      notify.success(`Cliente "${form.name}" creado exitosamente.`)
+      notify.success(`Cliente "${form.name}" registrado en la cartera.`)
     }
-
     emit('saved')
     emit('close')
   } catch (error) {
@@ -80,9 +74,7 @@ watch(
   () => props.clientId,
   (newId) => {
     resetForm()
-    if (newId) {
-      fetchClient(newId)
-    }
+    if (newId) fetchClient(newId)
   },
   { immediate: true },
 )
@@ -90,130 +82,81 @@ watch(
 watch(
   () => props.show,
   (newVal) => {
-    if (!newVal) {
-      resetForm()
-    }
+    if (!newVal) resetForm()
   },
 )
 </script>
 
 <template>
   <BaseModal :show="show" :title="modalTitle" @close="emit('close')">
-    <form class="modal-form">
-      <BaseInput
-        v-model="form.name"
-        label="Nombre / Razón Social"
-        name="name"
-        :error="getError('name')"
-        icon="fa-solid fa-user-circle"
-        placeholder="Nombre o Razón Social"
-        required
-        @input="clearError('name')"
+    <div v-if="isLoading" class="py-20 flex flex-col items-center justify-center gap-4">
+       <div class="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+       <p class="text-[0.65rem] font-bold uppercase tracking-widest text-primary/40">Sincronizando perfil...</p>
+    </div>
+
+    <form v-else @submit.prevent="handleSubmit" class="space-y-6">
+      <!-- Identidad -->
+      <BaseInput 
+        v-model="form.name" 
+        label="Nombre Completo / Razón Social" 
+        name="name" 
+        :error="getError('name')" 
+        icon="fa-solid fa-id-card" 
+        placeholder="Ej: Inversiones Globales C.A." 
+        required 
+        @input="clearError('name')" 
       />
 
-      <BaseInput
-        v-model="form.email"
-        label="Email"
-        name="email"
-        type="email"
-        :error="getError('email')"
-        icon="fa-solid fa-envelope"
-        placeholder="contacto@cliente.com"
-        @input="clearError('email')"
-      />
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <BaseInput 
+          v-model="form.email" 
+          label="Correo Electrónico" 
+          name="email" 
+          type="email" 
+          :error="getError('email')" 
+          icon="fa-solid fa-at" 
+          placeholder="contacto@empresa.com" 
+          @input="clearError('email')" 
+        />
+        
+        <BaseInput 
+          v-model="form.phone" 
+          label="Teléfono de Contacto" 
+          name="phone" 
+          :error="getError('phone')" 
+          icon="fa-solid fa-mobile-screen" 
+          placeholder="+58 412..." 
+          @input="clearError('phone')" 
+        />
+      </div>
 
-      <BaseInput
-        v-model="form.phone"
-        label="Teléfono"
-        name="phone"
-        :error="getError('phone')"
-        icon="fa-solid fa-phone"
-        placeholder="+XX XXX XXX XX XX"
-        @input="clearError('phone')"
-      />
-
-      <div class="form-group">
-        <label for="details">Detalles / Notas</label>
-        <textarea
-          id="details"
-          v-model="form.details"
-          rows="4"
-          class="custom-textarea"
-          placeholder="Notas importantes sobre el cliente"
+      <!-- Notas Premium -->
+      <div class="space-y-2 group">
+        <label for="details" class="inline-block text-[0.7rem] font-black uppercase tracking-[0.15em] text-white/40 group-focus-within:text-primary transition-colors">
+          Observaciones del Cliente
+        </label>
+        <textarea 
+          id="details" 
+          v-model="form.details" 
+          name="details" 
+          rows="3" 
+          class="w-full bg-white/[0.03] border border-white/5 p-4 text-sm text-white rounded-xl outline-none focus:bg-white/[0.05] focus:border-primary/50 transition-all placeholder:text-white/10" 
+          placeholder="Anotaciones extra sobre el perfil comercial..."
+          :class="{ '!border-danger': getError('details') }" 
+          @input="clearError('details')"
         ></textarea>
+        <p v-if="getError('details')" class="text-[0.65rem] font-bold text-danger uppercase tracking-wider ml-1">{{ getError('details') }}</p>
       </div>
     </form>
 
     <template #footer>
-      <button @click="emit('close')" type="button" class="btn-cancel-modal">Cancelar</button>
-      <button
-        @click="handleSubmit"
-        type="button"
-        class="btn-submit-modal"
-        :disabled="isSubmitting || isLoading"
-      >
-        <span v-if="isSubmitting">Guardando...</span>
-        <span v-else>{{ isEditing ? 'Guardar Cambios' : 'Crear Cliente' }}</span>
-      </button>
+      <div class="flex flex-col-reverse md:flex-row justify-end gap-3 w-full">
+        <BaseButton variant="secondary" outline @click="emit('close')" :disabled="isSubmitting">Cancelar</BaseButton>
+        <BaseButton variant="primary" @click="handleSubmit" :disabled="isSubmitting">
+          <span v-if="isSubmitting">Guardando...</span>
+          <span v-else>{{ isEditing ? 'Actualizar Perfil' : 'Registrar Cliente' }}</span>
+        </BaseButton>
+      </div>
     </template>
   </BaseModal>
 </template>
-
-<style scoped>
-/* Estilos para el formulario dentro del modal */
-.modal-form {
-  /* Mantiene el flujo de los inputs */
-}
-
-/* Estilo para el textarea (replicando BaseInput) */
-.custom-textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-background);
-  color: var(--color-text-light);
-  border-radius: 6px;
-  resize: vertical;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-
-.custom-textarea:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary);
-  outline: none;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-/* Estilos para los botones del footer */
-.btn-cancel-modal {
-  background: none;
-  border: none;
-  color: #aaa;
-  padding: 10px 15px;
-  cursor: pointer;
-  margin-right: 10px;
-}
-
-.btn-submit-modal {
-  padding: 10px 20px;
-  background-color: var(--color-success);
-  color: var(--color-secondary);
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.btn-submit-modal:hover:not(:disabled) {
-  background-color: #0dcf92;
-}
-.btn-submit-modal:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</style>

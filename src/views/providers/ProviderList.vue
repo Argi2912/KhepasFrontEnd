@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import alert from '@/services/alert'
@@ -32,22 +32,34 @@ const isLoading = ref(false)
 // Definición de Columnas
 const tableHeaders = [
   { key: 'name', label: 'Proveedor / Contacto' },
-  { key: 'financials', label: 'Por Pagar' },
-  { key: 'contact', label: 'Contacto' },
+  { key: 'financials', label: 'Saldos Pendientes' },
+  { key: 'contact', label: 'Vía de Contacto' },
   { key: 'status', label: 'Estado' },
+  { key: 'actions', label: '' },
 ]
+
+/**
+ * Estadísticas Rápidas
+ */
+const totalProviders = computed(() => pagination.value.total || providers.value.length)
+const activeProviders = computed(() => providers.value.filter(p => p.is_active).length)
+const totalDebtUSD = computed(() => {
+  return providers.value.reduce((acc, p) => {
+    const usdBal = p.balances?.find(b => b.currency_code === 'USD' || b.currency_code === 'USDT')
+    return acc + (usdBal ? Number(usdBal.amount) : 0)
+  }, 0)
+})
 
 const fetchProviders = async (page = 1) => {
   isLoading.value = true
   const params = { page: page, ...filters.value }
-
   try {
     const response = await api.get('/providers', { params })
     providers.value = response.data.data
     const { data, ...pagData } = response.data
     pagination.value = pagData
   } catch (error) {
-    notify.error('Error al cargar proveedores.')
+    notify.error('Error al sincronizar el directorio de proveedores.')
   } finally {
     isLoading.value = false
   }
@@ -70,23 +82,20 @@ const openBalanceModal = (provider) => {
 }
 
 const deleteProvider = async (providerId, providerName) => {
-  if (!authStore.can(permissionKey)) return notify.error('No autorizado.')
-
-  if (await alert.confirm(`¿Eliminar a ${providerName}?`, 'Esto afectará el historial contable.')) {
+  if (!authStore.can(permissionKey)) return notify.error('Permisos insuficientes.')
+  if (await alert.confirm(`¿Remover a ${providerName}?`, 'Esta acción podría afectar cuadres históricos.')) {
     try {
       await api.delete(`/providers/${providerId}`)
-      notify.success('Eliminado correctamente.')
+      notify.success('Proveedor archivado correctamente.')
       fetchProviders(pagination.value.current_page)
     } catch (error) {
-      console.error(error)
-      notify.error('No se pudo eliminar.')
+      notify.error('Fallo al eliminar: Verifique dependencias activas.')
     }
   }
 }
 
-// ✅ CORRECCIÓN 1: Usamos un formateador SOLO de números, sin símbolo forzado.
 const formatNumber = (value) => {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('es-VE', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(value || 0)
@@ -97,87 +106,174 @@ onMounted(() => fetchProviders())
 </script>
 
 <template>
-  <div class="provider-list">
-    <div class="header-actions">
-      <h1>Proveedores</h1>
-      <button v-if="authStore.can(permissionKey)" @click="openCreateModal" class="btn-primary">
-        <FontAwesomeIcon icon="fa-solid fa-circle-plus" /> Nuevo Proveedor
+  <div class="space-y-10 animate-premium-in pb-12">
+    
+    <!-- Header Premium -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+          <span class="w-1.5 h-10 bg-primary rounded-full"></span>
+          Gestión de <span class="text-gradient-primary">Proveedores</span>
+        </h1>
+        <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Administración financiera de aliados comerciales</p>
+      </div>
+
+      <button 
+        v-if="authStore.can(permissionKey)" 
+        @click="openCreateModal" 
+        class="bg-primary hover:bg-primary-dark text-secondary px-6 py-3.5 rounded-2xl font-black transition-all shadow-[0_10px_30px_rgba(247,166,0,0.2)] flex items-center gap-3 group active:scale-95"
+      >
+        <FontAwesomeIcon icon="fa-solid fa-truck-fast" class="text-lg group-hover:translate-x-1 transition-transform" /> 
+        <span>Nuevo Proveedor</span>
       </button>
     </div>
 
-    <FilterBar @update:filters="filters = $event" />
+    <!-- Panel de KPI v5 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Card: Total -->
+      <div class="premium-card p-6 bg-white/[0.02]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/10 shadow-inner">
+            <FontAwesomeIcon icon="fa-solid fa-address-book" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Directorio Activo</span>
+            <span class="text-xs font-bold text-primary/60">Proveedores registrados</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-4xl font-black text-white tracking-tighter">{{ totalProviders }}</span>
+          <span class="text-xs font-bold text-white/20 uppercase tracking-widest">Entidades</span>
+        </div>
+      </div>
 
-    <BaseCard>
-      <BaseTable :headers="tableHeaders" :data="providers" :is-loading="isLoading">
-        <tr v-for="provider in providers" :key="provider.id">
+      <!-- Card: Deuda USD -->
+      <div class="premium-card p-6 border-danger/5 bg-danger/[0.01]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-danger/10 flex items-center justify-center text-danger border border-danger/10 shadow-inner">
+             <FontAwesomeIcon icon="fa-solid fa-file-invoice-dollar" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Compromisos Pendientes</span>
+            <span class="text-xs font-bold text-danger/60">Balance consolidado USD</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-xs font-black text-danger/60 mr-1">$</span>
+          <span class="text-4xl font-black text-white tracking-tighter">{{ formatNumber(totalDebtUSD).split(',')[0] }}</span>
+          <span class="text-lg font-bold text-white/20 tracking-tighter">.{{ formatNumber(totalDebtUSD).split(',')[1] }}</span>
+        </div>
+      </div>
 
-          <td>
-            <div class="provider-info">
-              <span class="name">{{ provider.name }}</span>
-              <span class="email">{{ provider.email }}</span>
-            </div>
-          </td>
+      <!-- Card: Operatividad -->
+      <div class="premium-card p-6 bg-white/[0.02]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center text-success border border-success/10 shadow-inner text-xl">
+             🏢
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Estatus Operativo</span>
+            <span class="text-xs font-bold text-success/60">Proveedores en servicio</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-4xl font-black text-white tracking-tighter">{{ activeProviders }}</span>
+          <span class="text-xs font-bold text-white/20 uppercase tracking-widest">En Línea</span>
+        </div>
+      </div>
+    </div>
 
-          <td>
-            <div class="financial-cell">
-              <div class="row header-row">
-                <span class="label">Por Pagar:</span>
+    <!-- Listado con Filtros y Tabla v5 -->
+    <div class="space-y-6">
+      <FilterBar @update:filters="filters = $event" placeholder="Buscar por nombre, contacto o correo..." />
+
+      <BaseCard title="Central de Proveedores" subtitle="Monitoreo multimoneda y gestión de perfiles comerciales.">
+        <BaseTable :headers="tableHeaders" :data="providers" :is-loading="isLoading">
+          <tr v-for="provider in providers" :key="provider.id" class="group">
+            
+            <!-- Nombre -->
+            <td class="font-bold text-white transition-colors group-hover:text-primary">
+              <div class="flex flex-col">
+                <span class="text-base tracking-tight">{{ provider.name }}</span>
+                <span class="text-[0.65rem] font-black text-white/20 uppercase tracking-widest">{{ provider.email || 'SIN CORREO' }}</span>
               </div>
+            </td>
 
-              <div v-if="provider.balances && provider.balances.length > 0" class="balances-list">
-                <div v-for="(bal, idx) in provider.balances" :key="idx" class="balance-item">
-                  <span :class="['amount', bal.currency_code === 'USD' ? 'text-green' : 'text-blue']">
-                    {{ bal.symbol }} {{ formatNumber(bal.amount) }}
-                  </span>
-                  <span class="currency-tag">{{ bal.currency_code }}</span>
-                </div>
+            <!-- Balances -->
+            <td>
+              <div class="flex flex-wrap gap-2">
+                <template v-if="provider.balances && provider.balances.length > 0">
+                  <div v-for="(bal, idx) in provider.balances" :key="idx" 
+                       class="bg-white/[0.03] border border-white/5 px-2.5 py-1.5 rounded-xl flex items-baseline gap-2 group/bal hover:bg-white/[0.05] transition-all">
+                    <span class="text-[0.6rem] font-black uppercase tracking-widest" :class="bal.currency_code === 'USD' ? 'text-success' : 'text-info'">{{ bal.currency_code }}</span>
+                    <span class="text-xs font-black text-white tracking-tighter">{{ bal.symbol }} {{ formatNumber(bal.amount) }}</span>
+                  </div>
+                </template>
+                <span v-else class="text-[0.6rem] font-black text-white/10 uppercase tracking-widest italic py-2">Sin saldos pendientes</span>
               </div>
+            </td>
 
-              <div v-else class="row">
-                <span class="amount zero">0.00</span>
+            <!-- Contacto -->
+            <td>
+              <div class="flex flex-col gap-1">
+                <span class="text-sm font-mono text-white/60 flex items-center gap-2">
+                  <FontAwesomeIcon icon="fa-solid fa-phone-volume" class="text-[0.6rem] text-primary/40" />
+                  {{ provider.phone || 'N/A' }}
+                </span>
+                <span class="text-[0.65rem] font-bold text-white/20 uppercase tracking-widest truncate max-w-[150px]">
+                  Atención: {{ provider.contact_person || 'No especificado' }}
+                </span>
               </div>
-            </div>
-          </td>
+            </td>
 
-          <td>
-            <div class="contact-info">
-              <span v-if="provider.phone">{{ provider.phone }}</span>
-              <span v-if="provider.contact_person" class="contact-person">
-                <FontAwesomeIcon icon="fa-solid fa-user-tag" /> {{ provider.contact_person }}
+            <!-- Estado -->
+            <td>
+              <span 
+                class="px-3 py-1.5 rounded-xl text-[0.6rem] font-black uppercase tracking-[0.2em] transition-all border"
+                :class="provider.is_active 
+                  ? 'bg-success/5 text-success border-success/20 shadow-[0_0_15px_rgba(46,204,113,0.05)]' 
+                  : 'bg-white/5 text-white/20 border-white/5 opacity-50'"
+              >
+                {{ provider.is_active ? 'Activo' : 'Pausado' }}
               </span>
-            </div>
-          </td>
+            </td>
 
-          <td>
-            <span :class="['status-badge', provider.is_active ? 'active' : 'inactive']">
-              {{ provider.is_active ? 'Activo' : 'Inactivo' }}
-            </span>
-          </td>
+            <!-- Acciones -->
+            <td>
+              <div class="flex justify-end gap-2 opacity-10 group-hover:opacity-100 transition-opacity duration-300">
+                <template v-if="authStore.can(permissionKey)">
+                  <button 
+                    @click="openBalanceModal(provider)" 
+                    class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center transition-all hover:bg-primary hover:text-secondary hover:shadow-lg active:scale-90"
+                    title="Ajustar Balances"
+                  >
+                    <FontAwesomeIcon icon="fa-solid fa-scale-balanced" />
+                  </button>
+                  <button 
+                    @click="openEditModal(provider.id)" 
+                    class="w-9 h-9 rounded-xl bg-info/10 text-info flex items-center justify-center transition-all hover:bg-info hover:text-white hover:shadow-lg active:scale-90"
+                    title="Editar Proveedor"
+                  >
+                    <FontAwesomeIcon icon="fa-solid fa-user-pen" />
+                  </button>
+                  <button 
+                    @click="deleteProvider(provider.id, provider.name)" 
+                    class="w-9 h-9 rounded-xl bg-danger/10 text-danger flex items-center justify-center transition-all hover:bg-danger hover:text-white hover:shadow-lg active:scale-90"
+                    title="Eliminar"
+                  >
+                    <FontAwesomeIcon icon="fa-solid fa-trash-can" />
+                  </button>
+                </template>
+                <span v-else class="text-[0.55rem] font-black text-white/10 uppercase tracking-widest py-2">Restringido</span>
+              </div>
+            </td>
+          </tr>
+        </BaseTable>
+      </BaseCard>
+    </div>
 
-          <td class="actions-cell">
-            <template v-if="authStore.can(permissionKey)">
-              <button @click="openBalanceModal(provider)" class="btn-icon money" title="Gestionar Saldo">
-                <FontAwesomeIcon icon="fa-solid fa-wallet" />
-              </button>
-
-              <button @click="openEditModal(provider.id)" class="btn-icon edit" title="Editar">
-                <FontAwesomeIcon icon="fa-solid fa-pen" />
-              </button>
-
-              <button @click="deleteProvider(provider.id, provider.name)" class="btn-icon delete" title="Eliminar">
-                <FontAwesomeIcon icon="fa-solid fa-trash" />
-              </button>
-            </template>
-          </td>
-
-        </tr>
-      </BaseTable>
-
-      <template #footer>
-        <Pagination :pagination="pagination" @change-page="fetchProviders" />
-      </template>
-    </BaseCard>
-
+    <!-- Modales Premium -->
     <ProviderFormModal :show="showProviderModal" :provider-id="providerIdToEdit" @close="showProviderModal = false"
       @saved="fetchProviders(pagination.current_page)" />
 
@@ -186,161 +282,3 @@ onMounted(() => fetchProviders())
       @saved="fetchProviders(pagination.current_page)" />
   </div>
 </template>
-
-<style scoped>
-.header-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: #000;
-  padding: 10px 15px;
-  border-radius: 6px;
-  font-weight: bold;
-  border: none;
-  cursor: pointer;
-}
-
-/* Estilos de Celdas */
-.provider-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.provider-info .name {
-  font-weight: bold;
-  color: #fff;
-}
-
-.provider-info .email {
-  font-size: 0.85rem;
-  color: #aaa;
-}
-
-.contact-info {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.9rem;
-}
-
-.contact-person {
-  color: #888;
-  font-size: 0.8rem;
-  margin-top: 2px;
-}
-
-/* 🔥 ESTILOS FINANCIEROS CORREGIDOS 🔥 */
-.financial-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 0.9rem;
-}
-
-.header-row {
-  margin-bottom: 2px;
-}
-
-.label {
-  color: #888;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  font-weight: bold;
-}
-
-.balances-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.balance-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.amount {
-  font-weight: bold;
-  font-size: 0.95rem;
-}
-
-/* Colores Dinámicos */
-.text-green {
-  color: #27ae60;
-}
-
-/* Dólares */
-.text-blue {
-  color: #3498db;
-}
-
-/* Bolívares u otras */
-.zero {
-  color: #555;
-}
-
-.currency-tag {
-  font-size: 0.65rem;
-  color: #aaa;
-  background: #2c2f33;
-  padding: 1px 4px;
-  border-radius: 3px;
-  border: 1px solid #444;
-}
-
-/* Badges */
-.status-badge {
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: bold;
-}
-
-.status-badge.active {
-  background: rgba(39, 174, 96, 0.2);
-  color: #27ae60;
-}
-
-.status-badge.inactive {
-  background: rgba(192, 57, 43, 0.2);
-  color: #c0392b;
-}
-
-/* Botones */
-.actions-cell {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 5px;
-  transition: 0.2s;
-}
-
-.btn-icon.money {
-  color: #f1c40f;
-}
-
-.btn-icon.money:hover {
-  color: #f39c12;
-  background: rgba(241, 196, 15, 0.1);
-  border-radius: 4px;
-}
-
-.btn-icon.edit {
-  color: #3498db;
-}
-
-.btn-icon.delete {
-  color: #e74c3c;
-}
-</style>

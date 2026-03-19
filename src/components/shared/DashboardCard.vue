@@ -5,28 +5,17 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 const props = defineProps({
   title: String,
   value: [String, Number],
-  currencyCode: {
-    type: String,
-    default: 'USD',
-  },
+  currencyCode: { type: String, default: 'USD' },
   subtitle: String,
-  icon: String,
-  colorClass: String,
+  icon: [String, Array],
+  variant: { type: String, default: 'primary' }, // 'primary', 'success', 'danger', 'info'
 })
 
-/**
- * 🚨 Función de formato segura: Reemplaza USDT por USD para el formatter.
- */
 const formatValue = computed(() => {
   let rawValue = props.value
   let currency = props.currencyCode
-
-  // Si el valor ya viene como string (formateado en el padre), solo se devuelve
   if (typeof rawValue === 'string') return rawValue
-
-  // FIX: Usar USD para el formato cuando la divisa es USDT.
   const currencyCode = currency === 'USDT' ? 'USD' : currency
-
   if (rawValue === null || rawValue === undefined) rawValue = 0
 
   try {
@@ -37,88 +26,37 @@ const formatValue = computed(() => {
       maximumFractionDigits: 2,
     }).format(rawValue)
   } catch (e) {
-    // Fallback si el código es inválido (aunque el FIX debería evitarlo)
-    console.error('Error formatting currency:', currency, e)
-    return `${currency} ${rawValue}`
+    return `${currency} ${Number(rawValue).toFixed(2)}`
   }
 })
+
+const variantClasses = {
+  primary: 'bg-primary/10 text-primary border-primary/20 shadow-[0_0_20px_rgba(247,166,0,0.1)]',
+  success: 'bg-success/10 text-success border-success/20 shadow-[0_0_20px_rgba(46,204,113,0.1)]',
+  danger: 'bg-danger/10 text-danger border-danger/20 shadow-[0_0_20px_rgba(231,76,60,0.1)]',
+  info: 'bg-info/10 text-info border-info/20 shadow-[0_0_20px_rgba(52,152,219,0.1)]',
+}
 </script>
 
 <template>
-  <div :class="['dashboard-card', colorClass]">
-    <div class="kpi-icon-wrapper">
-      <FontAwesomeIcon :icon="icon" class="kpi-icon" />
+  <div class="premium-card p-6 flex items-center gap-5 transition-all duration-500 hover:scale-[1.02]">
+    <!-- Icon Container -->
+    <div :class="['w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0', variantClasses[variant] || variantClasses.primary]">
+      <FontAwesomeIcon :icon="icon" class="text-xl" />
     </div>
-    <div class="kpi-content">
-      <p class="kpi-title">{{ title }}</p>
-      <h3 class="kpi-value">{{ formatValue }}</h3>
-      <p v-if="subtitle" class="kpi-subtitle">{{ subtitle }}</p>
+
+    <!-- Content -->
+    <div class="flex flex-col min-w-0">
+      <p class="text-[0.6rem] font-black uppercase tracking-[0.2em] text-white/30 mb-1 truncate">{{ title }}</p>
+      <h3 class="text-2xl font-black text-white tracking-tighter leading-none mb-1 truncate">
+        {{ formatValue.split(',')[0] }}<span class="text-[0.6em] opacity-30">,{{ formatValue.split(',')[1] || '00' }}</span>
+      </h3>
+      <p v-if="subtitle" class="text-[0.65rem] font-bold text-white/20 uppercase tracking-widest mt-1 truncate">
+        {{ subtitle }}
+      </p>
     </div>
+    
+    <!-- Decorative Gradient Glow -->
+    <div class="absolute -right-4 -top-4 w-16 h-16 bg-white/5 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
   </div>
 </template>
-
-<style scoped>
-/* Estilos necesarios para la card */
-.dashboard-card {
-  background-color: var(--color-secondary);
-  padding: 20px;
-  border-radius: 8px;
-  border-left: 5px solid;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s;
-}
-
-.dashboard-card:hover {
-  transform: translateY(-2px);
-}
-
-.kpi-icon-wrapper {
-  background-color: var(--color-background-soft);
-  padding: 10px;
-  border-radius: 50%;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.kpi-icon {
-  font-size: 1.5rem;
-  color: var(--color-primary);
-}
-
-.kpi-title {
-  font-size: 0.9rem;
-  opacity: 0.8;
-  margin-bottom: 2px;
-}
-
-.kpi-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text-light);
-}
-
-.kpi-subtitle {
-  font-size: 0.75rem;
-  opacity: 0.6;
-}
-
-/* Colores Dinámicos (Ejemplos, el borde es manejado por colorClass) */
-.balance-neto {
-  border-color: #f7a600; /* Primary */
-}
-.por-cobrar {
-  border-color: #2ecc71; /* Success */
-}
-.por-pagar {
-  border-color: #e74c3c; /* Danger */
-}
-.cash-card {
-  border-color: #3498db;
-}
-</style>

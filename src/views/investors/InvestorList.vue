@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import alert from '@/services/alert'
@@ -32,25 +32,34 @@ const filters = ref({})
 const isLoading = ref(false)
 
 const tableHeaders = [
-  { key: 'name', label: 'Nombre Completo' },
-  { key: 'current_balance', label: 'Capital vs Disponible' },
-  { key: 'phone', label: 'Contacto' },
+  { key: 'name', label: 'Inversionista / Identidad' },
+  { key: 'current_balance', label: 'Estructura de Capital' },
+  { key: 'contact', label: 'Contacto Directo' },
   { key: 'status', label: 'Estado' },
   { key: 'actions', label: '' },
 ]
 
+/**
+ * Estadísticas Consolidadas
+ */
+const totalCapital = computed(() => {
+  return investors.value.reduce((acc, i) => acc + (Number(i.capital_historico) || 0), 0)
+})
+const totalLiquid = computed(() => {
+  return investors.value.reduce((acc, i) => acc + (Number(i.available_balance || i.current_balance) || 0), 0)
+})
+const activeCount = computed(() => investors.value.filter(i => i.is_active).length)
+
 const fetchInvestors = async (page = 1) => {
   isLoading.value = true
   const params = { page, ...filters.value }
-
   try {
     const response = await api.get('/investors', { params })
     investors.value = response.data.data
     const { data, ...pagData } = response.data
     pagination.value = pagData
   } catch (error) {
-    console.error(error)
-    notify.error('Error al cargar inversionistas.')
+    notify.error('Fallo al sincronizar la cartera de inversionistas.')
   } finally {
     isLoading.value = false
   }
@@ -66,37 +75,30 @@ const openEditModal = (id) => {
   showInvestorModal.value = true
 }
 
-// Abrir Modal para INGRESAR dinero
 const openBalanceModal = (investor) => {
   selectedInvestor.value = investor
   showBalanceModal.value = true
 }
 
-// Abrir Modal para MOVER dinero
 const openTransferModal = (investor) => {
   selectedInvestor.value = investor
   showTransferModal.value = true
 }
 
-// Formato de moneda
 const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
+  return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD' }).format(value || 0)
 }
 
 const deleteInvestor = async (id, name) => {
-  if (!authStore.can(permissionKey)) {
-    notify.error('No tienes permiso.')
-    return
-  }
-  const confirmed = await alert.confirm(`¿Eliminar al inversionista "${name}"?`)
+  if (!authStore.can(permissionKey)) return notify.error('Acceso restringido.')
+  const confirmed = await alert.confirm(`¿Remover inversionista "${name}"?`, 'Esto archivará su historial de aportes.')
   if (!confirmed) return
-
   try {
     await api.delete(`/investors/${id}`)
-    notify.success('Inversionista eliminado.')
+    notify.success('Inversionista removido del sistema.')
     fetchInvestors(pagination.value.current_page || 1)
   } catch (error) {
-    notify.error('No se pudo eliminar.')
+    notify.error('Fallo al eliminar: Verifique si posee capital activo.')
   }
 }
 
@@ -105,188 +107,196 @@ onMounted(() => fetchInvestors())
 </script>
 
 <template>
-  <div class="investor-list">
-    <div class="header-actions">
-      <h1>Inversionistas</h1>
-      <button v-if="authStore.can(permissionKey)" @click="openCreateModal" class="btn-primary">
-        <FontAwesomeIcon icon="fa-solid fa-user-plus" /> Registrar Inversionista
+  <div class="space-y-10 animate-premium-in pb-12">
+    
+    <!-- Header Premium -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+          <span class="w-1.5 h-10 bg-primary rounded-full"></span>
+          Gestión de <span class="text-gradient-primary">Inversionistas</span>
+        </h1>
+        <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Administración de capital social y liquidez</p>
+      </div>
+
+      <button 
+        v-if="authStore.can(permissionKey)" 
+        @click="openCreateModal" 
+        class="bg-primary hover:bg-primary-dark text-secondary px-6 py-3.5 rounded-2xl font-black transition-all shadow-[0_10px_30px_rgba(247,166,0,0.2)] flex items-center gap-3 group active:scale-95"
+      >
+        <FontAwesomeIcon icon="fa-solid fa-hand-holding-dollar" class="text-lg group-hover:-translate-y-1 transition-transform duration-500" /> 
+        <span>Nuevo Inversionista</span>
       </button>
     </div>
 
-    <FilterBar @update:filters="filters = $event" />
+    <!-- Panel de KPI v5 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Card: Capital Histórico -->
+      <div class="premium-card p-6 bg-white/[0.02]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-info/10 flex items-center justify-center text-info border border-info/10 shadow-inner">
+            <FontAwesomeIcon icon="fa-solid fa-vault" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Capital Histórico</span>
+            <span class="text-xs font-bold text-info/60">Aportes totales registrados</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-xs font-black text-info/60 mr-1">$</span>
+          <span class="text-4xl font-black text-white tracking-tighter">{{ formatCurrency(totalCapital).split(',')[0].replace('$', '') }}</span>
+          <span class="text-lg font-bold text-white/20 tracking-tighter">.{{ formatCurrency(totalCapital).split(',')[1] }}</span>
+        </div>
+      </div>
 
-    <BaseCard title="Listado de Inversionistas">
-      <BaseTable :headers="tableHeaders" :data="investors" :is-loading="isLoading">
-        <tr v-for="investor in investors" :key="investor.id">
+      <!-- Card: Liquidez Disponible -->
+      <div class="premium-card p-6 border-success/5 bg-success/[0.01]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center text-success border border-success/10 shadow-inner">
+             <FontAwesomeIcon icon="fa-solid fa-money-bill-trend-up" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Liquidez Disponible</span>
+            <span class="text-xs font-bold text-success/60">Fondo líquido para operaciones</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-xs font-black text-success/60 mr-1">$</span>
+          <span class="text-4xl font-black text-white tracking-tighter">{{ formatCurrency(totalLiquid).split(',')[0].replace('$', '') }}</span>
+          <span class="text-lg font-bold text-white/20 tracking-tighter">.{{ formatCurrency(totalLiquid).split(',')[1] }}</span>
+        </div>
+      </div>
 
-          <td>
-            <div class="user-info">
-              <strong>{{ investor.name }}</strong>
-              <small class="text-muted" v-if="investor.alias">({{ investor.alias }})</small>
-            </div>
-          </td>
+      <!-- Card: Accionistas Activos -->
+      <div class="premium-card p-6 bg-white/[0.02]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/10 shadow-inner">
+             <FontAwesomeIcon icon="fa-solid fa-users-gear" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Estructura Social</span>
+            <span class="text-xs font-bold text-primary/60">Socios en participación</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-4xl font-black text-white tracking-tighter">{{ activeCount }}</span>
+          <span class="text-xs font-bold text-white/20 uppercase tracking-widest">Activos</span>
+        </div>
+      </div>
+    </div>
 
-          <td>
-            <div class="balance-cell">
+    <!-- Listado con Filtros y Tabla v5 -->
+    <div class="space-y-6">
+      <FilterBar @update:filters="filters = $event" placeholder="Buscar por nombre, alias o identificación..." />
 
-              <div class="capital-row">
-                <span class="label">Capital Base:</span>
-                <span class="value-base">{{ formatCurrency(investor.capital_historico) }}</span>
+      <BaseCard title="Directorio de Accionistas" subtitle="Visión detallada de aportes, liquidaciones y saldos remanentes.">
+        <BaseTable :headers="tableHeaders" :data="investors" :is-loading="isLoading">
+          <tr v-for="investor in investors" :key="investor.id" class="group">
+            
+            <!-- Nombre -->
+            <td class="font-bold text-white transition-colors group-hover:text-primary">
+              <div class="flex flex-col">
+                <span class="text-base tracking-tight leading-tight">{{ investor.name }}</span>
+                <span v-if="investor.alias" class="text-[0.6rem] font-black text-primary/40 uppercase tracking-[0.2em] mt-0.5">"{{ investor.alias }}"</span>
               </div>
+            </td>
 
-              <div class="balance-row">
-                <span class="label">Disp. Mover:</span>
-                <span class="value-liquid">{{ formatCurrency(investor.available_balance || investor.current_balance)
-                  }}</span>
+            <!-- Capital -->
+            <td>
+              <div class="flex flex-col gap-1.5 min-w-[180px]">
+                <div class="flex items-center justify-between text-[0.6rem] font-black uppercase tracking-widest px-2 py-0.5 bg-white/[0.02] rounded-lg border border-white/5 group-hover:border-info/20 group-hover:bg-info/[0.02] transition-all">
+                  <span class="text-white/20">Base:</span>
+                  <span class="text-info/80">{{ formatCurrency(investor.capital_historico) }}</span>
+                </div>
+                <div class="flex items-center justify-between text-[0.65rem] font-black uppercase tracking-widest px-2 py-1 bg-success/[0.03] rounded-lg border border-success/10 group-hover:border-success/30 transition-all">
+                  <span class="text-success/40">Disponible:</span>
+                  <span class="text-success">{{ formatCurrency(investor.available_balance || investor.current_balance) }}</span>
+                </div>
               </div>
-            </div>
-          </td>
+            </td>
 
-          <td>
-            <div style="display:flex; flex-direction:column; font-size:0.85rem;">
-              <span>{{ investor.email }}</span>
-              <span class="text-muted">{{ investor.phone }}</span>
-            </div>
-          </td>
+            <!-- Contacto -->
+            <td>
+              <div class="flex flex-col gap-1">
+                <span class="text-xs font-mono text-white/60 flex items-center gap-2">
+                  <FontAwesomeIcon icon="fa-solid fa-envelope" class="text-[0.6rem] text-white/20" />
+                  {{ investor.email || 'N/A' }}
+                </span>
+                <span class="text-[0.65rem] font-bold text-white/30 flex items-center gap-2">
+                   <FontAwesomeIcon icon="fa-solid fa-phone" class="text-[0.6rem] text-white/10" />
+                   {{ investor.phone || '---' }}
+                </span>
+              </div>
+            </td>
 
-          <td>
-            <span class="badge" :class="investor.is_active ? 'badge-success' : 'badge-danger'">
-              {{ investor.is_active ? 'Activo' : 'Inactivo' }}
-            </span>
-          </td>
+            <!-- Estado -->
+            <td>
+              <span 
+                class="px-3 py-1.5 rounded-xl text-[0.6rem] font-black uppercase tracking-[0.2em] transition-all border"
+                :class="investor.is_active 
+                  ? 'bg-success/5 text-success border-success/20 shadow-[0_0_15px_rgba(46,204,113,0.05)]' 
+                  : 'bg-white/5 text-white/20 border-white/5 opacity-50'"
+              >
+                {{ investor.is_active ? 'Activo' : 'Retirado' }}
+              </span>
+            </td>
 
-          <td class="action-buttons">
+            <!-- Acciones -->
+            <td>
+              <div class="flex justify-end gap-2 opacity-10 group-hover:opacity-100 transition-all duration-300">
+                <button 
+                  @click="openBalanceModal(investor)" 
+                  class="w-9 h-9 rounded-xl bg-success/10 text-success flex items-center justify-center transition-all hover:bg-success hover:text-white hover:shadow-lg active:scale-90"
+                  title="Inyectar Capital"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-circle-plus" />
+                </button>
 
-            <button @click="openBalanceModal(investor)" class="btn-icon add-funds"
-              title="Ingresar Capital (Aumenta Base)">
-              <FontAwesomeIcon icon="fa-solid fa-circle-dollar-to-slot" />
-            </button>
+                <button 
+                  @click="openTransferModal(investor)" 
+                  class="w-9 h-9 rounded-xl bg-warning/10 text-warning flex items-center justify-center transition-all hover:bg-warning hover:text-secondary hover:shadow-lg active:scale-90"
+                  title="Retiro de Liquidez"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-right-from-bracket" />
+                </button>
 
-            <button @click="openTransferModal(investor)" class="btn-icon transfer"
-              title="Mover a Mis Cuentas (Solo Liquidez)">
-              <FontAwesomeIcon icon="fa-solid fa-money-bill-transfer" />
-            </button>
+                <template v-if="authStore.can(permissionKey)">
+                  <button 
+                    @click="openEditModal(investor.id)" 
+                    class="w-9 h-9 rounded-xl bg-info/10 text-info flex items-center justify-center transition-all hover:bg-info hover:text-white hover:shadow-lg active:scale-90"
+                    title="Configurar Perfil"
+                  >
+                    <FontAwesomeIcon icon="fa-solid fa-user-gear" />
+                  </button>
+                  <button 
+                    @click="deleteInvestor(investor.id, investor.name)" 
+                    class="w-9 h-9 rounded-xl bg-danger/10 text-danger flex items-center justify-center transition-all hover:bg-danger hover:text-white hover:shadow-lg active:scale-90"
+                    title="Eliminar"
+                  >
+                    <FontAwesomeIcon icon="fa-solid fa-trash-can" />
+                  </button>
+                </template>
+              </div>
+            </td>
+          </tr>
+        </BaseTable>
 
-            <template v-if="authStore.can(permissionKey)">
-              <button @click="openEditModal(investor.id)" class="btn-icon edit" title="Editar">
-                <FontAwesomeIcon icon="fa-solid fa-pen-to-square" />
-              </button>
-              <button @click="deleteInvestor(investor.id, investor.name)" class="btn-icon delete" title="Eliminar">
-                <FontAwesomeIcon icon="fa-solid fa-trash" />
-              </button>
-            </template>
-          </td>
-        </tr>
-      </BaseTable>
+        <template #footer>
+           <Pagination :pagination="pagination" @change-page="fetchInvestors" />
+        </template>
+      </BaseCard>
+    </div>
 
-      <template #footer>
-        <Pagination :pagination="pagination" @change-page="fetchInvestors" />
-      </template>
-    </BaseCard>
-
+    <!-- Modales Premium -->
     <InvestorFormModal :show="showInvestorModal" :investor-id="investorIdToEdit" @close="showInvestorModal = false"
       @saved="fetchInvestors(pagination.current_page || 1)" />
 
     <BalanceFormModal :show="showBalanceModal" resource="investors" :entity-id="selectedInvestor?.id"
-      :entity-name="selectedInvestor?.name" @close="showBalanceModal = false"
+      :entity-name="selectedInvestor?.name" :available-balance="selectedInvestor?.available_balance || selectedInvestor?.current_balance" @close="showBalanceModal = false"
       @saved="fetchInvestors(pagination.current_page || 1)" />
 
     <InvestorTransferModal :show="showTransferModal" :investor="selectedInvestor" @close="showTransferModal = false"
       @saved="fetchInvestors(pagination.current_page || 1)" />
-
   </div>
 </template>
-
-<style scoped>
-/* Tus estilos originales */
-.header-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-}
-
-.header-actions h1 {
-  font-size: 1.8rem;
-  color: var(--color-primary);
-}
-
-.btn-primary {
-  background-color: var(--color-primary);
-  color: white;
-  padding: 10px 18px;
-  border-radius: 8px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover {
-  background-color: #e6b800;
-  transform: translateY(-1px);
-}
-
-.badge {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-.badge-success {
-  background: rgba(40, 167, 69, 0.2);
-  color: #28a745;
-}
-
-.badge-danger {
-  background: rgba(220, 53, 69, 0.2);
-  color: #dc3545;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 10px;
-}
-
-.btn-icon {
-  background: none;
-  border: none;
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-icon:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.btn-icon.edit {
-  color: #3498db;
-}
-
-.btn-icon.delete {
-  color: #e74c3c;
-}
-
-/* NUEVO ESTILO PARA BOTON SALDO */
-.btn-icon.add-funds {
-  color: #27ae60;
-}
-
-.btn-icon.add-funds:hover {
-  color: #219150;
-  background-color: #e8f8f5;
-}
-
-.no-actions {
-  font-size: 0.8rem;
-  color: #999;
-  font-style: italic;
-}
-</style>

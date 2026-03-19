@@ -2,18 +2,11 @@
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const props = defineProps({
-  // Espera el objeto de paginación de Laravel (ej: {current_page: 1, last_page: 5, total: 50, ...})
-  pagination: {
-    type: Object,
-    required: true,
-  },
+  pagination: { type: Object, required: true },
 })
 
 const emit = defineEmits(['change-page'])
 
-/**
- * Emite un evento para cambiar a la página solicitada.
- */
 const changePage = (page) => {
   if (page >= 1 && page <= props.pagination.last_page) {
     emit('change-page', page)
@@ -22,94 +15,29 @@ const changePage = (page) => {
 </script>
 
 <template>
-  <div class="pagination-container" v-if="pagination.last_page > 1">
-    <span class="pagination-info">
-      Mostrando **{{ pagination.from }}** a **{{ pagination.to }}** de **{{ pagination.total }}**
-      resultados
+  <div v-if="pagination.last_page > 1" class="flex flex-col sm:flex-row justify-between items-center mt-5 py-4 border-t border-white/10 gap-4">
+    <span class="text-sm opacity-80 text-white/70">
+      Mostrando **{{ pagination.from }}** a **{{ pagination.to }}** de **{{ pagination.total }}** resultados
     </span>
 
-    <div class="pagination-controls">
+    <div class="flex gap-3 items-center">
       <button
         @click="changePage(pagination.current_page - 1)"
         :disabled="pagination.current_page === 1"
-        class="pagination-btn"
+        class="bg-secondary text-white border border-white/10 py-2 px-3 rounded-lg cursor-pointer text-sm font-semibold transition-all hover:bg-primary hover:text-secondary hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-[#333]"
       >
         <FontAwesomeIcon icon="fa-solid fa-chevron-left" /> Anterior
       </button>
 
-      <span class="page-numbers"
-        >Página **{{ pagination.current_page }}** de **{{ pagination.last_page }}**</span
-      >
+      <span class="font-medium text-sm text-white/80">Pág **{{ pagination.current_page }}** de **{{ pagination.last_page }}**</span>
 
       <button
         @click="changePage(pagination.current_page + 1)"
         :disabled="pagination.current_page === pagination.last_page"
-        class="pagination-btn"
+        class="bg-secondary text-white border border-white/10 py-2 px-3 rounded-lg cursor-pointer text-sm font-semibold transition-all hover:bg-primary hover:text-secondary hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-[#333]"
       >
         Siguiente <FontAwesomeIcon icon="fa-solid fa-chevron-right" />
       </button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.pagination-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 20px;
-  padding: 15px 0;
-  border-top: 1px solid var(--color-border);
-}
-
-.pagination-info {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-.pagination-controls {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.pagination-btn {
-  background-color: var(--color-secondary);
-  color: var(--color-text-light);
-  border: 1px solid var(--color-border);
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 600;
-  transition:
-    background-color 0.2s,
-    color 0.2s;
-}
-
-.pagination-btn:hover:not(:disabled) {
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
-  border-color: var(--color-primary);
-}
-
-.pagination-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background-color: #333;
-}
-
-.page-numbers {
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-/* RESPONSIVE */
-@media (max-width: 600px) {
-  .pagination-container {
-    flex-direction: column;
-    gap: 15px;
-    align-items: center;
-  }
-}
-</style>

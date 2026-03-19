@@ -3,8 +3,10 @@ import { ref, watch, onMounted } from 'vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseButton from '@/components/shared/BaseButton.vue'
 import notify from '@/services/notify'
 import api from '@/services/api'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const props = defineProps({
     show: Boolean,
@@ -14,6 +16,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const isProcessing = ref(false)
+const isLoading = ref(false)
 const currencies = ref([])
 
 const form = ref({
@@ -29,30 +32,30 @@ const form = ref({
     payment_day_2: 30
 })
 
-// --- CORRECCIÓN AQUÍ ---
-// Usamos 'id' y 'name' para que BaseSelect los lea automáticamente
 const frequencies = [
-    { id: 'weekly', name: 'Semanal' },
-    { id: 'biweekly', name: 'Quincenal' },
-    { id: 'monthly', name: 'Mensual' }
+    { id: 'weekly', name: 'Ciclo Semanal' },
+    { id: 'biweekly', name: 'Ciclo Quincenal' },
+    { id: 'monthly', name: 'Ciclo Mensual' }
 ]
 
-onMounted(async () => {
+const fetchCurrencies = async () => {
+    isLoading.value = true
     try {
-        const { data } = await api.get('/currencies', { params: { per_page: 100 } })
-        // --- CORRECCIÓN AQUÍ ---
-        // Mapeamos la respuesta de la API a 'id' y 'name'
+        const { data } = await api.get('/currencies?per_page=99')
         currencies.value = data.data.map(c => ({
-            id: c.code,          // El valor que se guarda (USD)
-            name: `${c.code} - ${c.name}` // El texto que se ve
+            id: c.code,
+            name: `${c.code} - ${c.name}`
         }))
     } catch (e) {
-        console.error(e)
+        notify.error('Fallo al sincronizar divisas.')
+    } finally {
+        isLoading.value = false
     }
-})
+}
 
 watch(() => props.show, (newVal) => {
     if (newVal) {
+        fetchCurrencies()
         if (props.employee) {
             form.value = { ...props.employee }
         } else {
@@ -70,16 +73,15 @@ const submit = async () => {
     try {
         if (props.employee) {
             await api.put(`/employees/${props.employee.id}`, form.value)
-            notify.success('Empleado actualizado')
+            notify.success(`Perfil de "${form.value.name}" actualizado.`)
         } else {
             await api.post('/employees', form.value)
-            notify.success('Empleado registrado')
+            notify.success(`Colaborador "${form.value.name}" registrado exitosamente.`)
         }
         emit('saved')
         emit('close')
     } catch (error) {
-        notify.error('Error al guardar')
-        console.error(error)
+        notify.error('Error al procesar el registro laboral.')
     } finally {
         isProcessing.value = false
     }
@@ -87,123 +89,130 @@ const submit = async () => {
 </script>
 
 <template>
-    <BaseModal :show="show" :title="employee ? '✏️ Editar Empleado' : '👷 Nuevo Empleado'" @close="$emit('close')">
-        <form @submit.prevent="submit" class="employee-form">
+    <BaseModal :show="show" :title="employee ? 'Configurar Perfil Laboral' : 'Alta de Nuevo Colaborador'" @close="$emit('close')">
+        <div v-if="isLoading" class="py-20 flex flex-col items-center justify-center gap-4">
+           <div class="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+           <p class="text-[0.65rem] font-black uppercase tracking-widest text-primary/40">Sincronizando base de datos laboral...</p>
+        </div>
 
-            <h4 class="section-title">Datos Personales</h4>
-            <div class="row">
-                <BaseInput v-model="form.name" label="Nombre Completo" required />
-                <BaseInput v-model="form.identification_doc" label="Cédula / DNI" />
+        <form v-else @submit.prevent="submit" class="space-y-10">
+            
+            <!-- Sección: Identidad -->
+            <div class="space-y-6">
+                <div class="flex items-center gap-3 text-primary/60 border-b border-white/5 pb-3">
+                    <div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/10">
+                       <FontAwesomeIcon icon="fa-solid fa-address-card" class="text-xs" />
+                    </div>
+                    <h4 class="text-[0.7rem] font-black uppercase tracking-[0.25em]">Información de Identidad</h4>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <BaseInput 
+                        v-model="form.name" 
+                        label="Nombre Completo" 
+                        placeholder="Ej: María Rodríguez"
+                        icon="fa-solid fa-user-tie"
+                        required 
+                    />
+                    <BaseInput 
+                        v-model="form.identification_doc" 
+                        label="Documento de Identificación" 
+                        placeholder="V-28.123.456"
+                        icon="fa-solid fa-id-badge"
+                    />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <BaseInput 
+                        v-model="form.email" 
+                        label="Contacto Digital" 
+                        type="email" 
+                        placeholder="empleado@khepas.com"
+                        icon="fa-solid fa-at"
+                    />
+                    <BaseInput 
+                        v-model="form.phone" 
+                        label="Contacto Móvil" 
+                        placeholder="+58 412..."
+                        icon="fa-solid fa-phone-flip"
+                    />
+                </div>
+
+                <BaseInput 
+                    v-model="form.position" 
+                    label="Cargo o Función Organizacional" 
+                    placeholder="Ej: Administrador de Operaciones Financieras" 
+                    icon="fa-solid fa-briefcase"
+                />
             </div>
 
-            <div class="row">
-                <BaseInput v-model="form.email" label="Email" type="email" />
-                <BaseInput v-model="form.phone" label="Teléfono" />
+            <!-- Sección: Nómina -->
+            <div class="space-y-6 pt-6 border-t border-white/10">
+                <div class="flex items-center gap-3 text-info/60 border-b border-white/5 pb-3">
+                    <div class="w-8 h-8 rounded-xl bg-info/10 flex items-center justify-center text-info border border-info/10">
+                       <FontAwesomeIcon icon="fa-solid fa-sack-dollar" class="text-xs" />
+                    </div>
+                    <h4 class="text-[0.7rem] font-black uppercase tracking-[0.25em]">Configuración Salarial</h4>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <BaseInput 
+                        v-model="form.salary_amount" 
+                        label="Compensación Base" 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00"
+                        icon="fa-solid fa-coins"
+                        required 
+                    />
+                    <BaseSelect 
+                        v-model="form.currency_code" 
+                        label="Divisa de Pago" 
+                        :options="currencies" 
+                        required 
+                    />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <BaseSelect 
+                        v-model="form.payment_frequency" 
+                        label="Frecuencia de Ciclo" 
+                        :options="frequencies" 
+                        required 
+                    />
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <BaseInput 
+                            v-model="form.payment_day_1" 
+                            label="Día de Corte 1" 
+                            type="number" 
+                            min="1" 
+                            max="31"
+                            placeholder="15"
+                        />
+                        <div v-if="form.payment_frequency === 'biweekly'" class="animate-fade-in">
+                            <BaseInput 
+                                v-model="form.payment_day_2" 
+                                label="Día de Corte 2" 
+                                type="number" 
+                                min="1" 
+                                max="31"
+                                placeholder="30"
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <BaseInput v-model="form.position" label="Cargo / Puesto" placeholder="Ej: Cajera" />
-
-            <hr class="divider">
-
-            <h4 class="section-title">Configuración de Pago</h4>
-            <div class="row">
-                <div class="col">
-                    <BaseInput v-model="form.salary_amount" label="Salario Base" type="number" step="0.01" required />
-                </div>
-                <div class="col">
-                    <BaseSelect v-model="form.currency_code" label="Moneda" :options="currencies" required />
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col">
-                    <BaseSelect v-model="form.payment_frequency" label="Frecuencia" :options="frequencies" required />
-                </div>
-
-                <div class="payment-days">
-                    <BaseInput v-model="form.payment_day_1" label="Día 1" type="number" class="short-input" />
-                    <BaseInput v-if="form.payment_frequency === 'biweekly'" v-model="form.payment_day_2" label="Día 2"
-                        type="number" class="short-input" />
-                </div>
-            </div>
-
         </form>
 
         <template #footer>
-            <div class="actions">
-                <button class="btn-cancel" @click="$emit('close')">Cancelar</button>
-                <button class="btn-save" @click="submit" :disabled="isProcessing">
-                    {{ isProcessing ? 'Guardando...' : 'Guardar' }}
-                </button>
+            <div v-if="!isLoading" class="flex flex-col-reverse md:flex-row justify-end gap-3 w-full">
+                <BaseButton variant="secondary" outline @click="$emit('close')" :disabled="isProcessing">Cancelar</BaseButton>
+                <BaseButton variant="primary" @click="submit" :disabled="isProcessing">
+                    <span v-if="isProcessing">Sincronizando...</span>
+                    <span v-else>{{ employee ? 'Guardar Cambios' : 'Registrar Colaborador' }}</span>
+                </BaseButton>
             </div>
         </template>
     </BaseModal>
 </template>
-
-<style scoped>
-.employee-form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    padding: 10px 0;
-}
-
-.row {
-    display: flex;
-    gap: 15px;
-}
-
-.col {
-    flex: 1;
-}
-
-.section-title {
-    font-size: 0.85rem;
-    font-weight: bold;
-    color: var(--color-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 5px;
-}
-
-.divider {
-    border: 0;
-    border-top: 1px dashed #444;
-    margin: 5px 0;
-}
-
-.payment-days {
-    display: flex;
-    gap: 10px;
-    align-items: flex-end;
-}
-
-.short-input {
-    width: 70px;
-}
-
-.actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-}
-
-.btn-cancel {
-    background: #333;
-    color: white;
-    border: 1px solid #555;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.btn-save {
-    background: var(--color-primary);
-    color: #000;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-}
-</style>
