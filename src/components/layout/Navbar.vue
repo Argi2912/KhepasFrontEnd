@@ -27,7 +27,7 @@ onUnmounted(() => {
 })
 
 const goToRequests = () => {
-  router.push({ name: 'transaction_requests' })
+  router.push({ name: 'transaction_requests_list' })
 }
 
 const confirmLogout = async () => {

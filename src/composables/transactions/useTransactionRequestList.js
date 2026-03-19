@@ -86,7 +86,7 @@ export function useTransactionRequestList() {
       // Redirigir al flujo de intercambio
       if (req.type === 'exchange') {
         router.push({ 
-          name: 'currency_exchanges_create', 
+          name: 'transaction_exchange_create', 
           query: { 
             request_id: req.id,
             client_id: req.client_id,
