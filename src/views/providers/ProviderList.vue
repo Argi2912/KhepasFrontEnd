@@ -1,11 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import api from '@/services/api'
-import alert from '@/services/alert'
-import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-
 // Componentes
 import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
@@ -13,21 +7,29 @@ import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import ProviderFormModal from '@/components/shared/ProviderFormModal.vue'
 import BalanceFormModal from '@/components/shared/BalanceFormModal.vue'
+import { useProviderList } from '@/composables/providers/useProviderList'
 
-const authStore = useAuthStore()
-const permissionKey = 'manage_exchanges'
-
-// Estados Modales
-const showProviderModal = ref(false)
-const providerIdToEdit = ref(null)
-const showBalanceModal = ref(false)
-const selectedProvider = ref(null)
-
-// Datos Tabla
-const providers = ref([])
-const pagination = ref({})
-const filters = ref({})
-const isLoading = ref(false)
+const {
+  authStore,
+  permissionKey,
+  showProviderModal,
+  providerIdToEdit,
+  showBalanceModal,
+  selectedProvider,
+  providers,
+  pagination,
+  filters,
+  isLoading,
+  totalProviders,
+  activeProviders,
+  totalDebtUSD,
+  fetchProviders,
+  openCreateModal,
+  openEditModal,
+  openBalanceModal,
+  deleteProvider,
+  formatNumber
+} = useProviderList()
 
 // Definición de Columnas
 const tableHeaders = [
@@ -37,72 +39,6 @@ const tableHeaders = [
   { key: 'status', label: 'Estado' },
   { key: 'actions', label: '' },
 ]
-
-/**
- * Estadísticas Rápidas
- */
-const totalProviders = computed(() => pagination.value.total || providers.value.length)
-const activeProviders = computed(() => providers.value.filter(p => p.is_active).length)
-const totalDebtUSD = computed(() => {
-  return providers.value.reduce((acc, p) => {
-    const usdBal = p.balances?.find(b => b.currency_code === 'USD' || b.currency_code === 'USDT')
-    return acc + (usdBal ? Number(usdBal.amount) : 0)
-  }, 0)
-})
-
-const fetchProviders = async (page = 1) => {
-  isLoading.value = true
-  const params = { page: page, ...filters.value }
-  try {
-    const response = await api.get('/providers', { params })
-    providers.value = response.data.data
-    const { data, ...pagData } = response.data
-    pagination.value = pagData
-  } catch (error) {
-    notify.error('Error al sincronizar el directorio de proveedores.')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// Modales
-const openCreateModal = () => {
-  providerIdToEdit.value = null
-  showProviderModal.value = true
-}
-
-const openEditModal = (providerId) => {
-  providerIdToEdit.value = providerId
-  showProviderModal.value = true
-}
-
-const openBalanceModal = (provider) => {
-  selectedProvider.value = provider
-  showBalanceModal.value = true
-}
-
-const deleteProvider = async (providerId, providerName) => {
-  if (!authStore.can(permissionKey)) return notify.error('Permisos insuficientes.')
-  if (await alert.confirm(`¿Remover a ${providerName}?`, 'Esta acción podría afectar cuadres históricos.')) {
-    try {
-      await api.delete(`/providers/${providerId}`)
-      notify.success('Proveedor archivado correctamente.')
-      fetchProviders(pagination.value.current_page)
-    } catch (error) {
-      notify.error('Fallo al eliminar: Verifique dependencias activas.')
-    }
-  }
-}
-
-const formatNumber = (value) => {
-  return new Intl.NumberFormat('es-VE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value || 0)
-}
-
-watch(filters, () => fetchProviders(1), { deep: true })
-onMounted(() => fetchProviders())
 </script>
 
 <template>
@@ -190,10 +126,10 @@ onMounted(() => fetchProviders())
 
       <BaseCard title="Central de Proveedores" subtitle="Monitoreo multimoneda y gestión de perfiles comerciales.">
         <BaseTable :headers="tableHeaders" :data="providers" :is-loading="isLoading">
-          <tr v-for="provider in providers" :key="provider.id" class="group">
+          <tr v-for="provider in providers" :key="provider.id" class="group hover:bg-white/[0.01] transition-colors">
             
             <!-- Nombre -->
-            <td class="font-bold text-white transition-colors group-hover:text-primary">
+            <td class="font-bold text-white py-5 group-hover:text-primary transition-colors">
               <div class="flex flex-col">
                 <span class="text-base tracking-tight">{{ provider.name }}</span>
                 <span class="text-[0.65rem] font-black text-white/20 uppercase tracking-widest">{{ provider.email || 'SIN CORREO' }}</span>
@@ -270,15 +206,57 @@ onMounted(() => fetchProviders())
             </td>
           </tr>
         </BaseTable>
+
+        <template #footer>
+          <div class="flex justify-between items-center px-4 py-2">
+             <div class="text-[0.65rem] font-black text-white/10 uppercase tracking-widest hidden md:block">
+               Mostrando {{ providers.length }} de {{ pagination.total || '...' }} registros
+             </div>
+             <Pagination :pagination="pagination" @change-page="fetchProviders" />
+          </div>
+        </template>
       </BaseCard>
     </div>
 
     <!-- Modales Premium -->
-    <ProviderFormModal :show="showProviderModal" :provider-id="providerIdToEdit" @close="showProviderModal = false"
-      @saved="fetchProviders(pagination.current_page)" />
+    <ProviderFormModal 
+      :show="showProviderModal" 
+      :provider-id="providerIdToEdit" 
+      @close="showProviderModal = false"
+      @saved="fetchProviders(pagination.current_page || 1)" 
+    />
 
-    <BalanceFormModal :show="showBalanceModal" resource="providers" :entity-id="selectedProvider?.id"
-      :entity-name="selectedProvider?.name" @close="showBalanceModal = false"
-      @saved="fetchProviders(pagination.current_page)" />
+    <BalanceFormModal 
+      :show="showBalanceModal" 
+      resource="providers" 
+      :entity-id="selectedProvider?.id"
+      :entity-name="selectedProvider?.name" 
+      @close="showBalanceModal = false"
+      @saved="fetchProviders(pagination.current_page || 1)" 
+    />
   </div>
 </template>
+
+<style scoped>
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2rem;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

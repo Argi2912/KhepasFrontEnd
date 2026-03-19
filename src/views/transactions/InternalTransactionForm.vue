@@ -1,245 +1,152 @@
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue'
-import { useTransactionStore } from '@/stores/transaction'
-import { useAuthStore } from '@/stores/auth'
-import { useFormValidation } from '@/utils/useFormValidation'
-import { useRouter } from 'vue-router'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import api from '@/services/api'
-import notify from '@/services/notify'
-import { useCategories } from '@/composables/useCategories'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { useInternalTransaction } from '@/composables/transactions/useInternalTransaction'
 
-const router = useRouter()
-const authStore = useAuthStore()
-const transactionStore = useTransactionStore()
-const { errors, handleAxiosError } = useFormValidation()
-
-const isSubmitting = ref(false)
-
-// Listas de datos
-const lists = reactive({
-  employees: [],
-  clients: [],
-  providers: [],
-  brokers: [],
-  platforms: [],
-  investors: [] 
-})
-
-const { getCategoriesByType } = useCategories()
-const categoryOptions = computed(() => {
-  return getCategoriesByType(form.type).map(cat => ({ id: cat, name: cat }))
-})
-
-// Opciones para el primer selector
-const entityTypes = [
-  { id: 'App\\Models\\Employee', name: 'Gestión de Nóminas (Empleados)' },
-  { id: 'App\\Models\\Client', name: 'Clientes' },
-  { id: 'App\\Models\\Provider', name: 'Proveedores' },
-  { id: 'App\\Models\\Broker', name: 'Corredores' },
-  { id: 'App\\Models\\Platform', name: 'Plataformas' },
-  { id: 'App\\Models\\Investor', name: 'Inversionistas' }, // <--- AGREGADO: Opción Inversionistas
-  { id: 'manual', name: 'Otro / Manual' }
-]
-
-const form = reactive({
-  account_id: '',
-  user_id: authStore.authUser?.id,
-  type: 'expense', // expense | income
-  category: '',
-
-  // Lógica dinámica
-  entity_type: '',
-  entity_id: '',
-
-  // Campos de texto
-  dueño: '',
-  person_name: '',
-
-  amount: '',
-  description: '',
-  transaction_date: new Date().toISOString().split('T')[0],
-})
-
-// =========================================================================
-// CARGA DE DATOS
-// =========================================================================
-onMounted(async () => {
-  await transactionStore.fetchAllSupportData()
-
-  // 1. Clientes
-  try {
-    const { data } = await api.get('/clients?per_page=100')
-    lists.clients = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
-  } catch (e) { console.error(e) }
-
-  // 2. Proveedores
-  try {
-    const { data } = await api.get('/providers?per_page=100')
-    lists.providers = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
-  } catch (e) { console.error(e) }
-
-  // 3. Corredores
-  try {
-    const { data } = await api.get('/brokers?per_page=100')
-    lists.brokers = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
-  } catch (e) { console.error(e) }
-
-  // 4. Plataformas
-  try {
-    const response = await api.get('/platforms?per_page=100')
-    const records = Array.isArray(response.data) ? response.data : (response.data.data || [])
-    lists.platforms = records.map(x => ({ id: x.id, name: x.name }))
-  } catch (e) { console.error(e) }
-
-  // 5. Empleados
-  try {
-    const { data } = await api.get('/employees?per_page=100')
-    lists.employees = data.data.map(x => ({ id: x.id, name: x.name }))
-  } catch (e) { console.warn("No se pudo cargar Empleados") }
-
-  // 6. Inversionistas (AGREGADO)
-  try {
-    const { data } = await api.get('/investors?per_page=100')
-    lists.investors = data.data.map(x => ({ id: x.id, name: x.name || x.alias }))
-  } catch (e) { console.error("Error cargando Inversionistas", e) }
-})
-
-// =========================================================================
-// LÓGICA REACTIVA
-// =========================================================================
-const entityOptions = computed(() => {
-  switch (form.entity_type) {
-    case 'App\\Models\\Employee': return lists.employees
-    case 'App\\Models\\Client': return lists.clients
-    case 'App\\Models\\Provider': return lists.providers
-    case 'App\\Models\\Broker': return lists.brokers
-    case 'App\\Models\\Platform': return lists.platforms
-    case 'App\\Models\\Investor': return lists.investors // <--- AGREGADO: Case Inversionistas
-    default: return []
-  }
-})
-
-watch(() => form.entity_type, () => {
-  form.entity_id = ''
-  form.person_name = ''
-})
-
-watch(() => form.entity_id, (newId) => {
-  if (!newId || form.entity_type === 'manual') return
-  const selected = entityOptions.value.find(item => item.id === newId)
-  if (selected) {
-    form.person_name = selected.name
-    const typeName = entityTypes.find(t => t.id === form.entity_type)?.name
-    form.dueño = typeName || 'Registrado'
-  }
-})
-
-// =========================================================================
-// 🔥 FUNCIÓN DE ENVÍO SIN ALERTA AMARILLA 🔥
-// =========================================================================
-const handleSubmit = async () => {
-  isSubmitting.value = true
-
-  // Limpiamos errores previos en la UI (el texto rojo antiguo)
-  Object.keys(errors).forEach(key => errors[key] = '')
-
-  try {
-    // 1. Preparar Payload
-    const payload = {
-      ...form,
-      source_type: 'account'
-    }
-
-    if (payload.entity_type === 'manual') {
-      payload.entity_type = null
-      payload.entity_id = null
-    }
-
-    // 2. Enviar Petición
-    await api.post('/transactions/internal', payload)
-
-    // 3. Éxito
-    notify.success('Transacción registrada exitosamente')
-    router.back()
-
-  } catch (error) {
-    console.error("Error al guardar:", error)
-
-    // 🔥 AQUÍ ESTÁ EL CAMBIO PARA BORRAR LA ALERTA AMARILLA 🔥
-    // Verificamos si es el error de saldo o cualquier error que venga con "message" desde el backend
-    if (error.response && error.response.data && error.response.data.message) {
-
-      // Asignamos el mensaje directamente al campo amount para que salga rojo
-      errors.amount = error.response.data.message
-
-      // ¡IMPORTANTE! Aquí hacemos return. NO llamamos a handleAxiosError.
-      // Al no llamarlo, la alerta amarilla nunca se genera.
-      return
-    }
-
-    // Solo si NO es un error de saldo (ej. error 500, o de red), llamamos al genérico
-    handleAxiosError(error)
-
-  } finally {
-    isSubmitting.value = false
-  }
-}
+const {
+  form,
+  entityTypes,
+  categoryOptions,
+  entityOptions,
+  isSubmitting,
+  errors,
+  handleSubmit,
+  transactionStore,
+  router
+} = useInternalTransaction()
 </script>
 
 <template>
-  <div class="internal-container">
-    <h1>Movimiento de Caja (Interno)</h1>
+  <div class="max-w-3xl mx-auto py-10 px-4 animate-premium-in">
+    <div class="mb-10">
+      <h1 class="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+        <span class="w-1.5 h-10 bg-primary rounded-full"></span>
+        Movimiento de <span class="text-gradient-primary">Caja Interna</span>
+      </h1>
+      <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Registro de ingresos, egresos y flujos operativos</p>
+    </div>
 
-    <div class="card">
-      <form @submit.prevent="handleSubmit">
-
-        <div class="type-selector">
-          <label :class="{ active: form.type === 'income', income: true }">
-            <input type="radio" value="income" v-model="form.type" />
-            INGRESO / APORTE
+    <div class="premium-card p-8 bg-white/[0.02] border-white/5 shadow-2xl relative overflow-hidden">
+      <div class="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 blur-3xl rounded-full"></div>
+      
+      <form @submit.prevent="handleSubmit" class="relative z-10 space-y-8">
+        
+        <!-- Selector de Tipo (Ingreso/Egreso) -->
+        <div class="flex p-1 bg-black/40 rounded-2xl border border-white/5">
+          <label 
+            class="flex-1 py-4 text-center cursor-pointer rounded-xl font-black text-xs tracking-widest transition-all duration-300 flex items-center justify-center gap-2"
+            :class="form.type === 'income' ? 'bg-success text-white shadow-lg shadow-success/20' : 'text-white/20 hover:text-white/40'"
+          >
+            <input type="radio" value="income" v-model="form.type" class="hidden" />
+            <FontAwesomeIcon icon="fa-solid fa-arrow-trend-up" /> INGRESO / APORTE
           </label>
-          <label :class="{ active: form.type === 'expense', expense: true }">
-            <input type="radio" value="expense" v-model="form.type" />
-            EGRESO / GASTO
+          <label 
+            class="flex-1 py-4 text-center cursor-pointer rounded-xl font-black text-xs tracking-widest transition-all duration-300 flex items-center justify-center gap-2"
+            :class="form.type === 'expense' ? 'bg-danger text-white shadow-lg shadow-danger/20' : 'text-white/20 hover:text-white/40'"
+          >
+            <input type="radio" value="expense" v-model="form.type" class="hidden" />
+            <FontAwesomeIcon icon="fa-solid fa-arrow-trend-down" /> EGRESO / GASTO
           </label>
         </div>
 
-        <div class="form-grid">
-          <BaseSelect label="Cuenta Afectada (Caja/Banco)" :options="transactionStore.getAccounts"
-            v-model="form.account_id" required :error="errors.account_id" />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div class="space-y-6">
+            <BaseSelect 
+              label="Cuenta Afectada (Caja/Banco)" 
+              :options="transactionStore.getAccounts"
+              v-model="form.account_id" 
+              required 
+              :error="errors.account_id" 
+            />
 
-          <BaseInput label="Monto" type="number" step="0.01" v-model="form.amount" required :error="errors.amount" />
-
-          <BaseSelect label="Tipo de Beneficiario / Pagador" :options="entityTypes" v-model="form.entity_type" required
-            placeholder="Seleccione grupo (Ej: Cliente, Proveedor...)" />
-
-          <div v-if="form.entity_type && form.entity_type !== 'manual'">
-            <BaseSelect label="Seleccione la Persona/Entidad" :options="entityOptions" v-model="form.entity_id" required
-              :disabled="entityOptions.length === 0"
-              :placeholder="entityOptions.length === 0 ? 'No hay registros cargados' : 'Busque en la lista...'" />
-            <small v-if="entityOptions.length === 0" class="warning-text">
-              ⚠️ No se cargaron datos para esta opción.
-            </small>
+            <div class="relative">
+              <BaseInput 
+                label="Monto de la Operación" 
+                type="number" 
+                step="0.01" 
+                v-model="form.amount" 
+                required 
+                :error="errors.amount" 
+                class="premium-input-large"
+              />
+              <span class="absolute right-4 top-10 text-white/20 font-black text-xs">USD</span>
+            </div>
           </div>
 
-          <div v-if="form.entity_type === 'manual'" class="manual-fields">
-            <BaseInput label="Nombre de la Persona (Manual)" placeholder="Escriba el nombre..."
-              v-model="form.person_name" required :error="errors.person_name" />
-            <BaseInput label="Referencia / Titular" placeholder="Titular..." v-model="form.dueño" />
+          <div class="space-y-6">
+            <BaseSelect 
+              label="Tipo de Beneficiario / Pagador" 
+              :options="entityTypes" 
+              v-model="form.entity_type" 
+              required
+              placeholder="Seleccione grupo..." 
+            />
+
+            <div v-if="form.entity_type && form.entity_type !== 'manual'" class="animate-fade-in">
+              <BaseSelect 
+                label="Seleccione la Persona/Entidad" 
+                :options="entityOptions" 
+                v-model="form.entity_id" 
+                required
+                :disabled="entityOptions.length === 0"
+                :placeholder="entityOptions.length === 0 ? 'Cargando datos...' : 'Busque en la lista...'" 
+              />
+              <p v-if="entityOptions.length === 0" class="text-[0.6rem] font-bold text-warning/60 mt-2 uppercase tracking-widest">
+                ⚠️ Sincronizando registros con el servidor...
+              </p>
+            </div>
+
+            <div v-if="form.entity_type === 'manual'" class="grid grid-cols-1 gap-4 animate-fade-in">
+              <BaseInput 
+                label="Nombre de la Persona (Manual)" 
+                placeholder="Escriba el nombre..."
+                v-model="form.person_name" 
+                required 
+                :error="errors.person_name" 
+              />
+              <BaseInput 
+                label="Referencia / Titular" 
+                placeholder="Titular..." 
+                v-model="form.dueño" 
+              />
+            </div>
           </div>
         </div>
 
-        <BaseSelect label="Categoría" :options="categoryOptions" v-model="form.category" required
-          :error="errors.category" class="mt-4" placeholder="Seleccione una categoría..." />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-white/5">
+          <BaseSelect 
+            label="Categoría Operativa" 
+            :options="categoryOptions" 
+            v-model="form.category" 
+            required
+            :error="errors.category" 
+            placeholder="Seleccione categoría..." 
+          />
+          <BaseInput 
+            label="Descripción / Notas Internas" 
+            v-model="form.description" 
+            placeholder="Detalle adicional del movimiento..."
+          />
+        </div>
 
-        <BaseInput label="Descripción / Notas" v-model="form.description" class="mt-4" />
-
-        <div class="actions">
-          <button type="button" @click="router.back()" class="btn-cancel">Cancelar</button>
-          <button type="submit" class="btn-save" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Guardando...' : 'Registrar' }}
+        <div class="flex justify-end items-center gap-6 pt-10">
+          <button 
+            type="button" 
+            @click="router.back()" 
+            class="text-xs font-black text-white/20 uppercase tracking-[0.2em] hover:text-white transition-colors"
+          >
+            Descartar
+          </button>
+          
+          <button 
+            type="submit" 
+            class="px-10 py-4 bg-primary text-secondary font-black text-xs uppercase tracking-[0.2em] rounded-2xl hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+            :disabled="isSubmitting"
+          >
+            <FontAwesomeIcon v-if="isSubmitting" icon="fa-solid fa-circle-notch" spin class="mr-2" />
+            {{ isSubmitting ? 'Procesando...' : 'Registrar Movimiento' }}
+            <FontAwesomeIcon icon="fa-solid fa-chevron-right" class="ml-2 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
       </form>
@@ -248,79 +155,34 @@ const handleSubmit = async () => {
 </template>
 
 <style scoped>
-.internal-container {
-  max-width: 600px;
-  margin: 20px auto;
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.card {
-  background: var(--color-secondary);
-  padding: 30px;
-  border-radius: 10px;
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2.5rem;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.type-selector {
-  display: flex;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 20px;
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.type-selector label {
-  flex: 1;
-  text-align: center;
-  padding: 15px;
-  cursor: pointer;
-  font-weight: bold;
-  opacity: 0.7;
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.type-selector input {
-  display: none;
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
-.type-selector label.active {
-  opacity: 1;
-  color: white;
-}
-
-.type-selector label.income.active {
-  background-color: #28a745;
-}
-
-.type-selector label.expense.active {
-  background-color: #dc3545;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 15px;
-  margin-top: 20px;
-}
-
-.btn-save {
-  background: var(--color-primary);
-  color: white;
-  padding: 10px 25px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.btn-cancel {
-  background: transparent;
-  border: 1px solid #ccc;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style>

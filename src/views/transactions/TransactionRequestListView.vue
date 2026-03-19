@@ -1,241 +1,258 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { useTransactionRequestStore } from '@/stores/transactionRequest'
-import { useRouter } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import BaseButton from '@/components/shared/BaseButton.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
-import { useTransactionStore } from '@/stores/transaction'
+import BaseTable from '@/components/ui/BaseTable.vue'
+import { useTransactionRequestList } from '@/composables/transactions/useTransactionRequestList'
 
-const requestStore = useTransactionRequestStore()
-const transactionStore = useTransactionStore()
-const router = useRouter()
-const currentFilter = ref('pending')
+const {
+  requestStore,
+  currentFilter,
+  isActionModalOpen,
+  selectedRequest,
+  actionForm,
+  isProcessing,
+  changeFilter,
+  formatCurrency,
+  getStatusBadge,
+  getStatusText,
+  goToCreate,
+  goToAction,
+  closeActionModal,
+  handleApprove,
+  handleReject
+} = useTransactionRequestList()
 
-// Modal state
-const isActionModalOpen = ref(false)
-const selectedRequest = ref(null)
-const actionForm = ref({
-  account_id: '',
-  notes: ''
-})
-const isProcessing = ref(false)
-
-onMounted(async () => {
-  requestStore.setFilters({ status: 'pending' })
-  if (transactionStore.getAccounts.length === 0) {
-    await transactionStore.fetchAllSupportData()
-  }
-})
-
-const changeFilter = (status) => {
-  currentFilter.value = status
-  requestStore.setFilters({ status })
-}
-
-const formatCurrency = (amount, currency) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount)
-}
-
-const getStatusBadge = (status) => {
-  switch(status) {
-    case 'pending': return 'bg-primary/20 text-primary border-primary/30'
-    case 'processed': return 'bg-success/20 text-success border-success/30'
-    case 'rejected': return 'bg-danger/20 text-danger border-danger/30'
-    default: return 'bg-white/10 text-white border-white/20'
-  }
-}
-
-const getStatusText = (status) => {
-  switch(status) {
-    case 'pending': return 'Pendiente'
-    case 'processed': return 'Procesada'
-    case 'rejected': return 'Rechazada'
-    default: return status
-  }
-}
-
-const goToCreate = () => {
-    router.push({ name: 'transaction_requests_create' })
-}
-
-const goToAction = (request) => {
-    selectedRequest.value = request
-    actionForm.value.account_id = ''
-    actionForm.value.notes = ''
-    isActionModalOpen.value = true
-}
-
-const closeActionModal = () => {
-  isActionModalOpen.value = false
-  selectedRequest.value = null
-}
-
-const handleApprove = async () => {
-  isProcessing.value = true
-  try {
-    await requestStore.updateRequestStatus(selectedRequest.value.id, 'processed', actionForm.value.notes)
-    closeActionModal()
-  } finally {
-    isProcessing.value = false
-  }
-}
-
-const handleReject = async () => {
-  if (!actionForm.value.notes) {
-    notify.error('Debe indicar un motivo en las notas para rechazar')
-    return
-  }
-  isProcessing.value = true
-  try {
-    await requestStore.updateRequestStatus(selectedRequest.value.id, 'rejected', actionForm.value.notes)
-    closeActionModal()
-  } finally {
-    isProcessing.value = false
-  }
-}
+const headers = [
+  { key: 'date', label: 'Fecha' },
+  { key: 'client', label: 'Cliente / Propietario' },
+  { key: 'type', label: 'Tipo' },
+  { key: 'route', label: 'Ruta de Cambio' },
+  { key: 'amount', label: 'Monto de Solicitud' },
+  { key: 'status', label: 'Estado' },
+  { key: 'actions', label: '' },
+]
 </script>
 
 <template>
-  <div class="space-y-6 animate-fade-in">
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+  <div class="space-y-10 animate-premium-in pb-12">
+    
+    <!-- Header Premium -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
       <div>
-        <h1 class="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-          <FontAwesomeIcon icon="fa-solid fa-inbox" class="text-primary" />
-          Solicitudes
+        <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+          <span class="w-1.5 h-10 bg-primary rounded-full shadow-[0_0_20px_rgba(247,166,0,0.4)]"></span>
+          Buzón de <span class="text-gradient-primary">Solicitudes</span>
         </h1>
-        <p class="text-white/40 text-sm mt-1">Gestión de retiros e intercambios solicitados por clientes.</p>
+        <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Gestión de retiros e intercambios de clientes</p>
       </div>
 
-      <div class="flex items-center gap-3">
-        <!-- Filtros Rápidos -->
-        <div class="flex bg-white/5 rounded-xl p-1 border border-white/10">
-          <button @click="changeFilter('pending')" :class="['px-4 py-1.5 text-xs font-bold rounded-lg transition-colors duration-300', currentFilter === 'pending' ? 'bg-primary text-secondary' : 'text-white/40 hover:text-white']">
-            Pendientes
-          </button>
-          <button @click="changeFilter('processed')" :class="['px-4 py-1.5 text-xs font-bold rounded-lg transition-colors duration-300', currentFilter === 'processed' ? 'bg-success text-white' : 'text-white/40 hover:text-white']">
-            Procesadas
-          </button>
-          <button @click="changeFilter('rejected')" :class="['px-4 py-1.5 text-xs font-bold rounded-lg transition-colors duration-300', currentFilter === 'rejected' ? 'bg-danger text-white' : 'text-white/40 hover:text-white']">
-            Rechazadas
+      <div class="flex items-center gap-4">
+        <!-- Filtros Rápidos Premium -->
+        <div class="flex flex-wrap items-center bg-black/40 p-1.5 rounded-2xl border border-white/5 shadow-inner backdrop-blur-md gap-1">
+          <button 
+            v-for="f in [{v:'pending', l:'Pendientes', c:'primary'}, {v:'processed', l:'Procesadas', c:'success'}, {v:'rejected', l:'Rechazadas', c:'danger'}]" 
+            :key="f.v"
+            @click="changeFilter(f.v)" 
+            :class="[
+              'px-5 py-2 text-[0.65rem] font-black uppercase tracking-widest rounded-xl transition-all duration-300', 
+              currentFilter === f.v 
+                ? `bg-${f.c}/20 text-${f.c} border border-${f.c}/20 shadow-lg` 
+                : 'text-white/20 hover:text-white/40'
+            ]"
+          >
+            {{ f.l }}
           </button>
         </div>
 
-        <BaseButton @click="goToCreate" variant="primary">
-          <FontAwesomeIcon icon="fa-solid fa-plus" class="mr-2" /> Nueva Solicitud
-        </BaseButton>
+        <button 
+          @click="goToCreate" 
+          class="bg-primary hover:bg-primary-dark text-secondary px-6 py-3.5 rounded-2xl font-black transition-all shadow-[0_10px_30px_rgba(247,166,0,0.2)] flex items-center gap-3 group active:scale-95"
+        >
+          <FontAwesomeIcon icon="fa-solid fa-plus-circle" class="text-lg group-hover:rotate-90 transition-transform duration-300" /> 
+          <span>Nueva Solicitud</span>
+        </button>
       </div>
     </div>
 
     <!-- Lista -->
-    <BaseCard>
-      <div v-if="requestStore.isLoading" class="flex justify-center p-12">
-        <FontAwesomeIcon icon="fa-solid fa-circle-notch" spin class="text-3xl text-primary" />
-      </div>
-
-      <div v-else-if="requestStore.requests.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
-        <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-          <FontAwesomeIcon icon="fa-solid fa-check-double" class="text-2xl text-white/20" />
+    <BaseCard title="Solicitudes del Sistema" subtitle="Control de autorizaciones previas a la ejecución de movimientos financieros.">
+      
+      <div v-if="requestStore.requests.length === 0 && !requestStore.isLoading" class="flex flex-col items-center justify-center py-20 text-center animate-premium-in">
+        <div class="w-20 h-20 bg-white/[0.02] rounded-full flex items-center justify-center mb-6 border border-white/5">
+          <FontAwesomeIcon icon="fa-solid fa-inbox" class="text-4xl text-white/10" />
         </div>
-        <h3 class="text-lg font-bold text-white/60">No hay solicitudes en este estado</h3>
-        <p class="text-sm text-white/30">Todo está al día para el filtro seleccionado.</p>
+        <h3 class="text-xl font-black text-white/40 tracking-tight">Bandeja Vacía</h3>
+        <p class="text-sm text-white/20 mt-2 font-medium">No se han encontrado registros para el filtro "{{ getStatusText(currentFilter) }}".</p>
       </div>
 
-      <div v-else class="overflow-x-auto">
-        <table class="w-full text-left">
-          <thead>
-            <tr class="text-[0.65rem] font-black text-white/20 uppercase tracking-[0.2em] border-b border-white/5">
-              <th class="py-4 px-4">Fecha</th>
-              <th class="py-4 px-4">Cliente</th>
-              <th class="py-4 px-4">Tipo</th>
-              <th class="py-4 px-4">Ruta</th>
-              <th class="py-4 px-4 text-right">Monto</th>
-              <th class="py-4 px-4 text-center">Estado</th>
-              <th class="py-4 px-4 text-center">Acciones</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-white/5">
-            <tr v-for="req in requestStore.requests" :key="req.id" class="group hover:bg-white/[0.02] transition-colors">
-              <td class="py-4 px-4 text-sm font-mono text-white/40">{{ new Date(req.created_at).toLocaleDateString() }}</td>
-              <td class="py-4 px-4 text-sm font-bold text-white">{{ req.client?.name || 'Cliente Eliminado' }}</td>
-              <td class="py-4 px-4">
-                <span class="text-xs font-bold uppercase tracking-wider" :class="req.type === 'withdrawal' ? 'text-danger' : 'text-info'">
-                  {{ req.type === 'withdrawal' ? 'Retiro' : 'Exchange' }}
-                </span>
-              </td>
-              <td class="py-4 px-4">
-                <div class="flex flex-col gap-1">
-                  <span class="text-xs font-bold text-white/60"><FontAwesomeIcon icon="fa-solid fa-arrow-right-from-bracket" class="text-white/20 mr-1"/> {{ req.source_origin || 'ND' }}</span>
-                  <span class="text-xs font-bold text-white/60"><FontAwesomeIcon icon="fa-solid fa-arrow-right-to-bracket" class="text-white/20 mr-1"/> {{ req.destination_target || 'ND' }}</span>
+      <BaseTable v-else :headers="headers" :data="requestStore.requests" :is-loading="requestStore.isLoading">
+        <tr v-for="req in requestStore.requests" :key="req.id" class="group hover:bg-white/[0.01] transition-colors border-b border-white/[0.02] last:border-0">
+          
+          <!-- Fecha -->
+          <td class="py-5">
+            <div class="flex flex-col">
+              <span class="text-xs font-bold text-white/80 tracking-tight leading-tight">{{ new Date(req.created_at).toLocaleDateString('es-VE') }}</span>
+              <span class="text-[0.6rem] font-black text-white/20 uppercase tracking-widest mt-0.5">{{ new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
+            </div>
+          </td>
+
+          <!-- Cliente -->
+          <td>
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white group-hover:text-primary transition-colors leading-tight">{{ req.client?.name || 'ENTIDAD DESCONOCIDA' }}</span>
+              <span class="text-[0.65rem] font-mono text-white/20 uppercase tracking-tighter mt-0.5">REQ-{{ req.id.toString().padStart(6, '0') }}</span>
+            </div>
+          </td>
+
+          <!-- Tipo -->
+          <td>
+            <div class="flex items-center gap-2">
+              <span 
+                class="px-2.5 py-1 rounded-lg text-[0.6rem] font-black uppercase tracking-[0.15em] border transition-all duration-300"
+                :class="req.type === 'withdrawal' ? 'bg-danger/5 text-danger border-danger/20' : 'bg-info/5 text-info border-info/20'"
+              >
+                {{ req.type === 'withdrawal' ? 'RETIRO' : 'EXCHANGE' }}
+              </span>
+            </div>
+          </td>
+
+          <!-- Ruta -->
+          <td>
+            <div class="flex flex-col gap-1.5 py-2">
+              <div class="flex items-center gap-2 group/route">
+                <div class="w-1.5 h-1.5 rounded-full bg-white/10 group-hover/route:bg-primary transition-colors"></div>
+                <span class="text-[0.65rem] font-bold text-white/40 group-hover/route:text-white/60 uppercase tracking-tight">{{ req.source_origin || 'ND' }}</span>
+              </div>
+              <div class="flex items-center gap-2 group/route">
+                <div class="w-1.5 h-1.5 rounded-full bg-primary/40"></div>
+                <span class="text-[0.65rem] font-black text-white/60 tracking-tight">{{ req.destination_target || 'ND' }}</span>
+              </div>
+            </div>
+          </td>
+
+          <!-- Monto -->
+          <td>
+            <div class="flex items-baseline gap-1 text-white group-hover:text-primary transition-colors">
+              <span class="text-base font-black tracking-tighter">{{ formatCurrency(req.amount, req.currency_code).split('.')[0] }}</span>
+              <span class="text-[0.65rem] font-bold opacity-30">.{{ formatCurrency(req.amount, req.currency_code).split('.')[1] || '00' }}</span>
+              <span class="text-[0.55rem] font-black uppercase text-white/20 ml-1">{{ req.currency_code }}</span>
+            </div>
+          </td>
+
+          <!-- Estado -->
+          <td>
+            <span 
+              class="px-3 py-1.5 rounded-xl text-[0.65rem] font-black uppercase tracking-[0.2em] border transition-all"
+              :class="getStatusBadge(req.status)"
+            >
+              {{ getStatusText(req.status) }}
+            </span>
+          </td>
+
+          <!-- Acciones -->
+          <td>
+            <div class="flex justify-end pr-2 opacity-10 group-hover:opacity-100 transition-opacity duration-300">
+                <button 
+                  v-if="req.status === 'pending'" 
+                  @click="goToAction(req)" 
+                  class="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center transition-all hover:bg-primary hover:text-secondary shadow-lg active:scale-90"
+                  title="Procesar Solicitud"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-bolt" />
+                </button>
+                <div v-else class="w-10 h-10 flex items-center justify-center text-white/10" :title="req.notes || 'Completada'">
+                   <FontAwesomeIcon icon="fa-solid fa-check-double" v-if="req.status === 'processed'" class="text-success/20" />
+                   <FontAwesomeIcon icon="fa-solid fa-ban" v-else class="text-danger/20" />
                 </div>
-              </td>
-              <td class="py-4 px-4 text-right text-sm font-black text-white">
-                {{ formatCurrency(req.amount, req.currency_code) }}
-              </td>
-              <td class="py-4 px-4 text-center">
-                <span :class="['px-3 py-1 text-[0.65rem] font-black uppercase tracking-widest rounded-full border', getStatusBadge(req.status)]">
-                  {{ getStatusText(req.status) }}
-                </span>
-              </td>
-              <td class="py-4 px-4 text-center">
-                  <button v-if="req.status === 'pending'" @click="goToAction(req)" class="w-8 h-8 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-secondary transition-all">
-                      <FontAwesomeIcon icon="fa-solid fa-bolt" />
-                  </button>
-                  <span v-if="req.status !== 'pending'" class="text-white/20" :title="req.notes || 'Sin notas'">
-                    <FontAwesomeIcon icon="fa-solid fa-info-circle" v-if="req.notes" class="text-white/40 cursor-help" />
-                    <span v-else>-</span>
-                  </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+            </div>
+          </td>
+        </tr>
+      </BaseTable>
     </BaseCard>
 
-    <!-- Modal de Acción -->
-    <BaseModal :show="isActionModalOpen" title="Procesar Solicitud" @close="closeActionModal">
-      <div v-if="selectedRequest" class="space-y-6">
-        <div class="bg-secondary p-4 rounded-xl border border-white/5 space-y-2">
-          <div class="flex justify-between text-sm">
-            <span class="text-white/40 font-bold">Cliente:</span>
-            <span class="text-white font-black">{{ selectedRequest.client?.name }}</span>
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-white/40 font-bold">Monto:</span>
-            <span class="text-primary font-black">{{ formatCurrency(selectedRequest.amount, selectedRequest.currency_code) }}</span>
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-white/40 font-bold">Destino:</span>
-            <span class="text-white font-bold">{{ selectedRequest.destination_target || 'N/A' }}</span>
-          </div>
-          <div v-if="selectedRequest.notes" class="mt-4 pt-4 border-t border-white/5 text-xs text-info">
-            <strong>Notas Cliente:</strong> {{ selectedRequest.notes }}
-          </div>
+    <!-- Modal de Acción Premium -->
+    <BaseModal :show="isActionModalOpen" title="Autorización de Solicitud" @close="closeActionModal">
+      <div v-if="selectedRequest" class="space-y-8 py-4">
+        
+        <!-- Resumen de Solicitud Card -->
+        <div class="relative p-8 rounded-[2rem] bg-black/60 border border-white/5 overflow-hidden group">
+           <div class="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 blur-3xl group-hover:bg-primary/10 transition-all duration-1000"></div>
+           <div class="relative z-10 flex flex-col items-center text-center space-y-3">
+              <div class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[0.6rem] font-black text-white/40 uppercase tracking-[0.3em] mb-2">
+                {{ selectedRequest.type === 'withdrawal' ? 'RETIRO DE CAPITAL' : 'INTERCAMBIO (EXCHANGE)' }}
+              </div>
+              <div class="flex flex-col">
+                <span class="text-5xl font-black text-white tracking-tighter drop-shadow-2xl">
+                  {{ formatCurrency(selectedRequest.amount, selectedRequest.currency_code) }}
+                </span>
+                <span class="text-[0.65rem] font-medium text-white/20 uppercase tracking-widest mt-2">DÉBITO PROYECTADO DESDE {{ selectedRequest.source_origin }}</span>
+              </div>
+           </div>
         </div>
 
-        <div class="space-y-4">
+        <!-- Meta Data Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 px-4">
+           <div class="space-y-1">
+              <label class="text-[0.55rem] font-black text-white/20 uppercase tracking-[0.2em] mb-1 block">Titular del Fondo</label>
+              <p class="font-bold text-white tracking-tight leading-tight">{{ selectedRequest.client?.name }}</p>
+           </div>
+           <div class="text-right space-y-1">
+              <label class="text-[0.55rem] font-black text-white/20 uppercase tracking-[0.2em] mb-1 block">Destino de Fondos</label>
+              <p class="text-xs font-bold text-primary tracking-tight">{{ selectedRequest.destination_target || 'N/A' }}</p>
+           </div>
+        </div>
+
+        <!-- Input de Notas Premium -->
+        <div class="px-2">
           <BaseInput
-            label="Notas / Observaciones"
+            label="Instrucciones / Notas de Procesamiento"
             v-model="actionForm.notes"
-            placeholder="Añade algún detalle o motivo si vas a rechazar..."
+            placeholder="Añade detalle sobre la plataforma o motivo de rechazo..."
+            class="premium-input-large"
           />
         </div>
 
-        <div class="flex justify-end gap-3 pt-6 border-t border-white/5">
-          <button @click="handleReject" :disabled="isProcessing" class="px-4 py-2 bg-danger/10 text-danger border border-danger/20 rounded-xl font-bold hover:bg-danger hover:text-white transition-colors">
-            Rechazar
-          </button>
-          <button @click="handleApprove" :disabled="isProcessing" class="px-4 py-2 bg-success/10 text-success border border-success/20 rounded-xl font-bold hover:bg-success hover:text-white transition-colors flex items-center gap-2">
-            <FontAwesomeIcon v-if="isProcessing" icon="fa-solid fa-spinner" spin />
-            Marcar como Procesada / Aprobada
-          </button>
+        <!-- Acciones de Modal -->
+        <div class="flex gap-4 pt-6 border-t border-white/5">
+           <button 
+             @click="handleReject" 
+             :disabled="isProcessing" 
+             class="px-8 py-4 rounded-2xl bg-danger/10 text-danger font-black text-xs uppercase tracking-widest transition-all hover:bg-danger hover:text-white border border-danger/20 active:scale-95 disabled:opacity-50"
+           >
+             Rechazar
+           </button>
+           <button 
+             @click="handleApprove" 
+             :disabled="isProcessing" 
+             class="flex-1 bg-success text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-success-dark hover:shadow-[0_10px_30px_rgba(14,203,129,0.3)] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
+           >
+             <FontAwesomeIcon v-if="isProcessing" icon="fa-solid fa-spinner" spin />
+             {{ isProcessing ? 'CONSOLIDANDO...' : 'APROBAR E INICIAR FLUJO' }}
+           </button>
         </div>
       </div>
     </BaseModal>
 
   </div>
 </template>
+
+<style scoped>
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

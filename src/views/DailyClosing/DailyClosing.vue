@@ -6,11 +6,12 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import BaseButton from '@/components/shared/BaseButton.vue'
 import BaseTable from '@/components/ui/BaseTable.vue'
+import { formatDateISO } from '@/utils/date'
 
 // --- ESTADO ---
 const isLoading = ref(false)
 const isDownloading = ref(false)
-const selectedDate = ref(new Date().toISOString().split('T')[0])
+const selectedDate = ref(formatDateISO(new Date()))
 const data = ref({
     global_summary: [],
     accounts_details: [],
@@ -238,6 +239,7 @@ onMounted(() => fetchClosing())
 .text-gradient-primary {
   background: linear-gradient(135deg, #f7a600, #f0b90b);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 </style>

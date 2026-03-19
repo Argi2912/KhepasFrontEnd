@@ -1,327 +1,272 @@
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { usePurchase } from '@/composables/transactions/usePurchase'
 import { useTransactionStore } from '@/stores/transaction'
-import { useAuthStore } from '@/stores/auth'
-import { useFormValidation } from '@/utils/useFormValidation'
-import api from '@/services/api'
-import notify from '@/services/notify'
-import { useRouter } from 'vue-router'
-
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import FormWizard from '@/components/shared/FormWizard.vue'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
-const router = useRouter()
-const authStore = useAuthStore()
 const transactionStore = useTransactionStore()
-const { errors, handleAxiosError, getError, clearError } = useFormValidation()
 
-const currentStep = ref(0)
-const isSubmitting = ref(false)
-const localCurrencyCode = 'VES'
-
-// NUEVO: Entrega física de la divisa
-const isDivisaDelivered = ref(true)
-
-const form = reactive({
-  client_id: null,
-  broker_id: null,
-  provider_id: null,
-  admin_user_id: authStore.authUser?.id,
-
-  from_account_id: null,
-  platform_account_id: null,
-
-  amount_to_deliver: 0.0,
-
-  buy_rate: 0.0,
-  received_rate: 0.0,
-
-  commission_charged_pct: 0.0,
-  commission_provider_pct: 0.0,
-
-  deliver_currency_code: '',
-})
-
-const selectedBroker = computed(() =>
-  transactionStore.getBrokers.find((b) => b.id == form.broker_id),
-)
-
-const fromAccount = computed(() =>
-  transactionStore.accounts.find((a) => a.id == form.from_account_id),
-)
-const platformAccount = computed(() =>
-  transactionStore.accounts.find((a) => a.id == form.platform_account_id),
-)
-
-const fromAccountOptions = computed(() =>
-  transactionStore.getAccounts.filter((a) => a.currency_code === localCurrencyCode),
-)
-const platformAccountOptions = computed(() =>
-  transactionStore.getAccounts.filter((a) => a.currency_code !== localCurrencyCode),
-)
-
-const deliverCurrency = computed(() => platformAccount.value?.currency_code || null)
-
-const ratePair = computed(() => {
-  if (!deliverCurrency.value) {
-    return { buy_rate: null, received_rate: null }
-  }
-  return transactionStore.getRatePair(localCurrencyCode, deliverCurrency.value)
-})
-
-const baseAmountInVes = computed(() => {
-  if (form.amount_to_deliver <= 0 || !form.received_rate) return 0
-  return form.amount_to_deliver * form.received_rate
-})
-
-const commissionCharged_USD = computed(
-  () => (form.amount_to_deliver * form.commission_charged_pct) / 100,
-)
-const commissionProvider_USD = computed(
-  () => (form.amount_to_deliver * form.commission_provider_pct) / 100,
-)
-
-const commissionCharged_VES = computed(() => commissionCharged_USD.value * form.received_rate)
-const commissionProvider_VES = computed(() => commissionProvider_USD.value * form.received_rate)
-
-const totalVesCredit = computed(() => {
-  return baseAmountInVes.value + commissionCharged_VES.value + commissionProvider_VES.value
-})
-
-const totalUsdDebit_Platform = computed(() => {
-  return parseFloat(form.amount_to_deliver || 0) + commissionProvider_USD.value
-})
-
-const platformAccountError = computed(() => {
-  if (
-    platformAccount.value &&
-    totalUsdDebit_Platform.value > 0 &&
-    totalUsdDebit_Platform.value > platformAccount.value.balance
-  ) {
-    return `El débito total (${formatCurrency(totalUsdDebit_Platform.value, deliverCurrency.value)}) supera el saldo de esta cuenta.`
-  }
-  return null
-})
-
-const generalAmountError = computed(() => platformAccountError.value)
-
-watch(selectedBroker, (broker) => {
-  if (broker) form.commission_charged_pct = broker.commission || 0
-})
-
-watch(ratePair, (rates) => {
-  form.buy_rate = rates.buy_rate || 0
-  form.received_rate = rates.received_rate || 0
-})
-
-watch(platformAccount, (account) => {
-  form.deliver_currency_code = account ? account.currency_code : ''
-})
-
-const validateStep = (step) => {
-  clearError()
-  if (step === 0 && !form.client_id) {
-    notify.error('Debe seleccionar un cliente.')
-    return false
-  }
-
-  if (step === 1) {
-    if (!form.from_account_id || !form.platform_account_id) {
-      notify.error('Debe seleccionar ambas cuentas.')
-      return false
-    }
-    if (!form.buy_rate || !form.received_rate) {
-      notify.error('No se encontraron las tasas para este par de divisas.')
-      return false
-    }
-    if (form.buy_rate >= form.received_rate) {
-      notify.error('La tasa de compra no puede ser mayor o igual a la de venta.')
-      return false
-    }
-    if (form.amount_to_deliver <= 0) {
-      notify.error('El monto a comprar debe ser mayor a cero.')
-      return false
-    }
-    if (generalAmountError.value) {
-      notify.error(generalAmountError.value)
-      return false
-    }
-  }
-  return true
-}
-
-const goToNextStep = () => {
-  if (validateStep(currentStep.value)) currentStep.value++
-}
-
-const handleSubmit = async () => {
-  if (!validateStep(1) || isSubmitting.value || generalAmountError.value) {
-    notify.error('Revise los campos, hay errores.')
-    return
-  }
-  isSubmitting.value = true
-
-  const payload = {
-    ...form,
-    amount_received: baseAmountInVes.value,
-    delivered: isDivisaDelivered.value, // ← ESTE ES EL NUEVO CAMPO
-  }
-  delete payload.amount_to_deliver
-
-  try {
-    await api.post('/transactions/dollar-purchase', payload)
-    notify.success('Compra de divisa registrada.')
-    router.push({ name: 'transactions_home' })
-  } catch (error) {
-    handleAxiosError(error)
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-onMounted(() => transactionStore.fetchAllSupportData())
-
-const formatCurrency = (value, currency) => {
-  if (value == null || !currency) return '...'
-  const code = currency === 'USDT' ? 'USD' : currency
-  try {
-    return new Intl.NumberFormat('es-VE', {
-      style: 'currency',
-      currency: code,
-    }).format(value)
-  } catch (e) {
-    return `${currency} ${value}`
-  }
-}
+const {
+  currentStep,
+  isSubmitting,
+  isDivisaDelivered,
+  form,
+  localCurrencyCode,
+  fromAccountOptions,
+  platformAccountOptions,
+  deliverCurrency,
+  baseAmountInVes,
+  commissionCharged_VES,
+  commissionProvider_VES,
+  commissionProvider_USD,
+  totalVesCredit,
+  totalUsdDebit_Platform,
+  platformAccountError,
+  generalAmountError,
+  goToNextStep,
+  handleSubmit,
+  formatCurrency,
+} = usePurchase()
 </script>
 
 <template>
-  <div class="transaction-form-view">
-    <FormWizard title="Registro de Compra de Divisa (VES a USD)" v-model="currentStep">
+  <div class="max-w-7xl mx-auto py-10 animate-premium-in">
+    
+    <!-- Título fuera del Wizard para mayor impacto -->
+    <div class="mb-10 px-4">
+      <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+        <span class="w-1.5 h-10 bg-primary rounded-full shadow-[0_0_20px_rgba(247,166,0,0.4)]"></span>
+        Registro de <span class="text-gradient-primary">Compra Divisa</span>
+      </h1>
+      <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Conversión estratégica de VES a USD vía plataformas</p>
+    </div>
+
+    <FormWizard v-model="currentStep">
+      
+      <!-- Paso 1: Entidades Involucradas -->
       <template #step-0>
-        <h2 class="step-title">1. Partes Involucradas</h2>
-        <div class="form-grid">
-          <BaseSelect v-model="form.client_id" label="Cliente" :options="transactionStore.getClients" required />
-          <BaseSelect v-model="form.broker_id" label="Corredor (Broker)" :options="transactionStore.getBrokers"
-            placeholder="Opcional" />
-          <BaseSelect v-model="form.provider_id" label="Proveedor" :options="transactionStore.getProviders"
-            placeholder="Opcional" />
+        <div class="space-y-8 py-4 animate-fade-in px-4">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+               <FontAwesomeIcon icon="fa-solid fa-users" />
+            </div>
+            <h2 class="text-lg font-black text-white uppercase tracking-widest">1. Núcleo de la Operación</h2>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <BaseSelect 
+              v-model="form.client_id" 
+              label="Entidad Cliente" 
+              :options="transactionStore.getClients" 
+              required 
+              placeholder="Seleccionar titular..." 
+              class="premium-input-large"
+            />
+            <BaseSelect 
+              v-model="form.broker_id" 
+              label="Corredor (Broker)" 
+              :options="transactionStore.getBrokers"
+              placeholder="Opcional (Socio)" 
+            />
+            <BaseSelect 
+              v-model="form.provider_id" 
+              label="Proveedor Externo" 
+              :options="transactionStore.getProviders"
+              placeholder="Opcional (Fuente)" 
+            />
+          </div>
+          
+          <div class="p-6 rounded-2xl bg-white/[0.02] border border-white/5 border-dashed text-center">
+             <p class="text-[0.6rem] font-black text-white/20 uppercase tracking-[0.3em]">Validación de contrapartes activa</p>
+          </div>
         </div>
       </template>
 
+      <!-- Paso 2: Configuración y Cálculos -->
       <template #step-1>
-        <h2 class="step-title">2. Operación y Resumen</h2>
-
-        <div class="form-grid-col2 section-title">
-          <BaseSelect v-model="form.from_account_id" :label="`Cuenta Destino (Plataforma Recibe ${localCurrencyCode})`"
-            :options="fromAccountOptions" required />
-          <BaseSelect v-model="form.platform_account_id" label="Cuenta Origen (Plataforma Paga Divisa)"
-            :options="platformAccountOptions" required :error="platformAccountError" />
-        </div>
-
-        <h2 class="step-title section-title">Cálculos</h2>
-        <div class="form-grid-col3">
-          <BaseInput v-model.number="form.amount_to_deliver" :label="`Monto a Comprar (${deliverCurrency || 'Divisa'})`"
-            type="number" step="0.01" required />
-          <div class="info-box rate-box">
-            <p>Tasa de Compra (Costo)</p>
-            <h3 :class="{ 'rate-found': form.buy_rate }">
-              {{ form.buy_rate ? form.buy_rate.toFixed(6) : '...' }}
-            </h3>
+        <div class="space-y-10 py-4 animate-fade-in px-4">
+          
+          <!-- Cuentas -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 bg-black/40 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 shadow-inner">
+            <BaseSelect 
+              v-model="form.from_account_id" 
+              :label="`Plataforma Recibe (${localCurrencyCode})`"
+              :options="fromAccountOptions" 
+              required 
+            />
+            <BaseSelect 
+              v-model="form.platform_account_id" 
+              label="Plataforma Paga (USD / Divisa)"
+              :options="platformAccountOptions" 
+              required 
+              :error="platformAccountError" 
+            />
           </div>
-          <div class="info-box rate-box">
-            <p>Tasa de Venta (Cliente)</p>
-            <h3 :class="{ 'rate-found': form.received_rate }">
-              {{ form.received_rate ? form.received_rate.toFixed(6) : '...' }}
-            </h3>
+
+          <!-- Montos y Tasas -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
+             <div class="relative group">
+                <BaseInput 
+                  v-model.number="form.amount_to_deliver" 
+                  :label="`Monto a Comprar (${deliverCurrency || 'USD'})`"
+                  type="number" 
+                  step="0.01" 
+                  required 
+                  class="premium-input-large"
+                />
+                <FontAwesomeIcon icon="fa-solid fa-money-bill-transfer" class="absolute right-4 top-10 text-primary/40 group-focus-within:text-primary transition-colors" />
+             </div>
+
+             <div class="flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 group hover:border-success/30 transition-all">
+                <span class="text-[0.55rem] font-black text-white/20 uppercase tracking-[0.3em]">Tasa Operativa (Costo)</span>
+                <div class="flex items-baseline gap-2">
+                   <span class="text-2xl font-black transition-colors" :class="form.buy_rate ? 'text-success' : 'text-white/20'">
+                     {{ form.buy_rate ? form.buy_rate.toFixed(4) : '0.0000' }}
+                   </span>
+                   <span class="text-[0.6rem] font-bold text-white/10 uppercase">VES/USD</span>
+                </div>
+             </div>
+
+             <div class="flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 group hover:border-primary/30 transition-all">
+                <span class="text-[0.55rem] font-black text-white/20 uppercase tracking-[0.3em]">Tasa Comercial (Cliente)</span>
+                <div class="flex items-baseline gap-2">
+                   <span class="text-2xl font-black transition-colors" :class="form.received_rate ? 'text-primary' : 'text-white/20'">
+                     {{ form.received_rate ? form.received_rate.toFixed(4) : '0.0000' }}
+                   </span>
+                   <span class="text-[0.6rem] font-bold text-white/10 uppercase">VES/USD</span>
+                </div>
+             </div>
           </div>
-        </div>
 
-        <h2 class="step-title section-title">Comisiones (Sobre Monto a Comprar)</h2>
-        <div class="form-grid-col2">
-          <BaseInput v-model.number="form.commission_charged_pct" label="Comisión Empresa (%)" type="number"
-            step="0.01" />
-          <BaseInput v-model.number="form.commission_provider_pct" label="Comisión Proveedor (%)" type="number"
-            step="0.01" />
-        </div>
-
-        <!-- NUEVO CHECKBOX -->
-        <div class="delivery-checkbox-section">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="isDivisaDelivered" />
-            <span class="checkmark"></span>
-            <strong>La divisa fue entregada físicamente al cliente</strong>
-          </label>
-          <div v-if="!isDivisaDelivered" class="warning-text">
-            <FontAwesomeIcon icon="fa-solid fa-exclamation-triangle" />
-            La transacción quedará en estado <strong>PENDIENTE DE ENTREGA</strong>
+          <!-- Comisiones -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-white/5">
+            <BaseInput v-model.number="form.commission_charged_pct" label="Margen Empresa (%)" type="number" step="0.01" placeholder="Ej: 2.50" />
+            <BaseInput v-model.number="form.commission_provider_pct" label="Cargo Proveedor (%)" type="number" step="0.01" placeholder="Ej: 1.00" />
           </div>
-        </div>
 
-        <div class="summary-box">
-          <h2 class="step-title section-title">Resumen Final (Calculado)</h2>
-          <div class="summary-grid">
-            <div class="summary-card">
-              <h4>
-                <FontAwesomeIcon icon="fa-solid fa-arrow-up" /> Plataforma Recibe (VES)
-              </h4>
-              <div class="summary-line">
-                <span>Monto Base (VES):</span>
-                <strong>{{ formatCurrency(baseAmountInVes, localCurrencyCode) }}</strong>
+          <!-- Footer Checkbox -->
+          <div class="p-6 rounded-[2rem] border transition-all duration-500 flex flex-col items-center text-center gap-4"
+               :class="isDivisaDelivered ? 'bg-success/5 border-success/30' : 'bg-warning/5 border-warning/30 shadow-[0_10px_40px_rgba(247,166,0,0.05)] shadow-inner'">
+            
+            <label class="flex items-center gap-4 cursor-pointer group">
+              <input type="checkbox" v-model="isDivisaDelivered" class="w-6 h-6 rounded-lg bg-black border-white/20 text-primary focus:ring-primary focus:ring-offset-0" />
+              <span class="text-sm font-black text-white uppercase tracking-widest group-hover:text-primary transition-colors">Confirmar Entrega Física de Divisa</span>
+            </label>
+            
+            <p v-if="!isDivisaDelivered" class="text-[0.65rem] font-bold text-warning/60 animate-pulse uppercase tracking-[0.2em] flex items-center gap-2">
+               <FontAwesomeIcon icon="fa-solid fa-triangle-exclamation" /> 
+               La orden quedará en cola de entrega pendiente
+            </p>
+            <p v-else class="text-[0.65rem] font-bold text-success uppercase tracking-[0.2em] flex items-center gap-2">
+               <FontAwesomeIcon icon="fa-solid fa-circle-check" /> 
+               Liquidación instantánea aprobada
+            </p>
+          </div>
+
+          <!-- Resumen con Glassmorphism -->
+          <div class="relative p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] bg-secondary-light/40 border border-white/10 shadow-2xl overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50"></div>
+            
+            <h3 class="text-xs font-black text-white/30 uppercase tracking-[0.4em] mb-8 relative z-10 border-b border-white/5 pb-4">Proyección de Impacto Contable</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
+              <!-- Crédito -->
+              <div class="space-y-6">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-success/20 flex items-center justify-center text-success">
+                    <FontAwesomeIcon icon="fa-solid fa-arrow-up" />
+                  </div>
+                  <h4 class="text-[0.65rem] font-black text-white/60 uppercase tracking-widest">Entrada neta (VES)</h4>
+                </div>
+                
+                <div class="space-y-3 px-2">
+                   <div class="flex justify-between text-xs font-bold text-white/30">
+                      <span>Monto Base:</span>
+                      <span>{{ formatCurrency(baseAmountInVes, localCurrencyCode) }}</span>
+                   </div>
+                   <div class="flex justify-between text-xs font-medium text-white/20">
+                      <span>FEE Empresa:</span>
+                      <span>{{ formatCurrency(commissionCharged_VES, localCurrencyCode) }}</span>
+                   </div>
+                   <div class="flex justify-between text-[0.6rem] italic text-white/10">
+                      <span>FEE Proveedor:</span>
+                      <span>{{ formatCurrency(commissionProvider_VES, localCurrencyCode) }}</span>
+                   </div>
+                   <div class="pt-4 border-t border-white/5 flex flex-col md:flex-row justify-between items-baseline group-hover:scale-[1.02] transition-transform gap-2">
+                      <span class="text-[0.55rem] font-black text-success uppercase tracking-widest">Total a Percibir</span>
+                      <span class="text-2xl md:text-3xl font-black text-success tracking-tighter">{{ formatCurrency(totalVesCredit, localCurrencyCode) }}</span>
+                   </div>
+                </div>
               </div>
-              <div class="summary-line com-line">
-                <span>Com. Empresa (VES):</span>
-                <span>{{ formatCurrency(commissionCharged_VES, localCurrencyCode) }}</span>
-              </div>
-              <div class="summary-line com-line">
-                <span>Com. Proveedor (VES):</span>
-                <span>{{ formatCurrency(commissionProvider_VES, localCurrencyCode) }}</span>
-              </div>
-              <div class="summary-total credit">
-                <span>Total a Recibir (VES):</span>
-                <strong>{{ formatCurrency(totalVesCredit, localCurrencyCode) }}</strong>
+
+              <!-- Débito -->
+              <div class="space-y-6">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-danger/20 flex items-center justify-center text-danger">
+                    <FontAwesomeIcon icon="fa-solid fa-arrow-down" />
+                  </div>
+                  <h4 class="text-[0.65rem] font-black text-white/60 uppercase tracking-widest">Salida Plat (USD)</h4>
+                </div>
+
+                <div class="space-y-3 px-2">
+                   <div class="flex justify-between text-xs font-bold text-white/30">
+                      <span>Principal:</span>
+                      <span>{{ formatCurrency(form.amount_to_deliver, deliverCurrency) }}</span>
+                   </div>
+                   <div class="flex justify-between text-xs font-medium text-white/20">
+                      <span>Com. Red:</span>
+                      <span>{{ formatCurrency(commissionProvider_USD, deliverCurrency) }}</span>
+                   </div>
+                   <div class="pt-4 border-t border-white/5 flex flex-col md:flex-row justify-between items-baseline group-hover:scale-[1.02] transition-transform gap-2">
+                       <span class="text-[0.55rem] font-black text-danger uppercase tracking-widest">Débito Estimado</span>
+                       <span class="text-2xl md:text-3xl font-black text-danger tracking-tighter">{{ formatCurrency(totalUsdDebit_Platform, deliverCurrency) }}</span>
+                   </div>
+                </div>
               </div>
             </div>
-            <div class="summary-card">
-              <h4>
-                <FontAwesomeIcon icon="fa-solid fa-arrow-down" /> Plataforma Paga (Divisa)
-              </h4>
-              <div class="summary-line">
-                <span>Monto Cliente:</span>
-                <strong>{{ formatCurrency(form.amount_to_deliver, deliverCurrency) }}</strong>
-              </div>
-              <div class="summary-line com-line">
-                <span>Com. Proveedor:</span>
-                <span>{{ formatCurrency(commissionProvider_USD, deliverCurrency) }}</span>
-              </div>
-              <div class="summary-total debit">
-                <span>Total a Pagar ({{ deliverCurrency }}):</span>
-                <strong>{{ formatCurrency(totalUsdDebit_Platform, deliverCurrency) }}</strong>
-              </div>
-            </div>
-          </div>
 
-          <div v-if="generalAmountError" class="error-box">
-            <FontAwesomeIcon icon="fa-solid fa-exclamation-triangle" />
-            {{ generalAmountError }}
+            <div v-if="generalAmountError" class="mt-8 p-4 bg-danger/10 border border-danger/20 rounded-2xl flex items-center gap-4 animate-bounce">
+              <FontAwesomeIcon icon="fa-solid fa-triangle-exclamation" class="text-danger text-xl" />
+              <p class="text-xs font-black text-danger uppercase tracking-widest">{{ generalAmountError }}</p>
+            </div>
           </div>
         </div>
       </template>
 
+      <!-- Navegación del Wizard -->
       <template #footer>
-        <div class="wizard-nav">
-          <button type="button" @click="currentStep--" :disabled="currentStep === 0" class="btn-prev">
-            Anterior
+        <div class="flex justify-between items-center w-full px-4 pt-6">
+          <button 
+            type="button" 
+            @click="currentStep--" 
+            :disabled="currentStep === 0" 
+            class="px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-0 active:scale-95 text-white/40 hover:text-white"
+          >
+            Regresar
           </button>
-          <button type="button" @click="goToNextStep" v-if="currentStep < 1" class="btn-next">
-            Siguiente
-          </button>
-          <button type="button" @click="handleSubmit" v-if="currentStep === 1"
-            :disabled="isSubmitting || generalAmountError" class="btn-finish">
-            {{ isSubmitting ? 'Procesando...' : 'Finalizar Compra' }}
-          </button>
+          
+          <div class="flex gap-4">
+            <button 
+              type="button" 
+              @click="goToNextStep" 
+              v-if="currentStep < 1" 
+              class="bg-white/10 hover:bg-white/20 text-white px-10 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 border border-white/10"
+            >
+              Continuar
+            </button>
+            <button 
+              type="button" 
+              @click="handleSubmit" 
+              v-if="currentStep === 1"
+              :disabled="isSubmitting || generalAmountError" 
+              class="bg-primary text-secondary px-12 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-primary-dark hover:shadow-xl active:scale-95 disabled:opacity-50"
+            >
+              <FontAwesomeIcon v-if="isSubmitting" icon="fa-solid fa-circle-notch" spin class="mr-2" />
+              {{ isSubmitting ? 'Consolidando...' : 'Confirmar Operación' }}
+            </button>
+          </div>
         </div>
       </template>
     </FormWizard>
@@ -329,207 +274,28 @@ const formatCurrency = (value, currency) => {
 </template>
 
 <style scoped>
-/* Tus estilos originales + el del checkbox */
-.delivery-checkbox-section {
-  margin: 40px 0 30px;
-  padding: 25px;
-  background: rgba(255, 193, 7, 0.15);
-  border: 2px dashed #ffc107;
-  border-radius: 12px;
-  text-align: center;
-  font-size: 1.2rem;
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  cursor: pointer;
-  font-weight: bold;
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.checkbox-label input[type='checkbox'] {
-  width: 28px;
-  height: 28px;
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.warning-text {
-  margin-top: 12px;
-  color: #ffc107;
-  font-weight: bold;
-  font-size: 1.1rem;
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
-/* Resto de tus estilos originales sin cambio */
-.step-title {
-  font-size: 1.3rem;
-  color: var(--color-text-light);
-}
-
-.section-title {
-  margin-top: 30px;
-  margin-bottom: 15px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.form-grid-col2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px 30px;
-}
-
-.form-grid-col3 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 20px;
-}
-
-.summary-box {
-  margin-top: 20px;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.summary-card {
-  background-color: var(--color-background);
-  padding: 20px;
-  border-radius: 8px;
-}
-
-.summary-card h4 {
-  font-size: 1.1rem;
-  color: var(--color-primary);
-  margin-top: 0;
-  margin-bottom: 15px;
-}
-
-.summary-line {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.95rem;
-  margin-bottom: 8px;
-  opacity: 0.8;
-}
-
-.summary-line.com-line {
-  font-size: 0.9rem;
-  opacity: 0.6;
-}
-
-.summary-total {
-  display: flex;
-  justify-content: space-between;
-  font-size: 1.1rem;
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid var(--color-border);
-}
-
-.summary-total.debit strong {
-  color: var(--color-danger);
-}
-
-.summary-total.credit strong {
-  color: var(--color-success);
-}
-
-.error-box {
-  margin-top: 20px;
-  padding: 15px;
-  background-color: #e74c3c20;
-  border: 1px solid var(--color-danger);
-  color: var(--color-danger);
-  border-radius: 6px;
-  text-align: center;
-  font-weight: 500;
-}
-
-.info-box {
-  background-color: var(--color-background);
-  padding: 15px;
-  border-radius: 8px;
-}
-
-.info-box p {
-  margin: 0 0 5px 0;
-  font-size: 0.9rem;
-  opacity: 0.7;
-}
-
-.info-box h3 {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--color-danger);
-}
-
-.info-box h3.rate-found {
-  color: var(--color-success);
-}
-
-.rate-box {
-  margin-top: 30px;
-}
-
-.form-grid-col3 .info-box {
-  margin-top: 0;
-}
-
-.form-grid-col3 .rate-box {
-  margin-top: 0;
-}
-
-.form-grid-col3>*:not(h2) {
-  height: 100%;
-}
-
-.form-grid-col3 .info-box {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.wizard-nav {
-  display: flex;
-  justify-content: flex-end;
-  width: 100%;
-  gap: 10px;
-}
-
-.wizard-nav button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.btn-prev {
-  background-color: var(--color-hover);
-  color: var(--color-text-light);
-}
-
-.btn-next {
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
-}
-
-.btn-finish {
-  background-color: var(--color-success);
-  color: var(--color-secondary);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style>

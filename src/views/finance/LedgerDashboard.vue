@@ -1,59 +1,37 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
-import { useTransactionStore } from '@/stores/transaction'
-import api from '@/services/api'
-import notify from '@/services/notify'
-
 import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
-// 👇 1. IMPORTAR PAGINACIÓN
 import Pagination from '@/components/ui/Pagination.vue'
-
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import Swal from 'sweetalert2'
+import { useLedger } from '@/composables/finance/useLedger'
 
-const transactionStore = useTransactionStore()
+const {
+  loading,
+  isDownloading,
+  activeTab,
+  summary,
+  entries,
+  paginationData,
+  searchQuery,
+  startDate,
+  endDate,
+  showPayModal,
+  selectedEntry,
+  paymentForm,
+  isProcessing,
+  filteredAccounts,
+  formatMoney,
+  isInterestRow,
+  fetchDashboard,
+  downloadReport,
+  openPayModal,
+  confirmPayment,
+  switchTab,
+  clearFilters
+} = useLedger()
 
-// --- ESTADO ---
-const loading = ref(false)
-const isDownloading = ref(false)
-const activeTab = ref('payable')
-const summary = ref({ payable_total: 0, receivable_total: 0 })
-const entries = ref([])
-// 👇 2. NUEVA VARIABLE PARA DATA DE PAGINACIÓN
-const paginationData = ref({})
-
-// --- FILTROS ---
-const searchQuery = ref('')
-const startDate = ref('')
-const endDate = ref('')
-
-// --- MODAL ABONO ---
-const showPayModal = ref(false)
-const selectedEntry = ref(null)
-const paymentForm = ref({
-  account_id: '',
-  amount: '',
-  description: '',
-})
-const isProcessing = ref(false)
-
-// --- COMPUTADAS ---
-const accountsOptions = computed(() => transactionStore.getAccounts)
-
-const filteredAccounts = computed(() => {
-  if (!selectedEntry.value || !selectedEntry.value.currency_code) {
-    return transactionStore.getAccounts
-  }
-  // Filtra las cuentas que tengan la misma moneda que la deuda
-  return transactionStore.getAccounts.filter(
-    (acc) => acc.currency === selectedEntry.value.currency_code,
-  )
-})
-
-// Headers de la tabla
 const headers = [
   { key: 'date', label: 'Fecha' },
   { key: 'entity', label: 'Entidad' },
@@ -61,387 +39,187 @@ const headers = [
   { key: 'ref', label: 'Referencia' },
   { key: 'amounts', label: 'Montos' },
   { key: 'status', label: 'Estado' },
+  { key: 'actions', label: '' },
 ]
-
-// --- HELPERS VISUALES ---
-const formatMoney = (amount, currency = 'USD') => {
-  // Intentamos formatear con el estándar. Si falla (como con USDT), lo hacemos manual.
-  try {
-    return Number(amount).toLocaleString('en-US', {
-      style: 'currency',
-      currency: currency,
-    })
-  } catch (error) {
-    // Fallback para monedas no estándar (USDT, BTC, etc.)
-    return (
-      Number(amount).toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }) +
-      ' ' +
-      currency
-    )
-  }
-}
-
-// [NUEVO] Helper para identificar filas de interés
-const isInterestRow = (description) => {
-  if (!description) return false
-  const lower = description.toLowerCase()
-  return lower.includes('rendimiento') || lower.includes('interés') || lower.includes('interes') || lower.includes('compuesto')
-}
-
-// --- CARGA DE DATOS ---
-// 👇 3. ACEPTAR PARÁMETRO PAGE
-const fetchDashboard = async (page = 1) => {
-  loading.value = true
-  try {
-    const { data: summaryData } = await api.get('/ledger/summary')
-    summary.value = summaryData
-
-    const params = {
-      page: page, // 👇 4. ENVIAR LA PÁGINA
-      type: activeTab.value,
-      search: searchQuery.value.trim() || undefined,
-      start_date: startDate.value || undefined,
-      end_date: endDate.value || undefined,
-      include_paid: false,
-    }
-
-    const { data: response } = await api.get('/ledger', { params })
-
-    // 👇 5. GUARDAR DATOS DE PAGINACIÓN (META/LINKS)
-    paginationData.value = response
-
-    entries.value = response.data.map((item) => {
-      const amount = parseFloat(item.amount || 0)
-      const original = parseFloat(item.original_amount || amount)
-      const paid = parseFloat(item.paid_amount || 0)
-      const pending = Math.max(0, original - paid)
-
-      let displayStatus = 'Pendiente'
-      if (pending <= 0.01) {
-        displayStatus = 'Pagado'
-      } else if (paid > 0) {
-        displayStatus = 'Parcial'
-      }
-
-      let prettyType = 'Desconocido'
-      if (item.entity_type) {
-        if (item.entity_type.includes('Employee')) prettyType = 'Empleado'
-        else if (item.entity_type.includes('Provider')) prettyType = 'Proveedor'
-        else if (item.entity_type.includes('Client')) prettyType = 'Cliente'
-        else if (item.entity_type.includes('Broker')) prettyType = 'Corredor'
-        else prettyType = item.entity_type.split('\\').pop()
-      }
-
-      return {
-        id: item.id,
-        date: new Date(item.created_at).toLocaleDateString('es-VE', {
-          day: '2-digit',
-          month: 'short',
-        }),
-        description: item.description,
-        amount,
-        currency_code: item.currency_code || 'USD',
-        original_amount: original,
-        paid_amount: paid,
-        pending_amount: pending,
-        display_status: displayStatus,
-        has_pending: pending > 0.01,
-        entity_name: item.entity
-          ? item.entity.name || item.entity.alias || item.entity.user?.name || 'Sin nombre'
-          : '---',
-        entity_type: prettyType,
-        tx_number: item.transaction ? item.transaction.number : 'MANUAL',
-      }
-    })
-  } catch (e) {
-    console.error(e)
-    notify.error('Error al cargar el libro mayor')
-  } finally {
-    loading.value = false
-  }
-}
-
-// --- 3. FUNCIÓN DE DESCARGA (AHORA ESTÁ AFUERA Y VISIBLE) ---
-const downloadReport = async (format) => {
-  isDownloading.value = true
-  try {
-    const today = new Date().toISOString().slice(0, 10)
-
-    // Mapeo: Si activeTab es 'payable' -> backend espera 'payables' (plural)
-    const reportType = activeTab.value === 'payable' ? 'payables' : 'receivables'
-
-    // Lógica de fechas: Si hay filtro úsalo, si no, trae todo el historial (2020)
-    const start = startDate.value || '2020-01-01'
-    const end = endDate.value || today
-
-    const response = await api.get('/reports/download', {
-      params: {
-        report_type: reportType,
-        format: format,
-        start_date: start,
-        end_date: end,
-        // Opcional: enviar búsqueda si quieres filtrar el reporte por texto
-        // search: searchQuery.value 
-      },
-      responseType: 'blob'
-    })
-
-    if (response.data.type === 'application/json') {
-      const errorText = await response.data.text()
-      throw new Error(JSON.parse(errorText).message || 'Error generando reporte')
-    }
-
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-
-    const title = activeTab.value === 'payable' ? 'Cuentas_Por_Pagar' : 'Cuentas_Por_Cobrar'
-    link.setAttribute('download', `${title}_${today}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
-
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-
-  } catch (error) {
-    console.error("Error descargando:", error)
-    Swal.fire('Error', error.message || 'No se pudo generar el reporte.', 'error')
-  } finally {
-    isDownloading.value = false
-  }
-}
-
-onMounted(() => {
-  transactionStore.fetchAllSupportData()
-  fetchDashboard()
-})
-
-watch(
-  [activeTab, searchQuery, startDate, endDate],
-  () => {
-    fetchDashboard() // Al cambiar filtros vuelve a pag 1 por defecto
-  },
-  { debounce: 600 },
-)
-
-const switchTab = (tab) => {
-  activeTab.value = tab
-}
-
-const clearFilters = () => {
-  searchQuery.value = ''
-  startDate.value = ''
-  endDate.value = ''
-  fetchDashboard()
-}
-
-const openPayModal = (entry) => {
-  selectedEntry.value = entry
-  paymentForm.value = {
-    account_id: '',
-    amount: entry.pending_amount > 0 ? entry.pending_amount.toFixed(2) : entry.amount.toFixed(2),
-    description: '',
-  }
-  showPayModal.value = true
-}
-
-const confirmPayment = async () => {
-  if (!paymentForm.value.account_id) {
-    notify.warning('Selecciona una cuenta')
-    return
-  }
-  const amount = parseFloat(paymentForm.value.amount)
-  if (amount <= 0 || amount > selectedEntry.value.pending_amount) {
-    notify.warning('Monto inválido')
-    return
-  }
-
-  isProcessing.value = true
-  try {
-    await api.post(`/ledger/${selectedEntry.value.id}/pay`, {
-      account_id: paymentForm.value.account_id,
-      amount,
-      description: paymentForm.value.description || null,
-    })
-    notify.success('Abono registrado correctamente')
-    showPayModal.value = false
-    fetchDashboard()
-  } catch (e) {
-    notify.error(e.response?.data?.message || 'Error al procesar el abono')
-  } finally {
-    isProcessing.value = false
-  }
-}
 </script>
 
 <template>
-  <div class="ledger-dashboard">
-    <h1 class="page-title">Libro Mayor - Cuentas por Pagar / Cobrar</h1>
+  <div class="ledger-dashboard animate-premium-in">
+    <div class="flex justify-between items-center mb-10">
+      <div>
+        <h1 class="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+          <span class="w-1.5 h-10 bg-primary rounded-full"></span>
+          Libro Mayor <span class="text-white/20">&</span> <span class="text-gradient-primary">Tesorería</span>
+        </h1>
+        <p class="text-white/30 text-[0.65rem] font-bold uppercase tracking-[0.2em] mt-2 ml-4">Monitor global de cuentas por pagar y cobrar</p>
+      </div>
+      <div class="flex gap-4">
+          <button @click="downloadReport('excel')" :disabled="isDownloading" class="w-12 h-12 rounded-2xl bg-success/10 text-success border border-success/10 flex items-center justify-center hover:bg-success hover:text-white transition-all shadow-lg active:scale-95" title="Exportar Excel">
+            <FontAwesomeIcon icon="fa-solid fa-file-excel" />
+          </button>
+          <button @click="downloadReport('pdf')" :disabled="isDownloading" class="w-12 h-12 rounded-2xl bg-danger/10 text-danger border border-danger/10 flex items-center justify-center hover:bg-danger hover:text-white transition-all shadow-lg active:scale-95" title="Exportar PDF">
+            <FontAwesomeIcon icon="fa-solid fa-file-pdf" />
+          </button>
+      </div>
+    </div>
 
     <div class="summary-grid">
       <div class="summary-card payable" :class="{ active: activeTab === 'payable' }" @click="switchTab('payable')">
         <div class="icon-box">
-          <FontAwesomeIcon icon="fa-solid fa-arrow-up" />
+          <FontAwesomeIcon icon="fa-solid fa-arrow-trend-up" />
         </div>
         <div class="info">
-          <h3>Por Pagar</h3>
+          <h3>TOTAL POR PAGAR</h3>
           <div class="amount text-danger">
-            ${{
-              (summary.payable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })
-            }}
+            ${{ (summary.payable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }) }}
           </div>
         </div>
+        <div class="active-indicator" v-if="activeTab === 'payable'"></div>
       </div>
 
-      <div class="summary-card receivable" :class="{ active: activeTab === 'receivable' }"
-        @click="switchTab('receivable')">
+      <div class="summary-card receivable" :class="{ active: activeTab === 'receivable' }" @click="switchTab('receivable')">
         <div class="icon-box">
-          <FontAwesomeIcon icon="fa-solid fa-arrow-down" />
+          <FontAwesomeIcon icon="fa-solid fa-arrow-trend-down" />
         </div>
         <div class="info">
-          <h3>Por Cobrar</h3>
+          <h3>TOTAL POR COBRAR</h3>
           <div class="amount text-success">
-            ${{
-              (summary.receivable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })
-            }}
+            ${{ (summary.receivable_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }) }}
           </div>
         </div>
+        <div class="active-indicator" v-if="activeTab === 'receivable'"></div>
       </div>
     </div>
 
-    <div class="filters-bar">
-      <div class="filters-flex">
-        <div class="filter-item search-input">
-          <BaseInput v-model="searchQuery" label="Buscar" placeholder="Descripción, entidad, referencia..."
-            icon="fa-solid fa-magnifying-glass" />
+    <!-- Filtros Inteligentes -->
+    <div class="premium-card p-6 bg-white/[0.02] border border-white/5 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+        <div class="md:col-span-2">
+          <BaseInput v-model="searchQuery" label="Buscar Operación" placeholder="Entidad, descripción o referencia..." icon="fa-solid fa-magnifying-glass" />
         </div>
-
-        <div class="filter-item date-input">
+        <div>
           <BaseInput v-model="startDate" label="Desde" type="date" />
         </div>
-
-        <div class="filter-item date-input">
+        <div>
           <BaseInput v-model="endDate" label="Hasta" type="date" />
         </div>
-
-        <div class="filter-actions">
-          <button class="btn-refresh" @click="fetchDashboard">
-            <FontAwesomeIcon icon="fa-solid fa-filter" /> Aplicar
-          </button>
-          <button class="btn-clear" @click="clearFilters">
-            <FontAwesomeIcon icon="fa-solid fa-rotate-left" /> Limpiar
-          </button>
-        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-white/5">
+        <button class="px-6 py-2.5 rounded-xl bg-white/5 text-white/40 font-black text-[0.65rem] uppercase tracking-widest hover:bg-white/10 transition-all" @click="clearFilters">
+          <FontAwesomeIcon icon="fa-solid fa-rotate-left" class="mr-2" /> Limpiar
+        </button>
+        <button class="px-8 py-2.5 rounded-xl bg-primary text-secondary font-black text-[0.65rem] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all" @click="fetchDashboard(1)">
+          <FontAwesomeIcon icon="fa-solid fa-filter" class="mr-2" /> Filtrar Registros
+        </button>
       </div>
     </div>
 
     <div class="list-section">
-      <div class="list-header">
-        <h2>{{ activeTab === 'payable' ? 'Cuentas por Pagar' : 'Cuentas por Cobrar' }}</h2>
-        <div class="header-actions">
-          <button @click="downloadReport('excel')" :disabled="isDownloading" class="btn-export btn-excel"
-            title="Exportar a Excel">
-            <FontAwesomeIcon icon="fa-solid fa-file-excel" />
-          </button>
-
-          <button @click="downloadReport('pdf')" :disabled="isDownloading" class="btn-export btn-pdf"
-            title="Exportar a PDF">
-            <FontAwesomeIcon icon="fa-solid fa-file-pdf" />
-          </button>
-          <button class="btn-refresh" @click="fetchDashboard">
-            <FontAwesomeIcon icon="fa-solid fa-sync" /> Actualizar
-          </button>
-        </div>
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-black text-white px-2">
+            <span class="text-primary mr-1">/</span> {{ activeTab === 'payable' ? 'Pendientes de Pago' : 'Pendientes de Cobro' }}
+        </h2>
+        <button class="w-10 h-10 rounded-xl bg-white/5 text-white/20 hover:text-primary transition-all" @click="fetchDashboard(paginationData.current_page || 1)">
+          <FontAwesomeIcon icon="fa-solid fa-sync" :spin="loading" />
+        </button>
       </div>
 
       <BaseTable :headers="headers" :data="entries" :isLoading="loading">
-        <tr v-for="entry in entries" :key="entry.id">
-          <td class="text-secondary">{{ entry.date }}</td>
-          <td>
-            <div class="entity-cell">
-              <span class="entity-name">{{ entry.entity_name }}</span>
-              <span class="entity-badge">{{ entry.entity_type }}</span>
+        <tr v-for="entry in entries" :key="entry.id" class="group hover:bg-white/[0.01] transition-colors border-b border-white/[0.02]">
+          <td class="py-5 px-4">
+            <div class="flex flex-col">
+              <span class="text-xs font-black text-white/40 uppercase tracking-widest">{{ entry.date.split(' de ')[0] }}</span>
+              <span class="text-[0.6rem] font-bold text-white/20">{{ entry.date.split(' de ')[1] }}</span>
             </div>
           </td>
-
-          <td class="desc-cell">
-            <div v-if="isInterestRow(entry.description)" style="display: flex; align-items: center; gap: 6px;">
-              <span class="interest-badge">📈 Interés</span>
-              <span :title="entry.description">{{ entry.description }}</span>
+          <td class="px-4">
+            <div class="flex flex-col gap-1">
+              <span class="font-bold text-white group-hover:text-primary transition-colors">{{ entry.entity_name }}</span>
+              <span class="text-[0.6rem] font-black text-white/20 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded w-fit">{{ entry.entity_type }}</span>
             </div>
-            <span v-else :title="entry.description">{{ entry.description }}</span>
           </td>
-
-          <td>
-            <span class="ref-tag">{{ entry.tx_number }}</span>
-          </td>
-          <td class="amount-cell">
-            <div class="main-amount" :class="activeTab === 'payable' ? 'text-danger' : 'text-success'">
-              {{ formatMoney(entry.pending_amount, entry.currency_code) }}
+          <td class="px-4 max-w-[200px]">
+            <div v-if="isInterestRow(entry.description)" class="flex items-center gap-2">
+              <span class="bg-primary/20 text-primary text-[0.5rem] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter">Interés</span>
+              <span class="text-sm text-white/60 truncate" :title="entry.description">{{ entry.description }}</span>
             </div>
-            <div class="sub-amount">
-              <span v-if="entry.paid_amount > 0">
-                Pagado: {{ formatMoney(entry.paid_amount, entry.currency_code) }}
+            <span v-else class="text-sm text-white/60 truncate block" :title="entry.description">{{ entry.description }}</span>
+          </td>
+          <td class="px-4">
+            <span class="font-mono text-[0.7rem] text-primary/40 bg-primary/5 px-2 py-1 rounded border border-primary/10">{{ entry.tx_number }}</span>
+          </td>
+          <td class="px-4 text-right">
+            <div class="flex flex-col">
+              <span class="text-base font-black tracking-tighter" :class="activeTab === 'payable' ? 'text-danger' : 'text-success'">
+                {{ formatMoney(entry.pending_amount, entry.currency_code) }}
               </span>
-              <span class="total-line">
-                Original: {{ formatMoney(entry.original_amount, entry.currency_code) }}
-              </span>
+              <div class="flex flex-col text-[0.6rem] font-bold text-white/20 uppercase">
+                <span v-if="entry.paid_amount > 0">Abonado: {{ formatMoney(entry.paid_amount, entry.currency_code) }}</span>
+                <span>Original: {{ formatMoney(entry.original_amount, entry.currency_code) }}</span>
+              </div>
             </div>
           </td>
-          <td>
-            <span :class="['status-pill', entry.display_status.toLowerCase()]">
+          <td class="px-4 text-center">
+            <span :class="['px-3 py-1 rounded-lg text-[0.6rem] font-black uppercase tracking-widest border transition-all', 
+              entry.display_status === 'Pendiente' ? 'bg-danger/5 text-danger border-danger/20' : 
+              entry.display_status === 'Parcial' ? 'bg-warning/5 text-warning border-warning/20' : 
+              'bg-success/5 text-success border-success/20']">
               {{ entry.display_status }}
             </span>
           </td>
-          <td class="actions-cell">
-            <button v-if="entry.has_pending" class="btn-action" @click="openPayModal(entry)">
+          <td class="px-4 text-right">
+            <button v-if="entry.has_pending" class="px-4 py-1.5 rounded-lg bg-primary/10 text-primary text-[0.65rem] font-black uppercase tracking-widest hover:bg-primary hover:text-secondary transition-all" @click="openPayModal(entry)">
               {{ activeTab === 'payable' ? 'Abonar' : 'Cobrar' }}
             </button>
-            <span v-else class="check-icon">✔</span>
+            <span v-else class="text-success text-lg">
+                <FontAwesomeIcon icon="fa-solid fa-circle-check" />
+            </span>
           </td>
         </tr>
       </BaseTable>
 
-      <div class="pagination-wrapper" v-if="paginationData && paginationData.total > 0">
+      <div class="mt-8 flex justify-between items-center px-4" v-if="paginationData && paginationData.total > 0">
+        <span class="text-[0.65rem] font-black text-white/10 uppercase tracking-widest hidden md:block">Registros: {{ paginationData.total }}</span>
         <Pagination :pagination="paginationData" @change-page="fetchDashboard" />
       </div>
-
     </div>
 
-    <BaseModal :show="showPayModal" title="Registrar Abono" @close="showPayModal = false">
-      <div v-if="selectedEntry">
-        <div class="modal-alert">
-          <FontAwesomeIcon icon="fa-solid fa-info-circle" />
-          <div>
-            <strong>{{ selectedEntry.entity_name }}</strong> ({{ selectedEntry.entity_type }})<br />
-            {{ selectedEntry.description }}<br />
-            <strong>Saldo pendiente:
-              {{ formatMoney(selectedEntry.pending_amount, selectedEntry.currency_code) }}</strong>
+    <!-- Modal de Pago/Cobro -->
+    <BaseModal :show="showPayModal" title="Sincronización de Pagos" @close="showPayModal = false">
+      <div v-if="selectedEntry" class="space-y-8 py-2">
+        <div class="bg-secondary/40 p-5 rounded-2xl border border-white/5 relative overflow-hidden">
+          <div class="absolute -right-4 -top-4 text-6xl opacity-5">💰</div>
+          <div class="flex flex-col gap-1 relative z-10">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/20">Liquidación para</span>
+            <span class="text-lg font-black text-white tracking-tight">{{ selectedEntry.entity_name }}</span>
+            <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-baseline">
+                <span class="text-[0.65rem] font-bold text-white/40 uppercase tracking-widest">Saldo Pendiente:</span>
+                <span class="text-xl font-black text-primary tracking-tighter">{{ formatMoney(selectedEntry.pending_amount, selectedEntry.currency_code) }}</span>
+            </div>
           </div>
         </div>
 
-        <BaseSelect label="Cuenta para el movimiento" :options="filteredAccounts" v-model="paymentForm.account_id"
-          placeholder="Selecciona una cuenta" required />
+        <div class="space-y-6">
+          <BaseSelect label="Cuenta para el movimiento" :options="filteredAccounts" v-model="paymentForm.account_id" placeholder="Selecciona el origen/destino..." required />
+          
+          <div v-if="filteredAccounts.length === 0" class="p-4 rounded-xl bg-danger/10 border border-danger/20 flex items-center gap-3 text-danger">
+            <FontAwesomeIcon icon="fa-solid fa-triangle-exclamation" />
+            <p class="text-[0.65rem] font-black uppercase tracking-widest">No hay cuentas disponibles en {{ selectedEntry.currency_code }}</p>
+          </div>
 
-        <p v-if="filteredAccounts.length === 0" class="text-danger text-sm mt-1">
-          ⚠️ No tienes cuentas en {{ selectedEntry.currency_code }} para realizar este pago.
-        </p>
-
-        <BaseInput label="Monto a abonar" type="number" step="0.01" v-model.number="paymentForm.amount"
-          placeholder="0.00" required />
-
-        <BaseInput label="Descripción (opcional)" type="text" v-model="paymentForm.description"
-          placeholder="Ej: Abono parcial vía Zelle" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <BaseInput label="Monto a Procesar" type="number" step="0.01" v-model.number="paymentForm.amount" placeholder="0.00" required />
+             <BaseInput label="Código de Referencia" type="text" v-model="paymentForm.description" placeholder="Ej: Zelle #9090" />
+          </div>
+        </div>
       </div>
 
       <template #footer>
-        <div class="modal-footer-actions">
-          <button class="btn-cancel" @click="showPayModal = false">Cancelar</button>
-          <button class="btn-confirm" @click="confirmPayment" :disabled="isProcessing">
-            {{ isProcessing ? 'Procesando...' : 'Confirmar Abono' }}
+        <div class="flex gap-4 w-full">
+          <button class="flex-1 py-3 rounded-xl bg-white/5 text-white/40 font-black text-[0.65rem] uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5" @click="showPayModal = false">Cancelar</button>
+          <button class="flex-2 py-3 px-8 rounded-xl bg-primary text-secondary font-black text-[0.65rem] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50" @click="confirmPayment" :disabled="isProcessing">
+            <FontAwesomeIcon v-if="isProcessing" icon="fa-solid fa-circle-notch" spin class="mr-2" />
+            {{ activeTab === 'payable' ? 'Confirmar Pago' : 'Confirmar Cobro' }}
           </button>
         </div>
       </template>
@@ -450,434 +228,108 @@ const confirmPayment = async () => {
 </template>
 
 <style scoped>
-/* --- TÍTULOS Y ESTRUCTURA --- */
-.page-title {
-  font-size: 1.8rem;
-  color: var(--color-primary);
-  margin-bottom: 30px;
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
 }
 
 .summary-card {
-  background: #1e1e1e;
-  padding: 20px;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 32px;
+  border-radius: 2rem;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
   cursor: pointer;
-  border: 1px solid #333;
-  transition: all 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.summary-card:hover,
+.summary-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 .summary-card.active {
+  background: rgba(255, 255, 255, 0.05);
   border-color: var(--color-primary);
-  background: #252525;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
 }
 
 .summary-card .icon-box {
   font-size: 2.5rem;
   opacity: 0.8;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.summary-card.payable .icon-box {
-  color: #ff5252;
-}
-
-.summary-card.receivable .icon-box {
-  color: #4caf50;
-}
+.summary-card.payable .icon-box { color: #ff5252; }
+.summary-card.receivable .icon-box { color: #4caf50; }
 
 .info h3 {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.65rem;
+  font-weight: 900;
   text-transform: uppercase;
-  color: #888;
-  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.2em;
 }
 
 .info .amount {
-  font-size: 1.8rem;
-  font-weight: bold;
-  margin-top: 5px;
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin-top: 4px;
+  letter-spacing: -0.05em;
 }
 
-/* --- FILTROS (RENOVADO CON FLEXBOX) --- */
-.filters-bar {
-  background: #1e1e1e;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  border: 1px solid #333;
+.active-indicator {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--color-primary);
 }
 
-.filters-flex {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  /* La magia: alinea todo al fondo del contenedor */
-  align-items: flex-end;
-}
-
-/* Controla el ancho de los inputs para que se estiren ordenadamente */
-.filter-item {
-  flex: 1;
-  min-width: 200px;
-}
-
-/* El input de búsqueda puede ser más ancho si hay espacio */
-.search-input {
-  flex: 2;
-  min-width: 250px;
-}
-
-.date-input {
-  flex: 1;
-  min-width: 150px;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 10px;
-  /* Asegura que los botones no se estiren verticalmente */
-  align-self: flex-end;
-  padding-bottom: 1px;
-  /* Ajuste fino por si los inputs tienen bordes extraños */
-}
-
-.btn-refresh,
-.btn-clear {
-  background: #2c2c2c;
-  border: 1px solid #444;
-  color: #ccc;
-  padding: 0 15px;
-  /* Padding lateral */
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 42px;
-  /* Altura fija estándar para coincidir con inputs */
-  white-space: nowrap;
-}
-
-.btn-refresh:hover {
-  background: #333;
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-/* --- TABLA --- */
 .list-section {
-  background: #1e1e1e;
-  padding: 20px;
-  border-radius: 8px;
-  border: 1px solid #333;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 32px;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 400px;
 }
 
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
+.premium-card {
+  border-radius: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
-td {
-  vertical-align: middle;
-  padding: 12px 8px;
-  border-bottom: 1px solid #2c2c2c;
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.text-secondary {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.entity-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.entity-name {
-  font-weight: 600;
-  color: #fff;
-  font-size: 0.95rem;
-}
-
-.entity-badge {
-  font-size: 0.7rem;
-  background: #333;
-  color: #aaa;
-  padding: 2px 6px;
-  border-radius: 4px;
-  width: fit-content;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.desc-cell {
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #ccc;
-  font-size: 0.9rem;
-}
-
-.ref-tag {
-  font-family: 'Consolas', monospace;
-  background: #111;
-  color: var(--color-primary);
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  border: 1px solid #333;
-}
-
-.amount-cell {
-  text-align: right;
-}
-
-.main-amount {
-  font-size: 1.1rem;
-  font-weight: bold;
-  margin-bottom: 2px;
-}
-
-.sub-amount {
-  font-size: 0.75rem;
-  color: #666;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.total-line {
-  border-top: 1px dashed #333;
-  padding-top: 1px;
-  margin-top: 1px;
-  display: inline-block;
-}
-
-.status-pill {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-.status-pill.pendiente {
-  background: rgba(255, 82, 82, 0.15);
-  color: #ff5252;
-}
-
-.status-pill.parcial {
-  background: rgba(255, 193, 7, 0.15);
-  color: #ffc107;
-}
-
-.status-pill.pagado {
-  background: rgba(76, 175, 80, 0.15);
-  color: #4caf50;
-}
-
-.actions-cell {
-  text-align: center;
-}
-
-.btn-action {
-  background: transparent;
-  border: 1px solid var(--color-primary);
-  color: var(--color-primary);
-  padding: 5px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.2s;
-}
-
-.btn-action:hover {
-  background: var(--color-primary);
-  color: #000;
-  font-weight: bold;
-}
-
-.check-icon {
-  color: #4caf50;
-  font-size: 1.2rem;
-}
-
-.text-success {
-  color: #4caf50 !important;
-}
-
-.text-danger {
-  color: #ff5252 !important;
-}
-
-.modal-alert {
-  background: rgba(240, 185, 11, 0.1);
-  padding: 15px;
-  border-radius: 6px;
-  border-left: 3px solid var(--color-primary);
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 20px;
-  color: #ddd;
-}
-
-.modal-footer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.btn-cancel {
-  background: transparent;
-  border: 1px solid #444;
-  color: #ccc;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.btn-confirm {
-  background: var(--color-primary);
-  color: #000;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.btn-confirm:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.btn-export {
-  background: #2c2c2c;
-  color: #fff;
-  border: 1px solid #444;
-  padding: 0 15px;
-  border-radius: 6px;
-  cursor: pointer;
-  height: 36px;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.btn-export:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-excel:hover {
-  background: #198754;
-  border-color: #198754;
-}
-
-.btn-pdf:hover {
-  background: #dc3545;
-  border-color: #dc3545;
-}
-
-.view-switch-container {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  min-width: 180px;
-}
-
-.view-switch {
-  background: #111;
-  border: 1px solid #333;
-  padding: 3px;
-  border-radius: 6px;
-  display: flex;
-  gap: 2px;
-}
-
-.view-switch button {
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  color: #888;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.view-switch button.active {
-  background: #333;
-  color: var(--color-primary);
-  font-weight: bold;
-}
-
-.detail-row {
-  background: #1a1a1a;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-}
-
-.detail-container {
-  padding: 15px 25px;
-}
-
-.btn-mini-pay {
-  background: #2c2c2c;
-  border: 1px solid var(--color-primary);
-  color: var(--color-primary);
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-mini-pay:hover {
-  background: var(--color-primary);
-  color: #000;
-}
-
-/* [NUEVO] Estilo para la etiqueta de interés */
-.interest-badge {
-  background-color: rgba(76, 175, 80, 0.2);
-  color: #4caf50;
-  border: 1px solid #4caf50;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  white-space: nowrap;
-}
-
-/* 👇 7. ESTILOS DE LA PAGINACIÓN */
-.pagination-wrapper {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>

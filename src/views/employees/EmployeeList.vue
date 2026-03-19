@@ -1,25 +1,30 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
-import api from '@/services/api'
-import notify from '@/services/notify'
-import alert from '@/services/alert'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import EmployeeFormModal from './EmployeeFormModal.vue'
+import { useEmployeeList } from '@/composables/employees/useEmployeeList'
 
-// Estado
-const employees = ref([])
-const pagination = ref({})
-const isLoading = ref(false)
-const filters = ref({})
-const isProcessing = ref(false)
-
-// Modals
-const showFormModal = ref(false)
-const selectedEmployee = ref(null)
+const {
+  employees,
+  pagination,
+  isLoading,
+  filters,
+  isProcessing,
+  showFormModal,
+  selectedEmployee,
+  totalEmployees,
+  totalPayrollUSD,
+  totalPending,
+  fetchEmployees,
+  openCreate,
+  openEdit,
+  deleteEmployee,
+  processPayroll,
+  formatNumber
+} = useEmployeeList()
 
 const headers = [
     { key: 'name', label: 'Colaborador / Identidad' },
@@ -30,88 +35,6 @@ const headers = [
     { key: 'status', label: 'Estado' },
     { key: 'actions', label: '' },
 ]
-
-/**
- * Estadísticas Rápidas
- */
-const totalEmployees = computed(() => pagination.value.total || employees.value.length)
-const totalPayrollUSD = computed(() => {
-  return employees.value.reduce((acc, e) => acc + (Number(e.salary_amount) || 0), 0)
-})
-const totalPending = computed(() => {
-  return employees.value.reduce((acc, e) => acc + (Number(e.pending_balance) || 0), 0)
-})
-
-// Cargar datos
-const fetchEmployees = async (page = 1) => {
-    isLoading.value = true
-    try {
-        const params = { page, ...filters.value }
-        const { data } = await api.get('/employees', { params })
-        employees.value = data.data
-        pagination.value = data.meta || {}
-    } catch (error) {
-        notify.error('Fallo al sincronizar plantilla de empleados.')
-    } finally {
-        isLoading.value = false
-    }
-}
-
-// Acciones CRUD
-const openCreate = () => {
-    selectedEmployee.value = null
-    showFormModal.value = true
-}
-
-const openEdit = (emp) => {
-    selectedEmployee.value = emp
-    showFormModal.value = true
-}
-
-const deleteEmployee = async (emp) => {
-    const confirm = await alert.confirm(`¿Remover a ${emp.name}?`, 'Esto archivará su historial laboral.')
-    if (confirm) {
-        try {
-            await api.delete(`/employees/${emp.id}`)
-            notify.success('Empleado removido del sistema.')
-            fetchEmployees()
-        } catch (e) {
-            notify.error('Fallo al eliminar: Verifique liquidaciones pendientes.')
-        }
-    }
-}
-
-const processPayroll = async (emp = null) => {
-    const isSingle = !!emp
-    const msg = isSingle
-        ? `¿Generar nómina individual para ${emp.name}?`
-        : '¿Procesar ciclo de nómina para TODA la plantilla activa?'
-
-    const confirm = await alert.confirm(msg, 'Esta acción generará obligaciones de pago en el sistema.')
-    if (confirm) {
-        isProcessing.value = true
-        try {
-            const payload = isSingle ? { employee_id: emp.id } : {}
-            const { data } = await api.post('/employees/process-payroll', payload)
-            notify.success(data.message)
-            fetchEmployees()
-        } catch (error) {
-            notify.error('Fallo al procesar nómina: Verifique configuración de salarios.')
-        } finally {
-            isProcessing.value = false
-        }
-    }
-}
-
-const formatNumber = (value) => {
-  return new Intl.NumberFormat('es-VE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value || 0)
-}
-
-watch(filters, () => fetchEmployees(1), { deep: true })
-onMounted(() => fetchEmployees())
 </script>
 
 <template>
@@ -213,10 +136,10 @@ onMounted(() => fetchEmployees())
 
         <BaseCard title="Plantilla de Colaboradores" subtitle="Directorio técnico para el procesamiento de pagos y auditoría de haberes.">
             <BaseTable :headers="headers" :data="employees" :is-loading="isLoading">
-                <tr v-for="emp in employees" :key="emp.id" class="group">
+                <tr v-for="emp in employees" :key="emp.id" class="group hover:bg-white/[0.01] transition-colors">
                     
                     <!-- Empleado -->
-                    <td class="font-bold text-white transition-colors group-hover:text-primary">
+                    <td class="font-bold text-white py-5 group-hover:text-primary transition-colors">
                       <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-[0.8rem] font-black text-white/40 border border-white/10 group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 transition-all duration-500">
                           {{ emp.name.charAt(0).toUpperCase() }}
@@ -313,7 +236,12 @@ onMounted(() => fetchEmployees())
             </BaseTable>
 
             <template #footer>
-                <Pagination :pagination="pagination" @change-page="fetchEmployees" />
+                <div class="flex justify-between items-center px-4 py-2">
+                   <div class="text-[0.65rem] font-black text-white/10 uppercase tracking-widest hidden md:block">
+                     Mostrando {{ employees.length }} de {{ pagination.total || '...' }} resultados
+                   </div>
+                   <Pagination :pagination="pagination" @change-page="fetchEmployees" />
+                </div>
             </template>
         </BaseCard>
 
@@ -322,3 +250,27 @@ onMounted(() => fetchEmployees())
 
     </div>
 </template>
+
+<style scoped>
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2rem;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

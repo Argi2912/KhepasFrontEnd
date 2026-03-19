@@ -1,28 +1,28 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import api from '@/services/api'
-import alert from '@/services/alert'
-import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import ClientFormModal from '@/components/shared/ClientFormModal.vue'
+import { useClientList } from '@/composables/clients/useClientList'
 
-const authStore = useAuthStore()
-const permissionKey = 'manage_clients'
-
-// Estado del Modal
-const showClientModal = ref(false)
-const clientIdToEdit = ref(null)
-
-// Estado de la Lista
-const clients = ref([])
-const pagination = ref({})
-const filters = ref({})
-const isLoading = ref(false)
+const {
+  authStore,
+  permissionKey,
+  showClientModal,
+  clientIdToEdit,
+  clients,
+  pagination,
+  filters,
+  isLoading,
+  totalClients,
+  newClientsCount,
+  fetchClients,
+  openCreateModal,
+  openEditModal,
+  deleteClient
+} = useClientList()
 
 const tableHeaders = [
   { key: 'name', label: 'Nombre Completo' },
@@ -31,67 +31,6 @@ const tableHeaders = [
   { key: 'created_at', label: 'Fecha de Registro' },
   { key: 'actions', label: '' },
 ]
-
-/**
- * Estadísticas Rápidas (Calculadas localmente)
- */
-const totalClients = computed(() => pagination.value.total || clients.value.length)
-const newClientsCount = computed(() => {
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-  return clients.value.filter(c => new Date(c.created_at) > oneMonthAgo).length
-})
-
-/**
- * Carga la lista de clientes.
- */
-const fetchClients = async (page = 1) => {
-  isLoading.value = true
-  const params = { page: page, ...filters.value }
-  try {
-    const response = await api.get('/clients', { params })
-    clients.value = response.data.data
-    const { data, ...pagData } = response.data
-    pagination.value = pagData
-  } catch (error) {
-    notify.error('Error al sincronizar cartera de clientes.')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-const openCreateModal = () => {
-  clientIdToEdit.value = null
-  showClientModal.value = true
-}
-
-const openEditModal = (clientId) => {
-  clientIdToEdit.value = clientId
-  showClientModal.value = true
-}
-
-const deleteClient = async (clientId, clientName) => {
-  if (!authStore.can(permissionKey)) {
-    notify.error('Acceso denegado: Permisos insuficientes.')
-    return
-  }
-  const confirmed = await alert.confirm(
-    `¿Archivar cliente ${clientName}?`,
-    'Esta acción es irreversible y afectará el historial de operaciones.',
-  )
-  if (confirmed) {
-    try {
-      await api.delete(`/clients/${clientId}`)
-      notify.success('Cliente removido del sistema.')
-      fetchClients(pagination.value.current_page)
-    } catch (error) {
-      notify.error('Fallo al eliminar: El cliente posee transacciones activas.')
-    }
-  }
-}
-
-watch(filters, () => fetchClients(1), { deep: true })
-onMounted(() => fetchClients())
 </script>
 
 <template>
@@ -104,7 +43,7 @@ onMounted(() => fetchClients())
           <span class="w-1.5 h-10 bg-primary rounded-full"></span>
           Cartera de <span class="text-gradient-primary">Clientes</span>
         </h1>
-        <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Gestin estratgica de relaciones comerciales</p>
+        <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Gestión estratégica de relaciones comerciales</p>
       </div>
 
       <button 
@@ -178,10 +117,10 @@ onMounted(() => fetchClients())
 
       <BaseCard title="Clientes Registrados" subtitle="Directorio optimizado para la gestión masiva y selectiva.">
         <BaseTable :headers="tableHeaders" :data="clients" :is-loading="isLoading">
-          <tr v-for="client in clients" :key="client.id" class="group">
+          <tr v-for="client in clients" :key="client.id" class="group hover:bg-white/[0.01] transition-colors">
             
             <!-- Nombre -->
-            <td class="font-bold text-white transition-colors group-hover:text-primary">
+            <td class="font-bold text-white py-5 group-hover:text-primary transition-colors">
               <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[0.65rem] font-black text-white/40 border border-white/10 opacity-50 group-hover:opacity-100 transition-all">
                   {{ client.name.charAt(0) }}
@@ -206,7 +145,7 @@ onMounted(() => fetchClients())
             <!-- Fecha -->
             <td>
               <span class="text-xs font-bold text-white/30 uppercase tracking-widest">
-                {{ client.created_at ? new Date(client.created_at).toLocaleDateString() : '---' }}
+                {{ client.created_at ? new Date(client.created_at).toLocaleDateString('es-VE') : '---' }}
               </span>
             </td>
 
@@ -236,7 +175,7 @@ onMounted(() => fetchClients())
         </BaseTable>
 
         <template #footer>
-          <div class="flex justify-between items-center px-2">
+          <div class="flex justify-between items-center px-4 py-2">
              <div class="text-[0.65rem] font-black text-white/10 uppercase tracking-widest hidden md:block">
                Mostrando {{ clients.length }} de {{ pagination.total || '...' }} registros
              </div>
@@ -247,7 +186,35 @@ onMounted(() => fetchClients())
     </div>
 
     <!-- Modal Premium -->
-    <ClientFormModal :show="showClientModal" :client-id="clientIdToEdit" @close="showClientModal = false"
-      @saved="fetchClients(pagination.current_page || 1)" />
+    <ClientFormModal 
+      :show="showClientModal" 
+      :client-id="clientIdToEdit" 
+      @close="showClientModal = false"
+      @saved="fetchClients(pagination.current_page || 1)" 
+    />
   </div>
 </template>
+
+<style scoped>
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2rem;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

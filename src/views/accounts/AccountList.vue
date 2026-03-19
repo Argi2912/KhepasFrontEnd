@@ -1,28 +1,30 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import api from '@/services/api'
-import alert from '@/services/alert'
-import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import AccountFormModal from '@/components/shared/AccountFormModal.vue'
+import { useAccountList } from '@/composables/accounts/useAccountList'
 
-const authStore = useAuthStore()
-const permissionKey = 'manage_exchanges'
-
-// Estado del Modal
-const showAccountModal = ref(false)
-const accountIdToEdit = ref(null)
-
-// Estado de la Lista
-const accounts = ref([])
-const pagination = ref({})
-const filters = ref({})
-const isLoading = ref(false)
+const {
+  authStore,
+  permissionKey,
+  showAccountModal,
+  accountIdToEdit,
+  accounts,
+  pagination,
+  filters,
+  isLoading,
+  totalBalanceUSD,
+  totalAccountsCount,
+  activeCurrencies,
+  formatCurrencyPremium,
+  fetchAccounts,
+  openCreateModal,
+  openEditModal,
+  deleteAccount
+} = useAccountList()
 
 const tableHeaders = [
   { key: 'name', label: 'Nombre de Cuenta' },
@@ -31,90 +33,6 @@ const tableHeaders = [
   { key: 'details', label: 'Observaciones' },
   { key: 'actions', label: '' },
 ]
-
-/**
- * Totales para KPI Cards (Calculados localmente para agilidad)
- */
-const totalBalanceUSD = computed(() => {
-  return accounts.value
-    .filter(a => a.currency_code === 'USD' || a.currency_code === 'USDT')
-    .reduce((acc, curr) => acc + Number(curr.balance), 0)
-})
-
-const totalAccountsCount = computed(() => accounts.value.length)
-
-const activeCurrencies = computed(() => {
-  const codes = accounts.value.map(a => a.currency_code)
-  return [...new Set(codes)].length
-})
-
-/**
- * Formatea un número a moneda (Premium: Separa enteros de decimales)
- */
-const formatCurrencyPremium = (value, currency = 'USD') => {
-  if (value === null || value === undefined) value = 0
-  let currencyCode = currency === 'USDT' ? 'USD' : currency
-  
-  const formatter = new Intl.NumberFormat('es-VE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-  
-  const formatted = formatter.format(value)
-  const [whole, decimal] = formatted.split(',')
-  return { whole, decimal, symbol: currencyCode === 'BS' ? 'Bs.' : (currencyCode === 'USD' ? '$' : currencyCode) }
-}
-
-/**
- * Carga la lista de cuentas.
- */
-const fetchAccounts = async (page = 1) => {
-  isLoading.value = true
-  const params = { page: page, ...filters.value }
-  try {
-    const response = await api.get('/accounts', { params })
-    accounts.value = response.data.data
-    const { data, ...pagData } = response.data
-    pagination.value = pagData
-  } catch (error) {
-    notify.error('Error al cargar la lista de cuentas.')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-const openCreateModal = () => {
-  accountIdToEdit.value = null
-  showAccountModal.value = true
-}
-
-const openEditModal = (accountId) => {
-  accountIdToEdit.value = accountId
-  showAccountModal.value = true
-}
-
-const deleteAccount = async (accountId, accountName) => {
-  if (!authStore.can(permissionKey)) {
-    notify.error('No tienes permiso para eliminar cuentas.')
-    return
-  }
-  const confirmed = await alert.confirm(
-    `¿Eliminar cuenta ${accountName}?`,
-    'Esta acción solo es posible si el saldo es exactamente CERO.',
-  )
-  if (confirmed) {
-    try {
-      await api.delete(`/accounts/${accountId}`)
-      notify.success('Cuenta liquidada correctamente.')
-      fetchAccounts(pagination.value.current_page)
-    } catch (error) {
-      notify.error('Fallo al eliminar: Verifique que el saldo sea cero.')
-    }
-  }
-}
-
-watch(filters, () => fetchAccounts(1), { deep: true })
-onMounted(() => fetchAccounts())
 </script>
 
 <template>
@@ -204,13 +122,13 @@ onMounted(() => fetchAccounts())
 
       <BaseCard title="Detalle de Cuentas" subtitle="Gestión granular de saldos y configuraciones bancarias/plataformas.">
         <BaseTable :headers="tableHeaders" :data="accounts" :is-loading="isLoading">
-          <tr v-for="account in accounts" :key="account.id" class="group">
+          <tr v-for="account in accounts" :key="account.id" class="group hover:bg-white/[0.01] transition-colors">
             
             <!-- Nombre de Cuenta -->
-            <td class="font-bold text-white transition-colors group-hover:text-primary">
+            <td class="font-bold text-white py-5">
               <div class="flex items-center gap-3">
                 <div class="w-2 h-2 rounded-full" :class="account.balance < 0 ? 'bg-danger shadow-[0_0_8px_rgba(231,76,60,0.5)]' : 'bg-success shadow-[0_0_8px_rgba(46,204,113,0.5)]'"></div>
-                <span>{{ account.name }}</span>
+                <span class="group-hover:text-primary transition-colors">{{ account.name }}</span>
               </div>
             </td>
 
@@ -261,7 +179,7 @@ onMounted(() => fetchAccounts())
         </BaseTable>
 
         <template #footer>
-          <div class="flex justify-between items-center px-2">
+          <div class="flex justify-between items-center px-4 py-2">
              <div class="text-[0.65rem] font-black text-white/10 uppercase tracking-widest hidden md:block">
                Mostrando {{ accounts.length }} de {{ pagination.total || '...' }} resultados
              </div>
@@ -272,11 +190,35 @@ onMounted(() => fetchAccounts())
     </div>
 
     <!-- Modal Premium -->
-    <AccountFormModal :show="showAccountModal" :account-id="accountIdToEdit" @close="showAccountModal = false"
-      @saved="fetchAccounts(pagination.current_page || 1)" />
+    <AccountFormModal 
+      :show="showAccountModal" 
+      :account-id="accountIdToEdit" 
+      @close="showAccountModal = false"
+      @saved="fetchAccounts(pagination.current_page || 1)" 
+    />
   </div>
 </template>
 
 <style scoped>
-/* Las animaciones y estilos base se heredan de global.css y animate-premium-in */
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2rem;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 </style>

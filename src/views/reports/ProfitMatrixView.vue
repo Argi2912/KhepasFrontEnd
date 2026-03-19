@@ -242,6 +242,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useTransactionStore } from '@/stores/transaction'
 import api from '@/services/api'
 import Swal from 'sweetalert2'
+import { downloadBlob } from '@/utils/download'
 
 const transactionStore = useTransactionStore()
 
@@ -315,15 +316,8 @@ const downloadReport = async (format) => {
       throw new Error(JSON.parse(errorText).message || 'Error generando reporte')
     }
 
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `Matriz_Rentabilidad_${filters.value.start_date}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
-
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    const filename = `Matriz_Rentabilidad_${filters.value.start_date}.${format === 'excel' ? 'xlsx' : 'pdf'}`
+    downloadBlob(response.data, filename)
 
   } catch (error) {
     console.error("Error descargando:", error)

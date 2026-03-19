@@ -1,11 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import api from '@/services/api'
-import alert from '@/services/alert'
-import notify from '@/services/notify'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-
 // Componentes UI
 import BaseTable from '@/components/ui/BaseTable.vue'
 import FilterBar from '@/components/ui/FilterBar.vue'
@@ -14,22 +8,31 @@ import BaseCard from '@/components/shared/BaseCard.vue'
 import InvestorFormModal from '@/components/shared/InvestorFormModal.vue'
 import BalanceFormModal from '@/components/shared/BalanceFormModal.vue'
 import InvestorTransferModal from '@/components/shared/InvestorTransferModal.vue'
+import { useInvestorList } from '@/composables/investors/useInvestorList'
 
-const authStore = useAuthStore()
-const permissionKey = 'manage_exchanges'
-
-const showInvestorModal = ref(false)
-const investorIdToEdit = ref(null)
-
-// Estados para Modales
-const showBalanceModal = ref(false)
-const showTransferModal = ref(false)
-const selectedInvestor = ref(null)
-
-const investors = ref([])
-const pagination = ref({})
-const filters = ref({})
-const isLoading = ref(false)
+const {
+  authStore,
+  permissionKey,
+  showInvestorModal,
+  investorIdToEdit,
+  showBalanceModal,
+  showTransferModal,
+  selectedInvestor,
+  investors,
+  pagination,
+  filters,
+  isLoading,
+  totalCapital,
+  totalLiquid,
+  activeCount,
+  fetchInvestors,
+  openCreateModal,
+  openEditModal,
+  openBalanceModal,
+  openTransferModal,
+  deleteInvestor,
+  formatCurrency
+} = useInvestorList()
 
 const tableHeaders = [
   { key: 'name', label: 'Inversionista / Identidad' },
@@ -38,72 +41,6 @@ const tableHeaders = [
   { key: 'status', label: 'Estado' },
   { key: 'actions', label: '' },
 ]
-
-/**
- * Estadísticas Consolidadas
- */
-const totalCapital = computed(() => {
-  return investors.value.reduce((acc, i) => acc + (Number(i.capital_historico) || 0), 0)
-})
-const totalLiquid = computed(() => {
-  return investors.value.reduce((acc, i) => acc + (Number(i.available_balance || i.current_balance) || 0), 0)
-})
-const activeCount = computed(() => investors.value.filter(i => i.is_active).length)
-
-const fetchInvestors = async (page = 1) => {
-  isLoading.value = true
-  const params = { page, ...filters.value }
-  try {
-    const response = await api.get('/investors', { params })
-    investors.value = response.data.data
-    const { data, ...pagData } = response.data
-    pagination.value = pagData
-  } catch (error) {
-    notify.error('Fallo al sincronizar la cartera de inversionistas.')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-const openCreateModal = () => {
-  investorIdToEdit.value = null
-  showInvestorModal.value = true
-}
-
-const openEditModal = (id) => {
-  investorIdToEdit.value = id
-  showInvestorModal.value = true
-}
-
-const openBalanceModal = (investor) => {
-  selectedInvestor.value = investor
-  showBalanceModal.value = true
-}
-
-const openTransferModal = (investor) => {
-  selectedInvestor.value = investor
-  showTransferModal.value = true
-}
-
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD' }).format(value || 0)
-}
-
-const deleteInvestor = async (id, name) => {
-  if (!authStore.can(permissionKey)) return notify.error('Acceso restringido.')
-  const confirmed = await alert.confirm(`¿Remover inversionista "${name}"?`, 'Esto archivará su historial de aportes.')
-  if (!confirmed) return
-  try {
-    await api.delete(`/investors/${id}`)
-    notify.success('Inversionista removido del sistema.')
-    fetchInvestors(pagination.value.current_page || 1)
-  } catch (error) {
-    notify.error('Fallo al eliminar: Verifique si posee capital activo.')
-  }
-}
-
-watch(filters, () => fetchInvestors(1), { deep: true })
-onMounted(() => fetchInvestors())
 </script>
 
 <template>
@@ -192,10 +129,10 @@ onMounted(() => fetchInvestors())
 
       <BaseCard title="Directorio de Accionistas" subtitle="Visión detallada de aportes, liquidaciones y saldos remanentes.">
         <BaseTable :headers="tableHeaders" :data="investors" :is-loading="isLoading">
-          <tr v-for="investor in investors" :key="investor.id" class="group">
+          <tr v-for="investor in investors" :key="investor.id" class="group hover:bg-white/[0.01] transition-colors">
             
             <!-- Nombre -->
-            <td class="font-bold text-white transition-colors group-hover:text-primary">
+            <td class="font-bold text-white transition-colors group-hover:text-primary py-5">
               <div class="flex flex-col">
                 <span class="text-base tracking-tight leading-tight">{{ investor.name }}</span>
                 <span v-if="investor.alias" class="text-[0.6rem] font-black text-primary/40 uppercase tracking-[0.2em] mt-0.5">"{{ investor.alias }}"</span>
@@ -283,20 +220,60 @@ onMounted(() => fetchInvestors())
         </BaseTable>
 
         <template #footer>
-           <Pagination :pagination="pagination" @change-page="fetchInvestors" />
+          <div class="flex justify-between items-center px-4 py-2">
+             <div class="text-[0.65rem] font-black text-white/10 uppercase tracking-widest hidden md:block">
+               Mostrando {{ investors.length }} de {{ pagination.total || '...' }} registros
+             </div>
+             <Pagination :pagination="pagination" @change-page="fetchInvestors" />
+          </div>
         </template>
       </BaseCard>
     </div>
 
     <!-- Modales Premium -->
-    <InvestorFormModal :show="showInvestorModal" :investor-id="investorIdToEdit" @close="showInvestorModal = false"
-      @saved="fetchInvestors(pagination.current_page || 1)" />
+    <InvestorFormModal 
+      :show="showInvestorModal" 
+      :investor-id="investorIdToEdit" @close="showInvestorModal = false"
+      @saved="fetchInvestors(pagination.current_page || 1)" 
+    />
 
-    <BalanceFormModal :show="showBalanceModal" resource="investors" :entity-id="selectedInvestor?.id"
-      :entity-name="selectedInvestor?.name" :available-balance="selectedInvestor?.available_balance || selectedInvestor?.current_balance" @close="showBalanceModal = false"
-      @saved="fetchInvestors(pagination.current_page || 1)" />
+    <BalanceFormModal 
+      :show="showBalanceModal" 
+      resource="investors" 
+      :entity-id="selectedInvestor?.id"
+      :entity-name="selectedInvestor?.name" 
+      :available-balance="selectedInvestor?.available_balance || selectedInvestor?.current_balance" @close="showBalanceModal = false"
+      @saved="fetchInvestors(pagination.current_page || 1)" 
+    />
 
-    <InvestorTransferModal :show="showTransferModal" :investor="selectedInvestor" @close="showTransferModal = false"
-      @saved="fetchInvestors(pagination.current_page || 1)" />
+    <InvestorTransferModal 
+      :show="showTransferModal" 
+      :investor="selectedInvestor" @close="showTransferModal = false"
+      @saved="fetchInvestors(pagination.current_page || 1)" 
+    />
   </div>
 </template>
+
+<style scoped>
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2rem;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

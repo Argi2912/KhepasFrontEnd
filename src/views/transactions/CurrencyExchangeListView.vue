@@ -1,30 +1,32 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import api from '@/services/api'
-import notify from '@/services/notify'
+import { onMounted } from 'vue'
 import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import BaseCard from '@/components/shared/BaseCard.vue'
 import BaseButton from '@/components/shared/BaseButton.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { useAuthStore } from '@/stores/auth'
-import { useTransactionStore } from '@/stores/transaction'
-import alert from '@/services/alert'
+import { useExchangeList } from '@/composables/transactions/useExchangeList'
 
-const authStore = useAuthStore()
-const transactionStore = useTransactionStore()
-
-// --- ESTADO ---
-const exchanges = ref([])
-const isLoading = ref(false)
-const isDownloading = ref(false)
-const pagination = ref({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 })
-
-// --- ESTADO DEL MODAL ---
-const showDetailModal = ref(false)
-const selectedTx = ref(null)
-const isLoadingDetail = ref(false)
+const {
+  exchanges,
+  isLoading,
+  isDownloading,
+  pagination,
+  showDetailModal,
+  selectedTx,
+  isLoadingDetail,
+  canApprove,
+  totalExchanges,
+  totalVolumeUSD,
+  totalGrossProfit,
+  fetchExchanges,
+  downloadReport,
+  downloadReceipt,
+  handleDeliver,
+  openModal,
+  formatMoney
+} = useExchangeList()
 
 const headers = [
   { key: 'number', label: 'Estructura / Referencia' },
@@ -36,125 +38,12 @@ const headers = [
   { key: 'actions', label: '' },
 ]
 
-const canApprove = computed(() => {
-  return authStore.can('manage_exchanges')
-})
-
-/**
- * Estadísticas Rápidas (Vista de Mando)
- */
-const totalExchanges = computed(() => pagination.value.total || exchanges.value.length)
-const totalVolumeUSD = computed(() => {
-  return exchanges.value.reduce((acc, tx) => acc + (tx.is_purchase ? (Number(tx.amount_received) || 0) : (Number(tx.amount_sent) || 0)), 0)
-})
-const totalGrossProfit = computed(() => {
-  return exchanges.value.reduce((acc, tx) => acc + (Number(tx.commission_total_amount) || 0), 0)
-})
-
-const fetchExchanges = async (page = 1) => {
-  isLoading.value = true
-  try {
-    const { data } = await api.get(`/transactions/exchanges?page=${page}`)
-    exchanges.value = data.data.map((tx) => {
-      const normalized = normalizeTransactionData(tx)
-      return {
-        ...tx,
-        ...normalized,
-        amount_out_fmt: formatMoney(normalized.amount_sent, normalized.from_currency),
-        amount_in_fmt: formatMoney(normalized.amount_total_in, normalized.to_currency),
-      }
-    })
-    const { data: list, ...meta } = data
-    pagination.value = meta
-  } catch (e) {
-    notify.error('Fallo al sincronizar historial operativo.')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-const normalizeTransactionData = (data) => {
-  const client = data.client || {}
-  const buyRate = parseFloat(data.buy_rate || 0)
-  const exRate = parseFloat(data.exchange_rate || 0)
-  const isPurchase = buyRate > 0
-
-  return {
-    id: data.id,
-    number: data.number,
-    status: data.status,
-    created_at: data.created_at,
-    date_fmt: new Date(data.created_at).toLocaleDateString(),
-    type_label: isPurchase ? 'COMPRA' : 'INTERCAMBIO',
-    is_purchase: isPurchase,
-    client_name: client.name || 'S/N',
-    from_currency: data.from_account?.currency_code || '---',
-    amount_sent: parseFloat(data.amount_sent || 0),
-    to_currency: data.to_account?.currency_code || '---',
-    amount_total_in: parseFloat(data.amount_received || 0),
-    rate_used: isPurchase ? buyRate : exRate,
-    rate_label: isPurchase ? 'Tasa Compra' : 'Tasa Cambio',
-    comm_charged: parseFloat(data.commission_total_amount || 0),
-    net_profit: parseFloat(data.commission_total_amount || 0) - parseFloat(data.commission_provider_amount || 0) - parseFloat(data.commission_admin_amount || 0) - parseFloat(data.commission_broker_amount || 0),
-  }
-}
-
-const downloadReport = async (format) => {
-  isDownloading.value = true
-  try {
-    const response = await api.get('/reports/download', {
-      params: { report_type: 'operations', format },
-      responseType: 'blob'
-    })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `Reporte_Khepas_${format}_${Date.now()}.${format === 'excel' ? 'xlsx' : 'pdf'}`
-    link.click()
-    notify.success('Documento exportado exitosamente.')
-  } catch (error) {
-    notify.error('Fallo al generar el reporte.')
-  } finally {
-    isDownloading.value = false
-  }
-}
-
-const handleDeliver = async (row) => {
-  const confirmed = await alert.confirm(`¿Confirmar entrega para Ref: ${row.number}?`, 'Esta acción marcará la operación como COMPLETADA.')
-  if (confirmed) {
-    isLoading.value = true
-    try {
-      await transactionStore.markAsDelivered(row.id)
-      notify.success('Operación completada.')
-      fetchExchanges(pagination.value.current_page)
-    } finally {
-      isLoading.value = false
-    }
-  }
-}
-
-const openModal = async (id) => {
-  showDetailModal.value = true
-  isLoadingDetail.value = true
-  try {
-    const { data } = await api.get(`/transactions/exchanges/${id}`)
-    selectedTx.value = normalizeTransactionData(data)
-  } finally {
-    isLoadingDetail.value = false
-  }
-}
-
-const formatMoney = (amount, currency = '') => {
-  return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(amount || 0) + (currency ? ` ${currency}` : '')
-}
-
 onMounted(() => fetchExchanges())
 </script>
 
 <template>
   <div class="space-y-10 animate-premium-in pb-12 overflow-hidden">
     
-    <!-- Header Premium -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
       <div>
         <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
@@ -182,7 +71,6 @@ onMounted(() => fetchExchanges())
       </div>
     </div>
 
-    <!-- Panel de KPI v5 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="premium-card p-6 bg-white/[0.02]">
         <div class="flex items-center gap-4 mb-6">
@@ -235,25 +123,18 @@ onMounted(() => fetchExchanges())
       </div>
     </div>
 
-    <!-- Historial v5 -->
     <BaseCard title="Libro de Operaciones" subtitle="Auditoría detallada de flujos de caja e intercambios de divisa.">
       <BaseTable :headers="headers" :data="exchanges" :is-loading="isLoading">
         <tr v-for="row in exchanges" :key="row.id" class="group">
-          
-          <!-- Referencia -->
           <td>
             <div class="flex flex-col">
               <span class="text-xs font-black text-white/40 tracking-widest group-hover:text-primary transition-colors">#{{ row.number }}</span>
               <span class="text-[0.6rem] font-mono text-white/20 uppercase tracking-tighter mt-1">{{ row.date_fmt }}</span>
             </div>
           </td>
-
-          <!-- Cliente -->
           <td class="font-bold text-white">
             <span class="text-sm tracking-tight leading-tight">{{ row.client_name }}</span>
           </td>
-
-          <!-- Tipo -->
           <td>
             <span 
               class="px-2.5 py-1 rounded-lg text-[0.6rem] font-black uppercase tracking-[0.15em] border"
@@ -262,18 +143,12 @@ onMounted(() => fetchExchanges())
               {{ row.type_label }}
             </span>
           </td>
-
-          <!-- Salida -->
           <td class="font-mono text-sm text-danger/80">
             - {{ row.amount_out_fmt }}
           </td>
-
-          <!-- Entrada -->
           <td class="font-mono text-sm text-success font-black">
             + {{ row.amount_in_fmt }}
           </td>
-
-          <!-- Estado -->
           <td>
             <span 
               class="px-3 py-1.5 rounded-xl text-[0.6rem] font-black uppercase tracking-[0.2em] border"
@@ -284,8 +159,6 @@ onMounted(() => fetchExchanges())
               {{ row.status === 'completed' ? 'Ejecutada' : 'Pendiente' }}
             </span>
           </td>
-
-          <!-- Acciones -->
           <td>
             <div class="flex justify-end gap-2 opacity-20 group-hover:opacity-100 transition-all duration-300">
                <button 
@@ -313,7 +186,6 @@ onMounted(() => fetchExchanges())
       </template>
     </BaseCard>
 
-    <!-- Modal Detalle Premium -->
     <BaseModal :show="showDetailModal" title="Auditoría de Transacción" @close="showDetailModal = false">
       <div v-if="isLoadingDetail" class="py-12 flex flex-col items-center gap-4">
         <FontAwesomeIcon icon="fa-solid fa-circle-notch" spin size="2x" class="text-primary" />
@@ -321,10 +193,8 @@ onMounted(() => fetchExchanges())
       </div>
 
       <div v-else-if="selectedTx" class="space-y-8 py-2">
-        <!-- Bloque Flujo Glass -->
         <div class="relative p-6 rounded-[2rem] bg-black/40 border border-white/5 overflow-hidden">
            <div class="absolute -top-10 -right-10 w-24 h-24 bg-primary/10 blur-3xl"></div>
-           
            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center relative z-10">
               <div class="space-y-2">
                  <span class="text-[0.6rem] font-bold text-white/20 uppercase tracking-widest">Origen (Sale)</span>
@@ -335,7 +205,6 @@ onMounted(() => fetchExchanges())
                  <p class="text-2xl font-black text-success tracking-tighter">+ {{ formatMoney(selectedTx.amount_total_in, selectedTx.to_currency) }}</p>
               </div>
            </div>
-           
            <div class="mt-6 pt-4 border-t border-white/5 flex justify-center">
               <span class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[0.65rem] font-black text-primary uppercase tracking-widest">
                 {{ selectedTx.rate_label }}: {{ selectedTx.rate_used }}
@@ -343,7 +212,7 @@ onMounted(() => fetchExchanges())
            </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-6 px-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 px-2">
            <div>
               <label class="text-[0.6rem] font-black text-white/30 uppercase tracking-[0.2em] mb-1 block">Cliente</label>
               <p class="font-bold text-white tracking-tight">{{ selectedTx.client_name }}</p>
@@ -354,7 +223,6 @@ onMounted(() => fetchExchanges())
            </div>
         </div>
 
-        <!-- Profit Box Premium -->
         <div class="bg-success/[0.02] border border-success/10 rounded-2xl p-5 space-y-3">
            <h4 class="text-[0.65rem] font-black text-success/60 uppercase tracking-widest border-b border-success/5 pb-2">Rendimiento Operativo</h4>
            <div class="flex justify-between items-center text-sm">
@@ -365,8 +233,32 @@ onMounted(() => fetchExchanges())
       </div>
 
       <template #footer>
-          <BaseButton variant="secondary" outline class="w-full" @click="showDetailModal = false">Finalizar Auditoría</BaseButton>
+        <div class="flex gap-3 w-full">
+          <BaseButton variant="primary" class="flex-1" @click="downloadReceipt(selectedTx.id)">
+            <FontAwesomeIcon icon="fa-solid fa-download" class="mr-2" /> Recibo
+          </BaseButton>
+          <BaseButton variant="secondary" outline class="flex-1" @click="showDetailModal = false">Cerrar</BaseButton>
+        </div>
       </template>
     </BaseModal>
   </div>
 </template>
+
+<style scoped>
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #f0b90b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.premium-card {
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.premium-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+</style>

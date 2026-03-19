@@ -1,322 +1,272 @@
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
-import api from '@/services/api'
-import notify from '@/services/notify'
-import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-
 // Componentes Base
 import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import Pagination from '@/components/ui/Pagination.vue'
+import BaseCard from '@/components/shared/BaseCard.vue'
+import { useTenantDashboard } from '@/composables/superadmin/useTenantDashboard'
 
-// --- ESTADO ---
-const stats = ref({
-  total_tenants: 0,
-  active_tenants: 0,
-  inactive_tenants: 0,
-  total_users: 0,
-})
-const tenants = ref([])
-const isLoading = ref(false)
-const pagination = ref({ current_page: 1, last_page: 1, total: 0 })
-const showModal = ref(false)
-const isSubmitting = ref(false)
-
-// Formulario reactivo - SE AÑADE 'plan'
-const form = reactive({
-  name: '',
-  admin_name: '',
-  admin_email: '',
-  password: '',
-  plan: 'basic', // <--- Añadido
-})
+const {
+  stats,
+  tenants,
+  isLoading,
+  pagination,
+  showModal,
+  isSubmitting,
+  form,
+  fetchTenants,
+  createTenant,
+  toggleTenant,
+  deleteTenant,
+} = useTenantDashboard()
 
 const headers = [
   { key: 'status', label: 'Estado' },
   { key: 'name', label: 'Negocio / Tenant' },
-  { key: 'plan', label: 'Plan' }, // <--- Añadido
+  { key: 'plan', label: 'Plan' },
   { key: 'users', label: 'Usuarios' },
   { key: 'admin', label: 'Admin Responsable' },
   { key: 'created_at', label: 'Registro' },
-  { key: 'actions', label: 'Acciones' },
+  { key: 'actions', label: '' },
 ]
-
-// --- API ---
-
-// 1. Cargar Estadísticas (KPIs)
-const fetchStats = async () => {
-  try {
-    const { data } = await api.get('/superadmin/stats')
-    stats.value = data
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-// 2. Cargar Lista de Tenants
-const fetchTenants = async (page = 1) => {
-  isLoading.value = true
-  try {
-    const { data } = await api.get(`/superadmin/tenants?page=${page}`)
-
-    // PROCESAMIENTO CORREGIDO: Usamos t.admin directamente
-    tenants.value = data.data.map((t) => {
-      const adminUser = t.admin; // Objeto enviado por el nuevo TenantController
-      return {
-        ...t,
-        admin_info: adminUser ? adminUser.name : 'Sin Asignar',
-        admin_email: adminUser ? adminUser.email : 'No registrado',
-        created_fmt: new Date(t.created_at).toLocaleDateString(),
-        // Badge color logic
-        status_class: t.is_active ? 'bg-success' : 'bg-danger',
-        status_text: t.is_active ? 'ACTIVO' : 'INACTIVO',
-      }
-    })
-
-    const { data: list, ...meta } = data
-    pagination.value = meta
-  } catch (e) {
-    console.error(e)
-    notify.error('Error cargando tenants')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// 3. Crear Tenant
-const createTenant = async () => {
-  isSubmitting.value = true
-  try {
-    await api.post('/superadmin/tenants', form)
-    notify.success('Tenant creado exitosamente')
-    showModal.value = false
-    // Limpiar form
-    form.name = ''
-    form.admin_name = ''
-    form.admin_email = ''
-    form.password = ''
-    form.plan = 'basic' // <--- Reset añadido
-
-    refreshAll()
-  } catch (e) {
-    const msg = e.response?.data?.message || 'Error al crear tenant'
-    notify.error(msg)
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// 4. Alternar Estado (Activar/Desactivar)
-const toggleTenant = async (tenant) => {
-  const action = tenant.is_active ? 'Desactivar' : 'Activar'
-  const color = tenant.is_active ? '#d33' : '#0ecb81'
-
-  const result = await Swal.fire({
-    title: `¿${action} Negocio?`,
-    text: `Vas a cambiar el estado de "${tenant.name}". Si lo activas manualmente, se le otorgará 1 mes de acceso inmediato.`,
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: `Sí, ${action}`,
-    confirmButtonColor: color,
-    cancelButtonText: 'Cancelar',
-  })
-
-  if (result.isConfirmed) {
-    try {
-      await api.patch(`/superadmin/tenants/${tenant.id}/toggle`)
-      notify.success(`Tenant ${action.toLowerCase()}do correctamente`)
-      fetchTenants(pagination.value.current_page)
-      fetchStats()
-    } catch (e) {
-      notify.error('Error al cambiar estado')
-    }
-  }
-}
-
-// 5. NUEVA FUNCIÓN: Eliminar Tenant
-const deleteTenant = async (tenant) => {
-  const result = await Swal.fire({
-    title: `¿Eliminar "${tenant.name}"?`,
-    text: "¡Cuidado! Esta acción borrará la empresa, todos sus usuarios y sus datos financieros. NO se puede deshacer.",
-    icon: 'error', // Icono rojo de error/peligro
-    showCancelButton: true,
-    confirmButtonText: 'Sí, Eliminar Definitivamente',
-    confirmButtonColor: '#d33',
-    cancelButtonText: 'Cancelar',
-    focusCancel: true
-  })
-
-  if (result.isConfirmed) {
-    try {
-      await api.delete(`/superadmin/tenants/${tenant.id}`)
-
-      notify.success('Tenant eliminado correctamente')
-
-      // Lógica para recargar página correcta si borramos el último item
-      if (tenants.value.length === 1 && pagination.value.current_page > 1) {
-        fetchTenants(pagination.value.current_page - 1)
-      } else {
-        fetchTenants(pagination.value.current_page)
-      }
-      fetchStats()
-    } catch (e) {
-      console.error(e)
-      // Mensaje específico si el backend lo envía (ej: "No puedes borrar el demo")
-      const msg = e.response?.data?.message || 'Error al eliminar. Puede tener datos protegidos.'
-      notify.error(msg)
-    }
-  }
-}
-
-const refreshAll = () => {
-  fetchStats()
-  fetchTenants()
-}
-
-onMounted(() => refreshAll())
 </script>
 
 <template>
-  <div class="sa-container">
-    <div class="page-header">
-      <h1>Panel Superadmin</h1>
-      <button class="btn-primary" @click="showModal = true">
-        <FontAwesomeIcon icon="fa-solid fa-plus" /> Nuevo Tenant
+  <div class="space-y-10 animate-premium-in pb-12">
+    
+    <!-- Header Premium -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+          <span class="w-1.5 h-10 bg-primary rounded-full shadow-[0_0_20px_rgba(247,166,0,0.4)]"></span>
+          Panel <span class="text-gradient-primary">Superadmin</span>
+        </h1>
+        <p class="text-white/30 text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-4">Control global de ecosistema multinivel</p>
+      </div>
+
+      <button 
+        @click="showModal = true" 
+        class="bg-primary hover:bg-primary-dark text-secondary px-6 py-3.5 rounded-2xl font-black transition-all shadow-[0_10px_30px_rgba(247,166,0,0.2)] flex items-center gap-3 group active:scale-95"
+      >
+        <FontAwesomeIcon icon="fa-solid fa-plus" class="text-lg group-hover:rotate-90 transition-transform duration-300" /> 
+        <span>Nuevo Tenant</span>
       </button>
     </div>
 
-    <div class="kpi-grid">
-      <div class="kpi-card total">
-        <div class="icon">
-          <FontAwesomeIcon icon="fa-solid fa-building" />
+    <!-- Panel de KPI v5 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+      
+      <!-- Total Tenants -->
+      <div class="premium-card p-6 bg-white/[0.02]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-info/10 flex items-center justify-center text-info border border-info/10 shadow-inner">
+            <FontAwesomeIcon icon="fa-solid fa-building" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Estructura Global</span>
+            <span class="text-xs font-bold text-info/60">Total de negocios</span>
+          </div>
         </div>
-        <div class="data">
-          <h3>{{ stats.total_tenants }}</h3>
-          <p>Tenants Registrados</p>
-        </div>
-      </div>
-
-      <div class="kpi-card active">
-        <div class="icon">
-          <FontAwesomeIcon icon="fa-solid fa-check-circle" />
-        </div>
-        <div class="data">
-          <h3>{{ stats.active_tenants }}</h3>
-          <p>Negocios Activos</p>
-        </div>
-      </div>
-
-      <div class="kpi-card inactive">
-        <div class="icon">
-          <FontAwesomeIcon icon="fa-solid fa-ban" />
-        </div>
-        <div class="data">
-          <h3>{{ stats.inactive_tenants }}</h3>
-          <p>Suspendidos</p>
+        <div class="flex items-baseline gap-2">
+          <span class="text-4xl font-black text-white tracking-tighter">{{ stats.total_tenants }}</span>
+          <span class="text-xs font-bold text-white/20 uppercase tracking-widest">Empresas</span>
         </div>
       </div>
 
-      <div class="kpi-card users">
-        <div class="icon">
-          <FontAwesomeIcon icon="fa-solid fa-users" />
+      <!-- Active Tenants -->
+      <div class="premium-card p-6 border-success/5 bg-success/[0.01]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center text-success border border-success/10 shadow-inner">
+            <FontAwesomeIcon icon="fa-solid fa-check-double" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Operatividad</span>
+            <span class="text-xs font-bold text-success/60">Tenants en servicio</span>
+          </div>
         </div>
-        <div class="data">
-          <h3>{{ stats.total_users }}</h3>
-          <p>Usuarios Totales</p>
+        <div class="flex items-baseline gap-2">
+          <span class="text-4xl font-black text-white tracking-tighter">{{ stats.active_tenants }}</span>
+          <span class="text-[0.65rem] font-black text-success uppercase tracking-widest">En Línea</span>
+        </div>
+      </div>
+
+      <!-- Inactive Tenants -->
+      <div class="premium-card p-6 border-danger/5 bg-danger/[0.01]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-danger/10 flex items-center justify-center text-danger border border-danger/10 shadow-inner">
+            <FontAwesomeIcon icon="fa-solid fa-ban" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Interrupciones</span>
+            <span class="text-xs font-bold text-danger/60">Negocios suspendidos</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-4xl font-black text-white tracking-tighter">{{ stats.inactive_tenants }}</span>
+          <span class="text-[0.65rem] font-black text-danger uppercase tracking-widest">Fuera</span>
+        </div>
+      </div>
+
+      <!-- Total Users -->
+      <div class="premium-card p-6 bg-white/[0.02]">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/10 shadow-inner">
+            <FontAwesomeIcon icon="fa-solid fa-users-rectangle" class="text-xl" />
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[0.6rem] font-black uppercase tracking-widest text-white/30 leading-none mb-1">Usuarios Finales</span>
+            <span class="text-xs font-bold text-primary/60">Cuentas activas en red</span>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-4xl font-black text-white tracking-tighter">{{ stats.total_users }}</span>
+          <span class="text-xs font-bold text-white/20 uppercase tracking-widest">Cuentas</span>
         </div>
       </div>
     </div>
 
-    <div class="table-card">
-      <BaseTable :headers="headers" :data="tenants" :is-loading="isLoading">
-        <tr v-for="row in tenants" :key="row.id" :class="{ 'row-inactive': !row.is_active }">
-          <td>
-            <span :class="['badge', row.status_class]">{{ row.status_text }}</span>
-          </td>
+    <!-- Directorio de Tenants -->
+    <BaseCard title="Directorio de Negocios" subtitle="Administración y monitoreo de instancias de clientes.">
+        <BaseTable :headers="headers" :data="tenants" :is-loading="isLoading">
+          <tr v-for="row in tenants" :key="row.id" class="group hover:bg-white/[0.01] transition-colors" :class="{ 'opacity-50 grayscale': !row.is_active }">
+            
+            <!-- Estado -->
+            <td>
+              <span 
+                class="px-2.5 py-1 rounded-lg text-[0.6rem] font-black uppercase tracking-widest border"
+                :class="row.is_active 
+                  ? 'bg-success/5 text-success border-success/20' 
+                  : 'bg-white/5 text-white/20 border-white/5'"
+              >
+                {{ row.status_text }}
+              </span>
+            </td>
 
-          <td>
-            <div class="tenant-name">{{ row.name }}</div>
-            <span class="id-ref">ID: {{ row.id }}</span>
-          </td>
+            <!-- Negocio -->
+            <td class="py-5">
+              <div class="flex flex-col">
+                <span class="text-base font-bold text-white group-hover:text-primary transition-colors leading-tight">{{ row.name }}</span>
+                <span class="text-[0.65rem] font-mono text-white/20 uppercase tracking-widest mt-0.5">UUID: {{ row.id.split('-')[0] }}...</span>
+              </div>
+            </td>
 
-          <td>
-            <div class="plan-badge" :class="row.plan_price > 10 ? 'pro' : 'basic'">
-              {{ row.plan_name || 'Básico' }}
-            </div>
-          </td>
+            <!-- Plan -->
+            <td>
+              <span 
+                class="px-3 py-1 rounded-xl text-[0.6rem] font-black uppercase tracking-widest border"
+                :class="row.plan_price > 10 
+                  ? 'bg-primary/5 text-primary border-primary/20 shadow-[0_0_15px_rgba(247,166,0,0.1)]' 
+                  : 'bg-white/5 text-white/30 border-white/10'"
+              >
+                {{ row.plan_name || 'Básico' }}
+              </span>
+            </td>
 
-          <td>
-            <div class="users-count">
-              <FontAwesomeIcon icon="fa-solid fa-user-group" />
-              <span>{{ row.users_count || (row.users ? row.users.length : 0) }}</span>
-            </div>
-          </td>
+            <!-- Usuarios -->
+            <td>
+              <div class="flex items-baseline gap-2">
+                <span class="text-sm font-black text-white">{{ row.users_count || 0 }}</span>
+                <span class="text-[0.6rem] font-black text-white/20 uppercase tracking-widest">Pax</span>
+              </div>
+            </td>
 
-          <td>
-            <div class="admin-info">
-              <strong :class="{ 'text-gray-500': row.admin_info === 'Sin Asignar' }">
-                {{ row.admin_info }}
-              </strong>
-              <small class="text-yellow-500 font-mono">{{ row.admin_email }}</small>
-            </div>
-          </td>
+            <!-- Admin -->
+            <td>
+              <div class="flex flex-col">
+                <span class="text-sm font-bold text-white/80">{{ row.admin_info }}</span>
+                <span class="text-[0.65rem] font-black text-primary/40 uppercase tracking-tighter truncate max-w-[150px]">{{ row.admin_email }}</span>
+              </div>
+            </td>
 
-          <td>{{ row.created_fmt }}</td>
+            <!-- Fecha -->
+            <td>
+              <span class="text-xs font-bold text-white/20 uppercase tracking-widest">{{ row.created_fmt }}</span>
+            </td>
 
-          <td class="actions-cell">
-            <div class="actions-flex">
-              <button @click="toggleTenant(row)" class="btn-icon" :class="row.is_active ? 'btn-disable' : 'btn-enable'"
-                :title="row.is_active ? 'Suspender Tenant' : 'Reactivar Tenant'">
-                <FontAwesomeIcon :icon="row.is_active ? 'fa-solid fa-power-off' : 'fa-solid fa-play'" />
-              </button>
+            <!-- Acciones -->
+            <td>
+              <div class="flex justify-end gap-2 opacity-10 group-hover:opacity-100 transition-opacity duration-300">
+                <button 
+                  @click="toggleTenant(row)" 
+                  class="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90"
+                  :class="row.is_active ? 'bg-danger/10 text-danger hover:bg-danger hover:text-white' : 'bg-success/10 text-success hover:bg-success hover:text-white'"
+                  :title="row.is_active ? 'Suspender Negocio' : 'Reactivar Negocio'"
+                >
+                  <FontAwesomeIcon :icon="row.is_active ? 'fa-solid fa-power-off' : 'fa-solid fa-play'" />
+                </button>
 
-              <button @click="deleteTenant(row)" class="btn-icon btn-delete" title="Eliminar Permanentemente">
-                <FontAwesomeIcon icon="fa-solid fa-trash" />
-              </button>
-            </div>
-          </td>
-        </tr>
-      </BaseTable>
-      <Pagination :pagination="pagination" @change-page="fetchTenants" />
-    </div>
+                <button 
+                  @click="deleteTenant(row)" 
+                  class="w-9 h-9 rounded-xl bg-white/5 text-white/20 flex items-center justify-center transition-all hover:bg-danger hover:text-white hover:shadow-lg active:scale-90 border border-white/5"
+                  title="Eliminar Instancia"
+                >
+                  <FontAwesomeIcon icon="fa-solid fa-trash-can" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        </BaseTable>
 
-    <BaseModal :show="showModal" title="Registrar Nuevo Negocio" @close="showModal = false">
-      <form @submit.prevent="createTenant" class="modal-form">
-        <div class="section-title">Datos de la Empresa</div>
-        <BaseInput label="Nombre del Tenant (Negocio)" v-model="form.name" placeholder="Ej: Cambio Seguro C.A."
-          required />
+        <template #footer>
+          <div class="flex justify-between items-center px-4 py-2">
+             <div class="text-[0.65rem] font-black text-white/10 uppercase tracking-widest hidden md:block">
+               Sincronización de red completa
+             </div>
+             <Pagination :pagination="pagination" @change-page="fetchTenants" />
+          </div>
+        </template>
+    </BaseCard>
 
-        <div class="section-title mt-4">Datos del Administrador</div>
-        <BaseInput label="Nombre Completo" v-model="form.admin_name" required />
-        <div class="grid-2">
-          <BaseInput label="Correo Electrónico" type="email" v-model="form.admin_email" required />
-          <BaseInput label="Contraseña Temporal" type="password" v-model="form.password" required />
+    <!-- Modal Premium -->
+    <BaseModal :show="showModal" title="Registrar Nueva Entidad" @close="showModal = false">
+      <form @submit.prevent="createTenant" class="space-y-6 py-4">
+        
+        <div class="space-y-4">
+          <div class="text-[0.6rem] font-black text-primary uppercase tracking-[0.2em] mb-2 border-b border-white/5 pb-2">Identidad Corporativa</div>
+          <BaseInput label="Razon Social" v-model="form.name" placeholder="Ej: Cambio Seguro C.A." required />
         </div>
 
-        <div class="section-title mt-4 text-yellow-500">Configuración del Plan</div>
-        <div class="plan-selector">
-          <label class="plan-option" :class="{ 'selected': form.plan === 'basic' }">
-            <input type="radio" v-model="form.plan" value="basic" />
-            <div class="plan-content">
-              <span class="p-name">Plan Básico</span>
-              <span class="p-price">$10.00 / mes</span>
-            </div>
-          </label>
-          <label class="plan-option" :class="{ 'selected': form.plan === 'pro' }">
-            <input type="radio" v-model="form.plan" value="pro" />
-            <div class="plan-content">
-              <span class="p-name">Profesional</span>
-              <span class="p-price">$29.99 / mes</span>
-            </div>
-          </label>
+        <div class="space-y-4">
+          <div class="text-[0.6rem] font-black text-primary uppercase tracking-[0.2em] mb-2 border-b border-white/5 pb-2">Administrador Maestro</div>
+          <BaseInput label="Nombre del Responsable" v-model="form.admin_name" required />
+          <div class="grid grid-cols-2 gap-4">
+            <BaseInput label="Email de Acceso" type="email" v-model="form.admin_email" required />
+            <BaseInput label="Credencial Temporal" type="password" v-model="form.password" required />
+          </div>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn-secondary" @click="showModal = false">Cancelar</button>
-          <button type="submit" class="btn-primary" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Creando...' : 'Registrar Tenant' }}
+        <div class="space-y-4">
+          <div class="text-[0.6rem] font-black text-primary uppercase tracking-[0.2em] mb-2 border-b border-white/5 pb-2">Configuración de Servicio</div>
+          <div class="grid grid-cols-2 gap-4">
+            <div 
+              @click="form.plan = 'basic'"
+              class="p-4 rounded-2xl border-2 transition-all cursor-pointer"
+              :class="form.plan === 'basic' ? 'bg-white/5 border-primary shadow-lg' : 'bg-white/[0.02] border-white/5 hover:border-white/10'"
+            >
+              <div class="text-xs font-black text-white mb-1">Standard</div>
+              <div class="text-[0.6rem] font-bold text-white/30">$10.00 / mensual</div>
+            </div>
+            <div 
+              @click="form.plan = 'pro'"
+              class="p-4 rounded-2xl border-2 transition-all cursor-pointer"
+              :class="form.plan === 'pro' ? 'bg-primary/5 border-primary shadow-lg shadow-primary/10' : 'bg-white/[0.02] border-white/5 hover:border-white/10'"
+            >
+              <div class="text-xs font-black text-primary mb-1">Empresarial</div>
+              <div class="text-[0.6rem] font-bold text-white/30">$29.99 / mensual</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-6 border-t border-white/5">
+          <button type="button" class="px-6 py-3 rounded-xl font-bold text-white/40 hover:text-white transition-colors" @click="showModal = false">Descartar</button>
+          <button 
+            type="submit" 
+            class="bg-primary text-secondary px-8 py-3 rounded-2xl font-black transition-all hover:shadow-lg disabled:opacity-50"
+            :disabled="isSubmitting"
+          >
+            {{ isSubmitting ? 'Procesando...' : 'Confirmar Registro' }}
           </button>
         </div>
       </form>
@@ -325,312 +275,25 @@ onMounted(() => refreshAll())
 </template>
 
 <style scoped>
-/* Tus estilos se mantienen iguales */
-.sa-container {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-  color: var(--color-text-light);
+.text-gradient-primary {
+  background: linear-gradient(135deg, #f7a600, #ffdf6d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2rem;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.page-header h1 {
-  color: var(--color-primary);
-  font-size: 1.8rem;
+.animate-premium-in {
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.kpi-card {
-  background: var(--color-secondary);
-  border: 1px solid var(--color-border);
-  padding: 20px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  transition: transform 0.2s;
-}
-
-.kpi-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--color-primary);
-}
-
-.kpi-card .icon {
-  font-size: 2rem;
-  opacity: 0.8;
-}
-
-.kpi-card h3 {
-  font-size: 1.8rem;
-  margin: 0;
-  font-weight: bold;
-}
-
-.kpi-card p {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
-.kpi-card.total .icon {
-  color: #3498db;
-}
-
-.kpi-card.active .icon {
-  color: #0ecb81;
-}
-
-.kpi-card.inactive .icon {
-  color: #e74c3c;
-}
-
-.kpi-card.users .icon {
-  color: #f1c40f;
-}
-
-.table-card {
-  background: var(--color-secondary);
-  border-radius: 8px;
-  padding: 20px;
-  border: 1px solid var(--color-border);
-}
-
-.row-inactive {
-  opacity: 0.6;
-  background: rgba(255, 0, 0, 0.05);
-}
-
-.tenant-name {
-  font-weight: bold;
-  font-size: 1.05rem;
-  color: #fff;
-}
-
-.id-ref {
-  font-size: 0.75rem;
-  color: #666;
-  font-family: monospace;
-}
-
-.users-count {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #333;
-  width: fit-content;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: bold;
-}
-
-.admin-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.admin-info small {
-  opacity: 0.9;
-}
-
-.badge {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: bold;
-}
-
-.bg-success {
-  background: rgba(14, 203, 129, 0.2);
-  color: #0ecb81;
-}
-
-.bg-danger {
-  background: rgba(231, 76, 60, 0.2);
-  color: #e74c3c;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: #000;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.btn-primary:hover {
-  background: #d4a000;
-}
-
-.actions-cell {
-  text-align: right;
-}
-
-.actions-flex {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.btn-icon {
-  background: #222;
-  border: 1px solid #444;
-  width: 35px;
-  height: 35px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-disable {
-  color: #e74c3c;
-}
-
-.btn-disable:hover {
-  background: #e74c3c;
-  color: #fff;
-}
-
-.btn-enable {
-  color: #0ecb81;
-}
-
-.btn-enable:hover {
-  background: #0ecb81;
-  color: #fff;
-}
-
-.btn-delete {
-  color: #e74c3c;
-  border-color: #522;
-}
-
-.btn-delete:hover {
-  background: #e74c3c;
-  color: white;
-  transform: scale(1.1);
-}
-
-.section-title {
-  font-size: 0.85rem;
-  color: var(--color-primary);
-  text-transform: uppercase;
-  margin-bottom: 10px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 5px;
-}
-
-.mt-4 {
-  margin-top: 20px;
-}
-
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.modal-footer {
-  margin-top: 25px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1px solid #666;
-  color: #ccc;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-/* --- NUEVOS ESTILOS PARA EL SELECTOR DE PLAN --- */
-.plan-selector {
-  display: flex;
-  gap: 12px;
-  margin-top: 10px;
-  margin-bottom: 20px;
-}
-
-.plan-option {
-  flex: 1;
-  background: #2b3139;
-  border: 2px solid transparent;
-  padding: 15px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: 0.2s;
-  position: relative;
-}
-
-.plan-option input {
-  position: absolute;
-  opacity: 0;
-}
-
-.plan-option.selected {
-  border-color: #f0b90b;
-  background: rgba(240, 185, 11, 0.05);
-}
-
-.plan-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.p-name {
-  font-weight: bold;
-  font-size: 0.9rem;
-  color: #fff;
-}
-
-.p-price {
-  font-size: 0.8rem;
-  color: #f0b90b;
-  margin-top: 4px;
-}
-
-/* PLAN BADGE EN TABLA */
-.plan-badge {
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 10px;
-  width: fit-content;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-.plan-badge.basic {
-  background: #333;
-  color: #aaa;
-}
-
-.plan-badge.pro {
-  background: rgba(240, 185, 11, 0.2);
-  color: #f0b90b;
-  border: 1px solid #f0b90b;
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
