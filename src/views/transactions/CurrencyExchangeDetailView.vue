@@ -25,6 +25,7 @@ const toAccount = computed(() => getRel(tx.value, 'toAccount') || {})
 const client = computed(() => getRel(tx.value, 'client') || {})
 const adminUser = computed(() => getRel(tx.value, 'adminUser') || {})
 const provider = computed(() => getRel(tx.value, 'provider') || {})
+const platform = computed(() => getRel(tx.value, 'platform') || {})
 const broker = computed(() => getRel(tx.value, 'broker') || {})
 const brokerUser = computed(() => broker.value.user || {})
 
@@ -173,8 +174,11 @@ const handleDownload = async () => {
                 </p>
              </div>
              <div class="space-y-1.5">
-                <label class="text-[0.6rem] font-black text-white/20 uppercase tracking-[0.3em] block">Auditor del Sistema</label>
-                <p class="text-base font-bold text-white/80">{{ adminUser.name || 'Procesamiento Automático' }}</p>
+                <label class="text-[0.6rem] font-black text-white/20 uppercase tracking-[0.3em] block">Plataforma / Auditor</label>
+                <div class="flex flex-col gap-1">
+                   <p v-if="platform.name" class="text-xs font-black text-primary uppercase tracking-widest">{{ platform.name }}</p>
+                   <p class="text-base font-bold text-white/80">{{ adminUser.name || 'Procesamiento Automático' }}</p>
+                </div>
              </div>
           </div>
 

@@ -140,7 +140,8 @@ const {
 
             <!-- Bloque Intermediarios -->
             <div class="space-y-6 bg-white/[0.02] p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
-               <div v-if="operationType === 'exchange'" class="relative">
+               <!-- Plataforma: Siempre visible -->
+               <div class="relative">
                   <button v-if="form.platform_id" @click="form.platform_id = null" class="absolute -top-1 right-0 text-[0.55rem] font-black text-primary uppercase hover:underline">Remover</button>
                   <BaseSelectWithSearchAndCreate 
                     label="Plataforma Gestora (Opcional)"
@@ -155,36 +156,36 @@ const {
                   />
                </div>
 
-               <template v-if="operationType !== 'exchange'">
-                  <div class="relative">
-                    <button v-if="form.broker_id" @click="form.broker_id = null" class="absolute -top-1 right-0 text-[0.55rem] font-black text-primary uppercase hover:underline">Remover</button>
-                    <BaseSelectWithSearchAndCreate 
-                      label="Socio / Broker (Opcional)" 
-                      :options="transactionStore.getBrokers"
-                      v-model="form.broker_id" 
-                      create-endpoint="/brokers" 
-                      :create-fields="{ name: '' }"
-                      create-label="Corredor" 
-                      @saved="handleDataReload" 
-                      :error="getError('broker_id')" 
-                    />
-                  </div>
+               <!-- Broker y Proveedor: Visibles para todos excepto 'exchange' (según lógica previa, pero los haremos siempre visibles si el usuario lo necesita) -->
+               <!-- Nota: He decidido dejar Broker y Proveedor visibles siempre también para mayor flexibilidad -->
+               <div class="relative">
+                  <button v-if="form.broker_id" @click="form.broker_id = null" class="absolute -top-1 right-0 text-[0.55rem] font-black text-primary uppercase hover:underline">Remover</button>
+                  <BaseSelectWithSearchAndCreate 
+                    label="Socio / Broker (Opcional)" 
+                    :options="transactionStore.getBrokers"
+                    v-model="form.broker_id" 
+                    create-endpoint="/brokers" 
+                    :create-fields="{ name: '' }"
+                    create-label="Corredor" 
+                    @saved="handleDataReload" 
+                    :error="getError('broker_id')" 
+                  />
+               </div>
 
-                  <div class="relative pt-2">
-                    <button v-if="form.provider_id" @click="form.provider_id = null" class="absolute top-1 right-0 text-[0.55rem] font-black text-primary uppercase hover:underline">Remover</button>
-                    <BaseSelectWithSearchAndCreate 
-                      label="Proveedor de Liquidez"
-                      :options="transactionStore.getProviders" 
-                      v-model="form.provider_id" 
-                      create-endpoint="/providers"
-                      :create-fields="{ name: '' }" 
-                      create-label="Proveedor" 
-                      @saved="handleDataReload"
-                      :error="getError('provider_id')" 
-                      @update:modelValue="clearError('provider_id')" 
-                    />
-                  </div>
-               </template>
+               <div class="relative pt-2">
+                  <button v-if="form.provider_id" @click="form.provider_id = null" class="absolute top-1 right-0 text-[0.55rem] font-black text-primary uppercase hover:underline">Remover</button>
+                  <BaseSelectWithSearchAndCreate 
+                    label="Proveedor de Liquidez"
+                    :options="transactionStore.getProviders" 
+                    v-model="form.provider_id" 
+                    create-endpoint="/providers"
+                    :create-fields="{ name: '' }" 
+                    create-label="Proveedor" 
+                    @saved="handleDataReload"
+                    :error="getError('provider_id')" 
+                    @update:modelValue="clearError('provider_id')" 
+                  />
+               </div>
             </div>
           </div>
 
