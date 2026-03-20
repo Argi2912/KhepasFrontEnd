@@ -6,6 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { useRouter } from 'vue-router'
 import { useFormValidation } from '@/utils/useFormValidation'
 import BaseButton from '@/components/shared/BaseButton.vue'
+import BaseModal from '@/components/shared/BaseModal.vue'
+
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -225,6 +227,88 @@ const goToLogin = () => router.push({ name: 'login' })
         </div>
       </div>
     </div>
+    
+    <!-- Modal de Términos y Condiciones -->
+    <BaseModal :show="showTermsModal" title="Privacidad y Seguridad" @close="showTermsModal = false">
+      <div class="space-y-6 text-white/70 text-sm leading-relaxed px-2">
+        <p class="italic text-white/30 text-[0.6rem] uppercase tracking-widest">Última actualización: 12 de marzo de 2026</p>
+        
+        <div class="space-y-4">
+          <p>
+            En <strong class="text-white">Productos Digitales SyO LLC</strong>, valoramos la privacidad de nuestros usuarios. Esta Política de Privacidad describe cómo tratamos la información en la aplicación <strong class="text-primary">Tu Conpay</strong>.
+          </p>
+          <p>
+            Al utilizar nuestros servicios, usted acepta las prácticas descritas en este documento.
+          </p>
+        </div>
+
+        <div class="space-y-4 py-4 border-t border-white/5">
+          <h4 class="text-primary font-black uppercase tracking-[0.2em] text-[0.65rem]">01. Recolección de Información</h4>
+          <p>Para el funcionamiento de la App, recolectamos dos tipos de datos:</p>
+          <ul class="space-y-3">
+            <li class="flex gap-3">
+              <span class="text-primary mt-1">•</span>
+              <span><strong class="text-white">Datos de Cuenta:</strong> Información básica para la creación del perfil (nombre, correo electrónico y datos de autenticación).</span>
+            </li>
+            <li class="flex gap-3">
+              <span class="text-primary mt-1">•</span>
+              <span><strong class="text-white">Datos de Transacciones:</strong> Información que el Usuario introduce manualmente sobre sus operaciones de corretaje o P2P (montos, divisas, nombres de contrapartes, fechas).</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="space-y-4 py-4 border-t border-white/5">
+          <h4 class="text-primary font-black uppercase tracking-[0.2em] text-[0.65rem]">02. Uso de la Información</h4>
+          <p>Nuestra filosofía es de acceso mínimo. La información se utiliza exclusivamente para:</p>
+          <ul class="space-y-3">
+            <li class="flex gap-3"><span class="text-primary">•</span> <span>Proporcionar las funciones de registro solicitadas.</span></li>
+            <li class="flex gap-3"><span class="text-primary">•</span> <span>Generar reportes y estadísticas privadas.</span></li>
+            <li class="flex gap-3"><span class="text-primary">•</span> <span>Brindar soporte técnico bajo petición expresa.</span></li>
+          </ul>
+          
+          <div class="bg-primary/5 p-6 rounded-2xl border border-primary/20 mt-6 group transition-all hover:bg-primary/10">
+            <p class="text-primary text-[0.7rem] font-bold leading-relaxed">
+              <strong class="uppercase tracking-widest block mb-2 underline decoration-2 underline-offset-4">Garantía de Privacidad:</strong>
+              Productos Digitales SyO LLC NO vende, NO alquila, NO intercambia ni utiliza los datos de sus transacciones para fines publicitarios o de marketing. Sus datos le pertenecen exclusivamente a usted.
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-4 py-4 border-t border-white/5">
+          <h4 class="text-primary font-black uppercase tracking-[0.2em] text-[0.65rem]">03. Seguridad de Nivel Bancario</h4>
+          <p>Implementamos medidas de seguridad de nivel industrial:</p>
+          <ul class="space-y-3">
+            <li class="flex gap-3">
+              <span class="text-primary mt-1">•</span>
+              <span><strong class="text-white">Cifrado:</strong> Datos cifrados en tránsito (SSL/TLS) y en reposo.</span>
+            </li>
+            <li class="flex gap-3">
+              <span class="text-primary mt-1">•</span>
+              <span><strong class="text-white">Acceso Restringido:</strong> Solo personal autorizado tiene acceso limitado bajo petición.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="space-y-4 py-4 border-t border-white/5">
+          <h4 class="text-primary font-black uppercase tracking-[0.2em] text-[0.65rem]">04. Control del Usuario</h4>
+          <p>Usted es el dueño de su información en todo momento:</p>
+          <ul class="space-y-3 flex flex-wrap gap-2">
+            <li class="bg-white/5 px-4 py-2 rounded-xl text-white font-bold text-[0.6rem] uppercase tracking-wider">Acceder y Exportar</li>
+            <li class="bg-white/5 px-4 py-2 rounded-xl text-white font-bold text-[0.6rem] uppercase tracking-wider">Rectificar Datos</li>
+            <li class="bg-white/5 px-4 py-2 rounded-xl text-white font-bold text-[0.6rem] uppercase tracking-wider">Eliminación Definitiva</li>
+          </ul>
+        </div>
+
+        <div class="pt-6 border-t border-white/5">
+          <p class="text-[0.65rem] text-white/30 text-center">
+            Dudas: <span class="text-primary/60 font-black">admin@tuconpay.com</span>
+          </p>
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton @click="showTermsModal = false" class="!w-full !h-12 !rounded-xl !text-xs !uppercase !tracking-widest">Entendido</BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 

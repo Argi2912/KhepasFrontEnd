@@ -1,17 +1,55 @@
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-// Asegúrate de tener fontawesome instalado, o usa iconos SVG directos si prefieres
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import GuestSupportWidget from '@/components/landing/GuestSupportWidget.vue'
 
 const router = useRouter()
 const goToLogin = () => router.push({ name: 'login' })
 const goToRegister = () => router.push({ name: 'register' })
 
+const activeModal = ref(null) // 'security' | 'protocols' | null
+const supportWidget = ref(null)
+
+const toggleModal = (type) => {
+    activeModal.value = type
+}
+
+const openSupport = () => {
+    if (supportWidget.value) {
+        supportWidget.value.openChat()
+    }
+}
+
 const features = [
-    { icon: 'fa-solid fa-bolt', title: 'Motor Ultra Rápido', desc: 'Ejecución de cambios y validación de saldos en milisegundos.' },
-    { icon: 'fa-solid fa-coins', title: 'Multi-Divisa Real', desc: 'Manejo nativo de USD, USDT, VES y más en una sola billetera.' },
-    { icon: 'fa-solid fa-chart-line', title: 'Ledger Automático', desc: 'Olvídate de la contabilidad manual. Cada centavo queda registrado.' },
-    { icon: 'fa-solid fa-lock', title: 'Seguridad Blindada', desc: 'Encriptación de grado bancario y auditoría de acciones por usuario.' }
+    { icon: ['fas', 'bolt'], title: 'Motor Ultra Rápido', desc: 'Ejecución de cambios y validación de saldos en milisegundos.' },
+    { icon: ['fas', 'coins'], title: 'Multi-Divisa Real', desc: 'Manejo nativo de USD, USDT, VES y más en una sola billetera.' },
+    { icon: ['fas', 'chart-line'], title: 'Ledger Automático', desc: 'Olvídate de la contabilidad manual. Cada centavo queda registrado.' },
+    { icon: ['fas', 'lock'], title: 'Seguridad Blindada', desc: 'Encriptación de grado bancario y auditoría de acciones por usuario.' }
+]
+
+const securityFeatures = [
+    { 
+        icon: ['fas', 'shield-halved'], 
+        title: 'Blindaje Digital', 
+        desc: 'Tus datos viajan por un túnel privado e impenetrable. Usamos la misma tecnología que los grandes bancos para que nadie más pueda ver tu información.' 
+    },
+    { 
+        icon: ['fas', 'vault'], 
+        title: 'Tesorería Inteligente', 
+        desc: 'Control automático de cada centavo. Nuestro sistema valida cada número para eliminar errores humanos y asegurar que tu dinero siempre esté exacto.' 
+    },
+    { 
+        icon: ['fas', 'cloud-shield'], 
+        title: 'Resguardo 24/7', 
+        desc: 'Copias de seguridad automáticas cada hora en servidores altamente seguros. Si algo sucede, recuperamos todo en segundos.' 
+    }
+]
+
+const protocolItems = [
+    { title: 'Conexión Segura', desc: 'Toda tu navegación está protegida. Verás siempre el candado de seguridad activo.' },
+    { title: 'Identidad Verificada', desc: 'Aseguramos que solo tú puedas entrar a tu cuenta mediante pasos de confirmación sencillos.' },
+    { title: 'Auditoría Transparente', desc: 'Guardamos un historial de quién hizo qué y a qué hora, para que tengas el control total.' }
 ]
 </script>
 
@@ -22,18 +60,22 @@ const features = [
         <div class="ambient-light blue-light"></div>
 
         <nav class="glass-nav">
-            <div class="brand">
-                <img src="@/assets/logo.jpg" alt="Logo" class="w-10 h-10 rounded-xl object-cover shadow-lg border border-white/10" />
-                <span>Conpay<span class="gold-text"></span></span>
-            </div>
-            <div class="nav-links">
-                <button @click="goToLogin" class="btn-text">Ingresar</button>
-                <button @click="goToRegister" class="btn-gold">Comenzar</button>
+            <div class="nav-container">
+                <div class="brand">
+                    <img src="@/assets/logo.jpg" alt="Logo" class="w-10 h-10 rounded-xl object-cover shadow-lg border border-white/10" />
+                    <span>TuConpay<span class="gold-text">.</span></span>
+                </div>
+                <div class="nav-links">
+                    <button @click="goToLogin" class="btn-text">Ecosistema</button>
+                    <button @click="goToRegister" class="btn-gold">Prueba Gratuita</button>
+                </div>
             </div>
         </nav>
 
         <header class="hero-section">
-            <div class="hero-content">
+            <div class="hero-container">
+                <div class="hero-content">
+
                 <div class="pill-badge">
                     <span class="dot-pulse"></span> Nueva Versión 2.0 Disponible
                 </div>
@@ -53,7 +95,7 @@ const features = [
                         Crear Cuenta
                     </button>
                     <button class="btn-glass btn-lg">
-                        <FontAwesomeIcon icon="fa-solid fa-play" /> Ver Demo
+                        <FontAwesomeIcon :icon="['fas', 'play']" /> Ver Demo
                     </button>
                 </div>
 
@@ -91,11 +133,17 @@ const features = [
 
                 <div class="decorative-circle"></div>
             </div>
+          </div>
         </header>
 
         <section class="features-section">
-            <h2 class="section-title">Potencia sin complicaciones</h2>
-            <div class="grid-cards">
+            <div class="section-container">
+                <h2 class="section-title">
+                   <span class="text-white/20 text-[0.6rem] font-bold uppercase tracking-[0.4em] block mb-4">Core Capabilities</span>
+                   Potencia sin complicaciones.
+                </h2>
+                <div class="grid-cards">
+
                 <div v-for="(item, i) in features" :key="i" class="feature-card">
                     <div class="icon-glow">
                         <FontAwesomeIcon :icon="item.icon" />
@@ -103,13 +151,61 @@ const features = [
                     <h3>{{ item.title }}</h3>
                     <p>{{ item.desc }}</p>
                 </div>
+                </div>
             </div>
         </section>
 
+        <!-- Modals Overlay -->
+        <transition name="fade">
+            <div v-if="activeModal" class="modal-overlay" @click="toggleModal(null)">
+                <div class="modal-content glass-box" @click.stop>
+                    <button class="close-modal" @click="toggleModal(null)">
+                        <FontAwesomeIcon :icon="['fas', 'times']" />
+                    </button>
+
+                    <!-- Security Content -->
+                    <div v-if="activeModal === 'security'" class="modal-body">
+                        <span class="pill-badge">Confianza Total</span>
+                        <h2 class="modal-title">Nuestra prioridad es <span class="gold-text">tu tranquilidad.</span></h2>
+                        <div class="security-features-list">
+                            <div v-for="(sec, i) in securityFeatures" :key="i" class="sec-item">
+                                <div class="sec-icon"><FontAwesomeIcon :icon="sec.icon" /></div>
+                                <div class="sec-content">
+                                    <h4>{{ sec.title }}</h4>
+                                    <p>{{ sec.desc }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Protocols Content -->
+                    <div v-if="activeModal === 'protocols'" class="modal-body">
+                        <h2 class="modal-title">Protocolos de <span class="gold-text">Seguridad</span></h2>
+                        <p class="modal-subtitle">Simples, claros y efectivos.</p>
+                        <div class="protocol-grid">
+                            <div v-for="(p, i) in protocolItems" :key="i" class="protocol-card">
+                                <div class="p-num">0{{ i+1 }}</div>
+                                <h4>{{ p.title }}</h4>
+                                <p>{{ p.desc }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
         <footer class="simple-footer">
-            <p>&copy; 2026 TuConpay Financial Services.</p>
+            <div class="footer-container">
+                <p>&copy; 2026 TuConpay Financial Services. Operado por <span class="text-white">SyO LLC Delaware</span>.</p>
+                <div class="footer-links">
+                   <button @click="toggleModal('security')" class="foot-shortcut">Seguridad</button>
+                   <button @click="openSupport" class="foot-shortcut highlight">Soporte</button>
+                   <button @click="toggleModal('protocols')" class="foot-shortcut">Protocolos</button>
+                </div>
+            </div>
         </footer>
 
+        <GuestSupportWidget ref="supportWidget" />
     </div>
 </template>
 
@@ -171,33 +267,29 @@ const features = [
     left: 0;
     right: 0;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
-    background: rgba(11, 14, 17, 0.8);
-    backdrop-filter: blur(12px);
+    justify-content: center;
+    background: rgba(11, 14, 17, 0.85);
+    backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     z-index: 100;
+}
+
+.nav-container {
+    width: 100%;
+    max-width: 1400px;
+    padding: 1.25rem 2.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-weight: 700;
-    font-size: 1.25rem;
-}
-
-.logo-box {
-    width: 36px;
-    height: 36px;
-    background: var(--gold);
-    color: #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    box-shadow: 0 0 15px var(--gold-glow);
+    gap: 12px;
+    font-weight: 900;
+    font-size: 1.5rem;
+    letter-spacing: -1px;
 }
 
 .gold-text {
@@ -206,9 +298,10 @@ const features = [
 
 .nav-links {
     display: flex;
-    gap: 1rem;
+    gap: 2rem;
     align-items: center;
 }
+
 
 /* =========================================
    BOTONES
@@ -218,10 +311,10 @@ button {
     transition: all 0.3s ease;
     border: none;
     font-family: inherit;
+    background: none;
 }
 
 .btn-text {
-    background: none;
     color: var(--text-muted);
     font-weight: 500;
     font-size: 0.95rem;
@@ -292,14 +385,24 @@ button {
    HERO SECTION
    ========================================= */
 .hero-section {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: center;
     min-height: 100vh;
-    padding: 8rem 5% 4rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 6rem 5% 4rem;
     position: relative;
     z-index: 10;
 }
+
+.hero-container {
+    width: 100%;
+    max-width: 1400px;
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    align-items: center;
+    gap: 4rem;
+}
+
 
 .pill-badge {
     display: inline-flex;
@@ -325,12 +428,13 @@ button {
 }
 
 .main-title {
-    font-size: 4rem;
-    line-height: 1.1;
-    font-weight: 800;
-    margin-bottom: 1.5rem;
-    letter-spacing: -1px;
+    font-size: clamp(3rem, 6vw, 5rem);
+    line-height: 1;
+    font-weight: 900;
+    margin-bottom: 2rem;
+    letter-spacing: -0.04em;
 }
+
 
 .gradient-text {
     background: linear-gradient(90deg, #ffffff 0%, #f0b90b 100%);
@@ -467,16 +571,17 @@ button {
 
 .decorative-circle {
     position: absolute;
-    width: 300px;
-    height: 300px;
-    border: 1px solid rgba(240, 185, 11, 0.1);
+    width: 120%;
+    height: 120%;
+    border: 1px solid rgba(240, 185, 11, 0.05);
     border-radius: 50%;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 1;
-    animation: spin 20s linear infinite;
+    animation: spin 30s linear infinite;
 }
+
 
 .decorative-circle::before {
     content: '';
@@ -494,16 +599,24 @@ button {
    FEATURES SECTION
    ========================================= */
 .features-section {
-    padding: 5rem 5%;
-    background: linear-gradient(to bottom, var(--dark-bg), #000);
+    padding: 10rem 5%;
+    display: flex;
+    justify-content: center;
+}
+
+.section-container {
+    width: 100%;
+    max-width: 1400px;
 }
 
 .section-title {
-    text-align: center;
-    font-size: 2.5rem;
-    margin-bottom: 4rem;
-    font-weight: 700;
+    text-align: left;
+    font-size: 3.5rem;
+    margin-bottom: 6rem;
+    font-weight: 900;
+    letter-spacing: -2px;
 }
+
 
 .grid-cards {
     display: grid;
@@ -553,49 +666,197 @@ button {
 }
 
 /* =========================================
+   MODALS UI
+   ========================================= */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.modal-content {
+    width: 100%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.glass-box {
+    background: rgba(30, 32, 38, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 32px;
+    padding: 4rem;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+}
+
+.close-modal {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.close-modal:hover {
+    background: var(--gold);
+    color: #000;
+}
+
+.modal-title {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin-bottom: 2rem;
+}
+
+.modal-subtitle {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    margin-bottom: 3rem;
+}
+
+.security-features-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+
+.sec-item {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.sec-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(240, 185, 11, 0.1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.sec-content h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+}
+
+.sec-content p {
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.protocol-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+}
+
+.protocol-card {
+    position: relative;
+    padding-top: 1.5rem;
+}
+
+.p-num {
+    position: absolute;
+    top: -1rem; left: 0;
+    font-size: 4rem;
+    font-weight: 900;
+    color: rgba(240, 185, 11, 0.1);
+    z-index: 0;
+}
+
+.protocol-card h4, .protocol-card p {
+    position: relative;
+    z-index: 1;
+}
+
+.protocol-card h4 {
+    color: var(--gold);
+    margin-bottom: 0.5rem;
+}
+
+/* =========================================
    FOOTER
    ========================================= */
 .simple-footer {
-    text-align: center;
-    padding: 2rem;
+    display: flex;
+    justify-content: center;
+    padding: 4rem 5%;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     color: var(--text-muted);
-    font-size: 0.9rem;
+}
+
+.footer-container {
+    width: 100%;
+    max-width: 1400px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.footer-links {
+    display: flex;
+    gap: 3rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.foot-shortcut {
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.foot-shortcut:hover {
+    color: var(--gold);
+}
+
+.foot-shortcut.highlight {
+    color: #fff;
 }
 
 /* =========================================
    ANIMACIONES
    ========================================= */
+.fade-enter-active, .fade-leave-active {
+    transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+    opacity: 0;
+}
+
 @keyframes pulse-gold {
-    0% {
-        box-shadow: 0 0 0 0 rgba(240, 185, 11, 0.4);
-    }
-
-    70% {
-        box-shadow: 0 0 0 10px rgba(240, 185, 11, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(240, 185, 11, 0);
-    }
+    0% { box-shadow: 0 0 0 0 rgba(240, 185, 11, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(240, 185, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(240, 185, 11, 0); }
 }
 
 @keyframes spin {
-    100% {
-        transform: translate(-50%, -50%) rotate(360deg);
-    }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 @keyframes float {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-15px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
 }
 
 .float-animation {
@@ -606,30 +867,14 @@ button {
    RESPONSIVE
    ========================================= */
 @media (max-width: 992px) {
-    .hero-section {
-        grid-template-columns: 1fr;
-        text-align: center;
-        padding-top: 7rem;
-    }
-
-    .hero-visual {
-        margin-top: 4rem;
-    }
-
-    .cta-group {
-        justify-content: center;
-    }
-
-    .stats-pills {
-        justify-content: center;
-    }
-
-    .subtitle {
-        margin: 0 auto 2.5rem;
-    }
-
-    .main-title {
-        font-size: 3rem;
-    }
+    .hero-container { grid-template-columns: 1fr; text-align: center; }
+    .hero-visual { order: -1; }
+    .cta-group, .stats-pills { justify-content: center; }
+    .main-title { font-size: 2.8rem; }
+    .section-title { font-size: 2.5rem; text-align: center; }
+    .footer-container { flex-direction: column; gap: 2rem; text-align: center; }
+    .footer-links { gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
+    .glass-box { padding: 2.5rem 1.5rem; }
 }
+
 </style>
