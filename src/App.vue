@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 // Importamos los Layouts
@@ -25,6 +25,18 @@ const transitionKey = computed(() => {
   const layout = route.meta.layout || 'AppLayout'
   return layout === 'AppLayout' ? 'dashboard-static' : route.fullPath
 })
+
+// Accedemos a los stores para controlar la visibilidad del soporte
+import { useAuthStore } from '@/stores/auth'
+import { useSupportStore } from '@/stores/support'
+
+const authStore = useAuthStore()
+const supportStore = useSupportStore()
+
+// Solo mostramos soporte si el usuario está logueado
+const showSupport = computed(() => {
+  return authStore.isLoggedIn
+})
 </script>
 
 <template>
@@ -36,7 +48,7 @@ const transitionKey = computed(() => {
     </Transition>
   </router-view>
 
-  <SupportForm />
+  <SupportForm v-if="showSupport" />
 </template>
 
 

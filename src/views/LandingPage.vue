@@ -23,7 +23,7 @@ const features = [
 
         <nav class="glass-nav">
             <div class="brand">
-                <div class="logo-box">T</div>
+                <img src="@/assets/logo.jpg" alt="Logo" class="w-10 h-10 rounded-xl object-cover shadow-lg border border-white/10" />
                 <span>Conpay<span class="gold-text"></span></span>
             </div>
             <div class="nav-links">

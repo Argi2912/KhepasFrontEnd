@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
 import notify from '@/services/notify'
+import { useAuthStore } from '@/stores/auth'
 
 export const useTransactionRequestStore = defineStore('transactionRequest', {
   state: () => ({
@@ -90,7 +91,7 @@ export const useTransactionRequestStore = defineStore('transactionRequest', {
 
     async fetchPendingCount() {
       const authStore = useAuthStore()
-      if (!authStore.token) return
+      if (!authStore.token || authStore.isSuperAdmin) return
 
       try {
         const { data } = await api.get('/transactions/requests', {

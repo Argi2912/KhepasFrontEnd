@@ -55,8 +55,8 @@ const goToRegister = () => router.push({ name: 'register' })
 
       <div class="relative z-10">
         <div class="flex items-center gap-4 mb-16">
-          <div class="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-            <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-secondary text-xl" />
+          <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-xl p-1 overflow-hidden">
+            <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-xl" />
           </div>
           <span class="text-2xl font-black text-white tracking-tighter">TuConpay<span class="text-primary">.</span></span>
         </div>
@@ -100,8 +100,8 @@ const goToRegister = () => router.push({ name: 'register' })
         
         <div class="mb-12">
           <div class="lg:hidden flex items-center gap-3 mb-8">
-            <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-secondary text-base" />
+            <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1 overflow-hidden">
+              <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-lg" />
             </div>
             <span class="text-xl font-black text-white tracking-tighter">TuConpay.</span>
           </div>

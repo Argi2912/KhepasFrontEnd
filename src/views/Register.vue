@@ -66,8 +66,8 @@ const goToLogin = () => router.push({ name: 'login' })
 
       <div class="relative z-10">
         <div class="flex items-center gap-4 mb-20">
-          <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-            <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-secondary text-lg" />
+          <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1 overflow-hidden shadow-xl">
+            <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-lg" />
           </div>
           <span class="text-xl font-black text-white tracking-tighter">TuConpay.</span>
         </div>
@@ -99,8 +99,8 @@ const goToLogin = () => router.push({ name: 'login' })
       <!-- Navbar móvil / Header formulario -->
       <div class="p-8 lg:px-16 lg:py-10 flex justify-between items-center border-b border-white/5 bg-secondary/50 backdrop-blur-xl sticky top-0 z-20">
         <div class="flex items-center gap-4 lg:hidden">
-            <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-secondary text-sm" />
+            <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1 overflow-hidden">
+              <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-md" />
             </div>
             <span class="text-lg font-black text-white tracking-tighter">TuConpay.</span>
         </div>

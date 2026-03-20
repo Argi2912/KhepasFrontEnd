@@ -3,11 +3,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTransactionRequestStore } from '@/stores/transactionRequest'
+import { useSupportStore } from '@/stores/support'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import alert from '@/services/alert'
 
 const authStore = useAuthStore()
 const requestStore = useTransactionRequestStore()
+const supportStore = useSupportStore()
 const router = useRouter()
 const emit = defineEmits(['toggle-sidebar'])
 
@@ -42,18 +44,36 @@ const toggleNotifications = () => {
   }
 }
 
+const isSuperAdmin = computed(() => authStore.isSuperAdmin)
+
+const toggleSupport = () => {
+  supportStore.isOpen = !supportStore.isOpen
+}
+
+// Controla la visibilidad de las notificaciones
+
 let pollingInterval = null
 
+// Actualizamos los contadores pendientes periódicamente (cada 30s)
 onMounted(() => {
   if (authStore.isLoggedIn) {
-    requestStore.fetchPendingCount()
-  }
-  
-  pollingInterval = setInterval(() => {
-    if (authStore.isLoggedIn) {
+    if (isSuperAdmin.value) {
+      supportStore.fetchPendingCount()
+    } else {
       requestStore.fetchPendingCount()
     }
-  }, 60000) // Cada 60 segundos
+    
+    // Intervalo de actualización
+    pollingInterval = setInterval(() => {
+      if (authStore.isLoggedIn) {
+        if (isSuperAdmin.value) {
+          supportStore.fetchPendingCount()
+        } else {
+          requestStore.fetchPendingCount()
+        }
+      }
+    }, 30000) // Cada 30 segundos
+  }
 })
 
 onUnmounted(() => {
@@ -90,8 +110,8 @@ const confirmLogout = async () => {
       </button>
       
       <div class="flex flex-col">
-        <div class="flex items-center gap-2 mb-0.5">
-           <span class="w-1 h-3 bg-primary/50 rounded-full"></span>
+        <div class="flex items-center gap-3 mb-0.5">
+           <img src="@/assets/logo.jpg" alt="Logo" class="h-6 w-auto rounded-lg shadow-sm brightness-110" />
            <span class="text-[0.6rem] text-white/30 uppercase tracking-[0.4em] font-black leading-none">Console / Core</span>
         </div>
         <span class="text-xl font-black text-white whitespace-nowrap overflow-hidden text-ellipsis leading-tight tracking-tight">
@@ -118,11 +138,11 @@ const confirmLogout = async () => {
                
                <!-- Badge de Notificación -->
                <span 
-                 v-if="requestStore.pendingCount > 0 || subscriptionAlert"
+                 v-if="requestStore.pendingCount > 0 || supportStore.pendingCount > 0 || subscriptionAlert"
                  class="absolute -top-1 -right-1 w-4 h-4 text-white text-[0.6rem] font-black flex items-center justify-center rounded-full shadow-lg animate-bounce"
                  :class="subscriptionAlert?.isCritical ? 'bg-danger shadow-danger/50' : 'bg-primary shadow-primary/50'"
                >
-                 {{ (requestStore.pendingCount || 0) + (subscriptionAlert ? 1 : 0) }}
+                 {{ (requestStore.pendingCount || 0) + (supportStore.pendingCount || 0) + (subscriptionAlert ? 1 : 0) }}
                </span>
             </button>
 
@@ -149,8 +169,20 @@ const confirmLogout = async () => {
                       <p class="text-[0.65rem] font-medium leading-relaxed">{{ subscriptionAlert.message }}</p>
                     </div>
                   </div>
+                   <!-- Alertas de Soporte (Mini Chat) -->
+                   <div 
+                     v-if="supportStore.pendingCount > 0" 
+                     class="p-4 mx-2 mt-2 rounded-2xl border border-primary/20 bg-primary/10 text-primary flex gap-3 transition-all cursor-pointer hover:bg-primary/20"
+                     @click="showNotifications = false"
+                   >
+                     <FontAwesomeIcon icon="fa-solid fa-headset" class="mt-0.5" />
+                     <div>
+                       <p class="text-[0.7rem] font-black uppercase tracking-wider mb-0.5">Soporte Pendiente</p>
+                       <p class="text-[0.65rem] font-medium leading-relaxed">Tienes {{ supportStore.pendingCount }} mensajes nuevos de usuarios.</p>
+                     </div>
+                   </div>
 
-                  <div v-if="requestStore.requests.length === 0 && !subscriptionAlert" class="p-8 text-center">
+                   <div v-if="requestStore.requests.length === 0 && !subscriptionAlert && supportStore.pendingCount === 0" class="p-8 text-center">
                     <FontAwesomeIcon icon="fa-solid fa-check-circle" class="text-white/10 text-2xl mb-2" />
                     <p class="text-[0.65rem] text-white/30 font-bold uppercase tracking-widest">Todo al día</p>
                   </div>

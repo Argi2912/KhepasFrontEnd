@@ -117,16 +117,16 @@ const menuItems = computed(() => {
       
       <transition name="fade">
         <div v-if="isOpen" class="flex items-center gap-3 relative z-10 transition-all duration-500">
-          <div class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-[0_0_25px_rgba(247,166,0,0.4)] group-hover:scale-110 transition-transform duration-500">
-             <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-secondary text-lg" />
+          <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-[0_0_25px_rgba(255,255,255,0.1)] group-hover:scale-110 transition-transform duration-500 p-1 overflow-hidden">
+             <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-lg" />
           </div>
           <div class="flex flex-col">
             <span class="text-xl font-black text-white tracking-tighter leading-none">TuConpay<span class="text-primary">.</span></span>
             <span class="text-[0.6rem] font-bold text-white/20 uppercase tracking-[0.3em] mt-1">Ecosistema Pro</span>
           </div>
         </div>
-        <div v-else class="w-11 h-11 bg-white/[0.03] rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-primary/30 transition-all duration-500 shadow-inner">
-          <FontAwesomeIcon icon="fa-solid fa-bolt" class="text-xl text-primary drop-shadow-[0_0_8px_rgba(247,166,0,0.5)]" />
+        <div v-else class="w-11 h-11 bg-white rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-primary/30 transition-all duration-500 shadow-inner p-1 overflow-hidden">
+          <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-xl" />
         </div>
       </transition>
     </div>
