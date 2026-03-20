@@ -4,47 +4,91 @@ import notify from '@/services/notify'
 
 export const useSupportStore = defineStore('support', {
   state: () => ({
+    tickets: [], // Lista de tickets del usuario o admin
     messages: [],
+    activeTicketId: null, // Ticket seleccionado actualmente
     pendingCount: 0,
-    pendingThreads: [], // Lista de usuarios con mensajes pendientes
-    isOpen: false, // Control global del chat
+    pendingThreads: [], // Ahora representará tickets abiertos con mensajes sin leer
+    isOpen: false,
     isLoading: false,
-    activeUserId: null // Para que el admin filtre el chat de un usuario
+    activeUserId: null // Para filtros del admin
   }),
 
   actions: {
-    async fetchMessages() {
+    async fetchTickets(userId = null) {
       this.isLoading = true
       try {
         const params = {}
-        if (this.activeUserId) {
-          params.user_id = this.activeUserId
-        }
+        if (userId || this.activeUserId) params.user_id = userId || this.activeUserId
         const { data } = await api.get('/support/contact', { params })
-        this.messages = data
+        this.tickets = data
         return data
       } catch (error) {
-        console.error('Error al cargar mensajes de soporte', error)
+        console.error('Error al cargar tickets', error)
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    async fetchTicketMessages(ticketId) {
+      this.isLoading = true
+      try {
+        const { data } = await api.get(`/support/contact/${ticketId}`)
+        this.messages = data.messages
+        // Si el ticket es el activo, actualizamos su info básica si es necesario
+        return data
+      } catch (error) {
+        console.error('Error al cargar mensajes del ticket', error)
       } finally {
         this.isLoading = false
       }
     },
 
     async sendMessage(payload) {
-      // Si el Admin está respondiendo, forzamos el activeUserId si no viene en el payload
-      if (!payload.user_id && this.activeUserId) {
-        payload.user_id = this.activeUserId
+      if (!payload.ticket_id && this.activeTicketId) {
+        payload.ticket_id = this.activeTicketId
       }
       
       try {
         const { data } = await api.post('/support/contact', payload)
-        // No pusheamos directamente si es respuesta, dejamos que el polling lo traiga 
-        // o lo añadimos si ya estamos en ese hilo
-        this.messages.push(data)
+        // Si es un ticket nuevo (primer mensaje), debemos actualizar la lista de tickets
+        if (!payload.ticket_id) {
+          await this.fetchTickets()
+          if (this.tickets.length > 0) {
+            this.activeTicketId = this.tickets[0].id
+          }
+        } else {
+          this.messages.push(data)
+        }
         return data
       } catch (error) {
         console.error('Error al enviar mensaje', error)
+        notify.error(error.response?.data?.error || 'Error al enviar mensaje')
         throw error
+      }
+    },
+
+    async closeTicket(ticketId = null) {
+      const id = ticketId || this.activeTicketId
+      if (!id) return
+      try {
+        await api.post(`/support/contact/${id}/close`)
+        notify.success('Ticket cerrado correctamente')
+        await this.fetchTickets()
+        // Actualizar el estado del ticket activo si coincide
+        const active = this.tickets.find(t => t.id === id)
+        if (active && this.activeTicketId === id) {
+          // Podríamos refrescar los mensajes para ver el sistema de bloqueo
+          await this.fetchTicketMessages(id)
+        }
+      } catch (error) {
+        console.error('Error al cerrar ticket', error)
+      }
+    },
+
+    async fetchMessages() {
+      if (this.activeTicketId) {
+        return this.fetchTicketMessages(this.activeTicketId)
       }
     },
 
@@ -66,10 +110,11 @@ export const useSupportStore = defineStore('support', {
       }
     },
 
-    async markRead(userId = null) {
-      const targetId = userId || this.activeUserId
+    async markRead(ticketId = null) {
+      const id = ticketId || this.activeTicketId
+      if (!id) return
       try {
-        await api.post('/support/mark-read', { user_id: targetId })
+        await api.post('/support/mark-read', { ticket_id: id })
         this.fetchPendingCount()
       } catch (error) {
         console.error('Error al marcar mensajes como leídos', error)
