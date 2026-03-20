@@ -26,7 +26,7 @@ const sendMessage = async () => {
     try {
         // Enviar al backend (endpoint de invitado por crear/verificar)
         await api.post('/support/guest', {
-            message: userMsg,
+            body: userMsg,
             contact_info: contactInfo.value,
             subject: 'Consulta desde Landing Page'
         })
