@@ -5,6 +5,7 @@ import api from '@/services/api';
 import notify from '@/services/notify';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { useRouter } from 'vue-router';
+import PayPalButton from '@/components/shared/PayPalButton.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -15,22 +16,12 @@ const planPrice = computed(() => authStore.user?.tenant?.plan_price || '0.00');
 const planName = computed(() => authStore.user?.tenant?.plan_name || 'Plan Actual');
 
 // --- Lógica de Pago (PayPal) ---
-const payWithPaypal = async () => {
-    isLoading.value = true;
-    try {
-        const response = await api.post('/subscription/paypal');
-
-        if (response.data.payment_url) {
-            window.location.href = response.data.payment_url;
-        } else {
-            notify.error('No se pudo generar el enlace de PayPal.');
-        }
-    } catch (error) {
-        console.error(error);
-        notify.error('Error al iniciar el pago con PayPal.');
-    } finally {
-        isLoading.value = false;
-    }
+const handlePaymentSuccess = () => {
+    notify.success('¡Suscripción reactivada con éxito!');
+    // Recargar los datos del usuario para actualizar el estado de la suscripción
+    authStore.fetchUser().then(() => {
+        router.push({ name: 'dashboard' });
+    });
 };
 
 const logout = () => {
@@ -79,13 +70,15 @@ const logout = () => {
                 </div>
             </div>
 
-            <button @click="payWithPaypal" class="btn-primary" :disabled="isLoading">
-                <span v-if="!isLoading">
-                    <font-awesome-icon icon="lock" class="mr-2" /> Pagar y Reactivar
-                </span>
-                <span v-else>
-                    <font-awesome-icon icon="spinner" spin /> Procesando...
-                </span>
+            <PayPalButton 
+                v-if="planPrice > 0"
+                :amount="planPrice"
+                :planId="planName"
+                :description="`Reactivación Suscripción - ${tenantName}`"
+                @success="handlePaymentSuccess"
+            />
+            <button v-else @click="handlePaymentSuccess" class="btn-primary">
+                Reactivar Gratis
             </button>
 
             <div class="auth-footer">

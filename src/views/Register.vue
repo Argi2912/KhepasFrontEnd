@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import { useFormValidation } from '@/utils/useFormValidation'
 import BaseButton from '@/components/shared/BaseButton.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
+import PayPalButton from '@/components/shared/PayPalButton.vue'
 
 
 const router = useRouter()
@@ -26,6 +27,8 @@ const form = reactive({
 const isLoading = ref(false)
 const acceptedTerms = ref(false)
 const showTermsModal = ref(false)
+const showPayPal = ref(false)
+const registrationData = ref(null)
 
 const handleRegister = async () => {
   if (!acceptedTerms.value) {
@@ -36,15 +39,18 @@ const handleRegister = async () => {
   isLoading.value = true
   try {
     const response = await authStore.register(form)
-    const url = response.data?.url || response.url
+    registrationData.value = response.data || response
 
-    if (url) {
-      const successMsg = form.plan === 'free'
-          ? '¡Ecosistema Creado! Iniciando despliegue de prueba...'
-          : 'Redirigiendo a Pasarela de Pago Segura...'
-
-      notify.success(successMsg)
-      setTimeout(() => { window.location.href = url }, 1000)
+    if (form.plan === 'free') {
+      const url = registrationData.value.url
+      if (url) {
+        notify.success('¡Ecosistema Creado! Iniciando despliegue de prueba...')
+        setTimeout(() => { window.location.href = url }, 1000)
+      }
+    } else {
+      // Para planes pagos, mostramos el botón de PayPal
+      showPayPal.value = true
+      notify.success('Ecosistema pre-configurado. Procede con el pago para activar.')
     }
   } catch (error) {
     if (!handleAxiosError(error)) {
@@ -53,6 +59,16 @@ const handleRegister = async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+const handlePaymentSuccess = () => {
+  notify.success('¡Pago completado con éxito! Redirigiendo...')
+  // Aquí el backend ya debería haber capturado la orden si usamos el flujo recomendado
+  // Pero para este ejemplo, redirigimos al success page que manejará la verificación
+  const tenant_id = registrationData.value.tenant_id || registrationData.value.id
+  setTimeout(() => {
+    router.push({ name: 'payment-success', query: { tenant_id } })
+  }, 1500)
 }
 
 const goToLogin = () => router.push({ name: 'login' })
@@ -214,6 +230,7 @@ const goToLogin = () => router.push({ name: 'login' })
               </label>
 
               <BaseButton 
+                v-if="!showPayPal"
                 class="!w-full !h-16 !rounded-2xl !text-sm !font-black !tracking-[0.2em] !uppercase border border-primary/20"
                 @click="handleRegister" 
                 :disabled="isLoading || !acceptedTerms"
@@ -221,6 +238,22 @@ const goToLogin = () => router.push({ name: 'login' })
                 <template v-if="!isLoading">Implementar Ecosistema</template>
                 <template v-else><div class="w-5 h-5 border-2 border-secondary/20 border-t-secondary rounded-full animate-spin"></div></template>
               </BaseButton>
+
+              <!-- Botón de PayPal (SDK) -->
+              <div v-if="showPayPal" class="w-full space-y-4 animate-premium-in">
+                <div class="p-4 bg-primary/5 border border-primary/20 rounded-2xl mb-4 text-center">
+                  <p class="text-[0.6rem] font-black text-primary uppercase tracking-[0.2em]">Pagar Plan {{ form.plan.toUpperCase() }}</p>
+                </div>
+                <PayPalButton 
+                  :amount="form.plan === 'pro' ? '29.99' : '10.00'" 
+                  :planId="form.plan"
+                  :description="`Plan ${form.plan} - TuConpay`"
+                  @success="handlePaymentSuccess"
+                />
+                <button @click="showPayPal = false" class="text-white/20 hover:text-white text-[0.55rem] font-black uppercase tracking-[0.2em] transition-colors">
+                  ← Volver a editar datos
+                </button>
+              </div>
             </div>
 
           </form>
