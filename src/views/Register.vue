@@ -8,7 +8,7 @@ import { useFormValidation } from '@/utils/useFormValidation'
 import BaseButton from '@/components/shared/BaseButton.vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
 import PayPalButton from '@/components/shared/PayPalButton.vue'
-
+import api from '@/services/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -40,12 +40,23 @@ const handleRegister = async () => {
   try {
     const response = await authStore.register(form)
     registrationData.value = response.data || response
+    const tenant_id = registrationData.value.tenant_id || registrationData.value.id
 
     if (form.plan === 'free') {
+      try {
+        // Attempt to activate free plan using the backend endpoint
+        await api.post('/subscription/free', { tenant_id })
+      } catch (e) {
+        console.warn('Free activation endpoint response', e)
+      }
+
       const url = registrationData.value.url
       if (url) {
         notify.success('¡Ecosistema Creado! Iniciando despliegue de prueba...')
         setTimeout(() => { window.location.href = url }, 1000)
+      } else {
+        notify.success('¡Ecosistema Creado! Por favor inicia sesión.')
+        goToLogin()
       }
     } else {
       // Para planes pagos, mostramos el botón de PayPal
@@ -66,7 +77,7 @@ const handlePaymentSuccess = (details) => {
   const tenant_id = registrationData.value.tenant_id || registrationData.value.id
   const token = details.id || details.orderID
   setTimeout(() => {
-    router.push({ name: 'payment-success', query: { tenant_id, token } })
+    router.push({ name: 'payment-success', query: { tenant_id, token, plan: form.plan } })
   }, 1500)
 }
 
@@ -204,7 +215,7 @@ const goToLogin = () => router.push({ name: 'login' })
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <!-- Plan Card Adaptado -->
                 <div 
-                  v-for="plan in [{id:'free', n:'Gratis', p:'0.00', t:'/30d'}, {id:'basic', n:'Básico', p:'10.00', t:'/mes'}, {id:'pro', n:'Pro', p:'29.99', t:'/mes'}]" 
+                  v-for="plan in [{id:'free', n:'Gratis', p:'0.00', t:'/30d'}, {id:'normal', n:'Normal', p:'47.00', t:'/mes'}, {id:'pro', n:'Pro', p:'300.00', t:'/13mes'}]" 
                   :key="plan.id"
                   @click="form.plan = plan.id"
                   class="relative p-6 rounded-3xl border cursor-pointer transition-all duration-500 overflow-hidden group"
@@ -244,9 +255,9 @@ const goToLogin = () => router.push({ name: 'login' })
                   <p class="text-[0.6rem] font-black text-primary uppercase tracking-[0.2em]">Pagar Plan {{ form.plan.toUpperCase() }}</p>
                 </div>
                 <PayPalButton 
-                  :amount="form.plan === 'pro' ? '29.99' : '10.00'" 
+                  :amount="form.plan === 'pro' ? '300.00' : '47.00'" 
                   :planId="form.plan"
-                  :description="`Plan ${form.plan} - TuConpay`"
+                  :description="`Plan ${form.plan.toUpperCase()} - TuConpay`"
                   @success="handlePaymentSuccess"
                 />
                 <button @click="showPayPal = false" class="text-white/20 hover:text-white text-[0.55rem] font-black uppercase tracking-[0.2em] transition-colors">

@@ -39,8 +39,24 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function register(data) {
+    // 🧹 LIMPIEZA PREVIA: Borrar tokens viejos en localStorage que podrían causar falsos 401
+    setToken(null)
+    user.value = null
+    permissions.value = []
+
     try {
       const response = await api.post('/register', data)
+      
+      // Auto-login si el backend devuelve un access_token y estamos a punto de pagar
+      if (response.data && response.data.access_token) {
+        setToken(response.data.access_token)
+        try {
+          await fetchUser() // Cargar el usuario y sus permisos
+        } catch (e) {
+          console.warn('No se pudieron obtener datos del usuario tras registro:', e)
+        }
+      }
+      
       return response.data
     } catch (error) {
       throw error

@@ -54,8 +54,11 @@ const processCapture = async () => {
 
   try {
     // 2. Llamar al Backend para COBRAR y ACTIVAR
-    await api.post('subscription/capture-registration', {
-      token: token,
+    const plan = route.query.plan || 'normal' // fallback
+    
+    await api.post('subscription/paypal/capture-order', {
+      orderID: token,
+      plan: plan,
       tenant_id: tenantId
     })
 

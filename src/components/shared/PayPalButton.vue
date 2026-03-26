@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import notify from '@/services/notify'
+import api from '@/services/api'
 
 const props = defineProps({
   amount: {
@@ -43,19 +44,18 @@ const renderPayPalButtons = () => {
       shape: 'rect',
       label: 'pay'
     },
-    createOrder: (_, actions) => {
-      // Aquí llamamos al backend para crear la orden
-      // Asumimos un endpoint POST /api/subscription/paypal/create-order
-      // Si no existe, podemos usar actions.order.create como fallback temporal para sandbox
-      return actions.order.create({
-        purchase_units: [{
-          description: props.description,
-          amount: {
-            currency_code: 'USD',
-            value: props.amount
-          }
-        }]
-      })
+    createOrder: async (_, actions) => {
+      try {
+        const response = await api.post('/subscription/paypal/create-order', {
+          plan: props.planId
+        })
+        
+        return response.data.id
+      } catch (error) {
+        console.error('Error creando orden en backend', error)
+        notify.error('No se pudo inicializar el pago.')
+        throw error
+      }
     },
     onApprove: (data) => {
       // Dejamos que el backend capture la orden real
