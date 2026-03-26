@@ -52,17 +52,17 @@ router.beforeEach(async (to, from, next) => {
 
   // --- LÓGICA DE BLOQUEO POR SUSCRIPCIÓN VENCIDA ---
   if (isLoggedIn && authStore.user?.tenant) {
-    const isTenantActive = Boolean(authStore.user.tenant.is_active);
+    const isTenantActive = Boolean(authStore.user.tenant.is_active)
 
     if (!isTenantActive) {
-      if (to.name !== 'subscription_expired') {
-        return next({ name: 'subscription_expired' });
+      if (to.name !== 'subscription_expired' && to.name !== 'payment-success') {
+        return next({ name: 'subscription_expired' })
       }
-      return next();
+      return next()
     }
 
     if (isTenantActive && to.name === 'subscription_expired') {
-      return next({ name: 'dashboard' });
+      return next({ name: 'dashboard' })
     }
   }
 

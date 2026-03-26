@@ -6,20 +6,24 @@ import api from '@/services/api'
 const props = defineProps({
   amount: {
     type: [String, Number],
-    required: true
+    required: true,
   },
   planId: {
     type: String,
-    required: true
+    required: true,
   },
   tenantId: {
     type: [String, Number],
-    default: null
+    default: null,
   },
   description: {
     type: String,
-    default: 'Suscripción TuConpay'
-  }
+    default: 'Suscripción TuConpay',
+  },
+  token: {
+    type: String,
+    required: false,
+  },
 })
 
 const emit = defineEmits(['success', 'error', 'cancel'])
@@ -37,39 +41,62 @@ const renderPayPalButtons = () => {
     return
   }
 
-  window.paypal.Buttons({
-    style: {
-      layout: 'vertical',
-      color: 'gold',
-      shape: 'rect',
-      label: 'pay'
-    },
-    createOrder: async (_, actions) => {
-      try {
-        const response = await api.post('/subscription/paypal/create-order', {
-          plan: props.planId
-        })
-        
-        return response.data.id
-      } catch (error) {
-        console.error('Error creando orden en backend', error)
-        notify.error('No se pudo inicializar el pago.')
-        throw error
-      }
-    },
-    onApprove: (data) => {
-      // Dejamos que el backend capture la orden real
-      emit('success', data)
-    },
-    onCancel: () => {
-      emit('cancel')
-    },
-    onError: (err) => {
-      console.error('PayPal Error:', err)
-      emit('error', err)
-    }
-  }).render(paypalContainer.value)
-  
+  window.paypal
+    .Buttons({
+      style: {
+        layout: 'vertical',
+        color: 'gold',
+        shape: 'rect',
+        label: 'pay',
+      },
+      createOrder: async (_, actions) => {
+        try {
+          const response = await api.post('/subscription/paypal/create-order', {
+            plan: props.planId,
+          })
+
+          return response.data.id
+        } catch (error) {
+          console.error('Error creando orden en backend', error)
+          notify.error('No se pudo inicializar el pago.')
+          throw error
+        }
+      },
+      onApprove: async (data) => {
+        try {
+          const response = await api.post(
+            '/subscription/paypal/capture-order',
+            {
+              orderID: data.orderID,
+              plan: props.planId,
+            },
+            {
+              // Forzamos el envío del token de autorización
+              headers: props.token ? { Authorization: `Bearer ${props.token}` } : {},
+            },
+          )
+
+          if (response.data.status === 'success') {
+            emit('success', data)
+          } else {
+            throw new Error(response.data.message || 'Error del servidor')
+          }
+        } catch (error) {
+          console.error('Error capturando orden en backend:', error)
+          notify.error('El pago fue aprobado, pero hubo un error al activar la cuenta.')
+          emit('error', error)
+        }
+      },
+      onCancel: () => {
+        emit('cancel')
+      },
+      onError: (err) => {
+        console.error('PayPal Error:', err)
+        emit('error', err)
+      },
+    })
+    .render(paypalContainer.value)
+
   isLoaded.value = true
 }
 </script>

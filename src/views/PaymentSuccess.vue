@@ -31,6 +31,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '@/services/api' // Usamos tu instancia configurada
 import notify from '@/services/notify'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +62,16 @@ const processCapture = async () => {
       plan: plan,
       tenant_id: tenantId
     })
+
+    // Refrescar el estado local del usuario para que Vue se entere de que is_active = true
+    const authStore = useAuthStore()
+    if (authStore.isLoggedIn) {
+      try {
+        await authStore.fetchUser()
+      } catch (e) {
+        console.warn('No se pudo refrescar el usuario', e)
+      }
+    }
 
     // 3. Éxito total
     active.value = true
