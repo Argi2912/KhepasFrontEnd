@@ -38,7 +38,10 @@ api.interceptors.response.use(
       // Si el middleware del backend devuelve 402, redirigimos a la pantalla de bloqueo
       // =================================================================
       if (status === 402) {
-        router.push({ name: 'subscription_expired' })
+        const currentRoute = router.currentRoute.value.name
+        if (currentRoute !== 'subscription_expired' && currentRoute !== 'payment-success') {
+          router.push({ name: 'subscription_expired' })
+        }
         return Promise.reject(error)
       }
 

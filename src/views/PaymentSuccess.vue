@@ -63,17 +63,8 @@ const processCapture = async () => {
       tenant_id: tenantId
     })
 
-    // Refrescar el estado local del usuario para que Vue se entere de que is_active = true
-    const authStore = useAuthStore()
-    if (authStore.isLoggedIn) {
-      try {
-        await authStore.fetchUser()
-      } catch (e) {
-        console.warn('No se pudo refrescar el usuario', e)
-      }
-    }
-
-    // 3. Éxito total
+    // 3. Éxito total — refrescar estado del usuario
+    await refreshUserState()
     active.value = true
     notify.success('¡Pago completado correctamente!')
     checking.value = false
@@ -94,6 +85,8 @@ const checkIfAlreadyActive = async (originalError = '') => {
     const response = await api.get(`tenants/check-status/${tenantId}`)
 
     if (response.data.is_active) {
+      // Tenant activo — refrescar estado del usuario para que el router guard lo sepa
+      await refreshUserState()
       active.value = true
       checking.value = false
     } else {
@@ -107,7 +100,32 @@ const checkIfAlreadyActive = async (originalError = '') => {
   }
 }
 
-const goToLogin = () => router.push({ name: 'login' })
+// Refresca el estado del usuario en el store para que is_active = true se refleje
+const refreshUserState = async () => {
+  const authStore = useAuthStore()
+  if (authStore.isLoggedIn) {
+    // Forzar is_active = true inmediatamente en el store
+    if (authStore.user?.tenant) {
+      authStore.user.tenant.is_active = true
+    }
+    // Luego refrescar desde el backend
+    try {
+      await authStore.fetchUser()
+    } catch (e) {
+      console.warn('No se pudo refrescar el usuario', e)
+    }
+  }
+}
+
+const goToLogin = () => {
+  const authStore = useAuthStore()
+  // Si ya está logueado y el tenant fue activado, ir directo al dashboard
+  if (authStore.isLoggedIn && authStore.user?.tenant?.is_active) {
+    router.push({ name: 'dashboard' })
+  } else {
+    router.push({ name: 'login' })
+  }
+}
 
 onMounted(() => {
   // Al cargar, intentamos capturar el pago inmediatamente

@@ -15,13 +15,30 @@ const tenantName = computed(() => authStore.user?.tenant?.name || 'Tu Organizaci
 const planPrice = computed(() => authStore.user?.tenant?.plan_price || '0.00');
 const planName = computed(() => authStore.user?.tenant?.plan_name || 'Plan Actual');
 
+// Normaliza el plan_name del tenant al ID que el backend espera ("normal" o "pro")
+const normalizedPlanId = computed(() => {
+    const raw = (authStore.user?.tenant?.plan_name || '').toLowerCase();
+    const price = parseFloat(authStore.user?.tenant?.plan_price || 0);
+    if (raw === 'pro' || raw === 'normal') return raw;
+    if (raw.includes('profesional') || raw.includes('pro') || price >= 300) return 'pro';
+    return 'normal';
+});
+
 // --- Lógica de Pago (PayPal) ---
-const handlePaymentSuccess = () => {
+const handlePaymentSuccess = async () => {
     notify.success('¡Suscripción reactivada con éxito!');
-    // Recargar los datos del usuario para actualizar el estado de la suscripción
-    authStore.fetchUser().then(() => {
-        router.push({ name: 'dashboard' });
-    });
+
+    // Forzar is_active = true en el estado local del usuario
+    // El pago ya fue validado por el backend en capture-order, solo falta reflejarlo en el frontend
+    if (authStore.user?.tenant) {
+        authStore.user.tenant.is_active = true;
+    }
+
+    // Refrescar datos del usuario en segundo plano (sin bloquear la navegación)
+    authStore.fetchUser().catch(() => {});
+
+    // Navegar al dashboard — el router guard verá is_active = true
+    router.push({ name: 'dashboard' });
 };
 
 const logout = () => {
@@ -73,7 +90,7 @@ const logout = () => {
             <PayPalButton 
                 v-if="planPrice > 0"
                 :amount="planPrice"
-                :planId="planName"
+                :planId="normalizedPlanId"
                 :description="`Reactivación Suscripción - ${tenantName}`"
                 @success="handlePaymentSuccess"
             />
