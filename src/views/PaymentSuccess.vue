@@ -17,7 +17,7 @@
 
       <div v-else class="error-state">
         <h2 style="color: #ef4444;">No pudimos confirmar el pago</h2>
-        <p style="color: #9ca3af; margin: 10px 0;">{{ errorMessage || 'Hubo un error al procesar la respuesta dePayPal.'
+        <p style="color: #9ca3af; margin: 10px 0;">{{ errorMessage || 'Hubo un error al procesar la respuesta de PayPal.'
         }}</p>
         <button @click="goToLogin" class="btn-secondary">Volver al Inicio</button>
       </div>
@@ -54,7 +54,7 @@ const processCapture = async () => {
 
   try {
     // 2. Llamar al Backend para COBRAR y ACTIVAR
-    await api.post('/subscription/capture-registration', {
+    await api.post('subscription/capture-registration', {
       token: token,
       tenant_id: tenantId
     })

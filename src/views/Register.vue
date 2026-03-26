@@ -61,13 +61,12 @@ const handleRegister = async () => {
   }
 }
 
-const handlePaymentSuccess = () => {
+const handlePaymentSuccess = (details) => {
   notify.success('¡Pago completado con éxito! Redirigiendo...')
-  // Aquí el backend ya debería haber capturado la orden si usamos el flujo recomendado
-  // Pero para este ejemplo, redirigimos al success page que manejará la verificación
   const tenant_id = registrationData.value.tenant_id || registrationData.value.id
+  const token = details.id || details.orderID
   setTimeout(() => {
-    router.push({ name: 'payment-success', query: { tenant_id } })
+    router.push({ name: 'payment-success', query: { tenant_id, token } })
   }, 1500)
 }
 

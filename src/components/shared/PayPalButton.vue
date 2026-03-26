@@ -57,16 +57,9 @@ const renderPayPalButtons = () => {
         }]
       })
     },
-    onApprove: async (_, actions) => {
-      try {
-        // Capturar la orden
-        const details = await actions.order.capture()
-        emit('success', details)
-      } catch (error) {
-        console.error('Error en captura:', error)
-        notify.error('Hubo un problema al procesar el pago.')
-        emit('error', error)
-      }
+    onApprove: (data) => {
+      // Dejamos que el backend capture la orden real
+      emit('success', data)
     },
     onCancel: () => {
       emit('cancel')
