@@ -238,7 +238,13 @@ const goToLogin = () => router.push({ name: 'login' })
                     placeholder="Tu identidad"
                     required
                     class="w-full bg-white/[0.02] border border-white/5 rounded-2xl py-5 px-6 text-white text-sm font-bold placeholder:text-white/5 outline-none focus:border-info/40 focus:bg-white/[0.04] transition-all"
+                    @input="clearError('admin_name')"
                   />
+                  <span
+                    v-if="getError('admin_name')"
+                    class="text-danger text-[0.65rem] ml-1 font-bold"
+                    >{{ getError('admin_name') }}</span
+                  >
                 </div>
                 <div class="space-y-3">
                   <label
@@ -251,7 +257,13 @@ const goToLogin = () => router.push({ name: 'login' })
                     placeholder="admin@empresa.com"
                     required
                     class="w-full bg-white/[0.02] border border-white/5 rounded-2xl py-5 px-6 text-white text-sm font-bold placeholder:text-white/5 outline-none focus:border-info/40 focus:bg-white/[0.04] transition-all"
+                    @input="clearError('admin_email')"
                   />
+                  <span
+                    v-if="getError('admin_email')"
+                    class="text-danger text-[0.65rem] ml-1 font-bold"
+                    >{{ getError('admin_email') }}</span
+                  >
                 </div>
               </div>
 
@@ -267,7 +279,13 @@ const goToLogin = () => router.push({ name: 'login' })
                     placeholder="••••••••"
                     required
                     class="w-full bg-white/[0.02] border border-white/5 rounded-2xl py-5 px-6 text-white text-sm font-bold tracking-[0.3em] outline-none focus:border-info/40 focus:bg-white/[0.04] transition-all"
+                    @input="clearError('password')"
                   />
+                  <span
+                    v-if="getError('password')"
+                    class="text-danger text-[0.65rem] ml-1 font-bold"
+                    >{{ getError('password') }}</span
+                  >
                 </div>
                 <div class="space-y-3">
                   <label
@@ -280,7 +298,13 @@ const goToLogin = () => router.push({ name: 'login' })
                     placeholder="••••••••"
                     required
                     class="w-full bg-white/[0.02] border border-white/5 rounded-2xl py-5 px-6 text-white text-sm font-bold tracking-[0.3em] outline-none focus:border-info/40 focus:bg-white/[0.04] transition-all"
+                    @input="clearError('password_confirmation')"
                   />
+                  <span
+                    v-if="getError('password_confirmation')"
+                    class="text-danger text-[0.65rem] ml-1 font-bold"
+                    >{{ getError('password_confirmation') }}</span
+                  >
                 </div>
               </div>
             </section>
@@ -297,13 +321,31 @@ const goToLogin = () => router.push({ name: 'login' })
                 <!-- Plan Card Adaptado -->
                 <div
                   v-for="plan in [
-                    { id: 'free', n: 'Gratis', p: '0.00', t: '/30d' },
-                    { id: 'normal', n: 'Normal', p: '47.00', t: '/mes' },
-                    { id: 'pro', n: 'Pro', p: '300.00', t: '/13mes' },
+                    { 
+                      id: 'free', 
+                      n: 'Prueba Gratuita', 
+                      p: '0.00', 
+                      t: '/30d',
+                      desc: ['30 días de prueba, si no te funciona, no nos debes nada.']
+                    },
+                    { 
+                      id: 'normal', 
+                      n: 'Suscripción Mensual', 
+                      p: '47.00', 
+                      t: '/mes',
+                      desc: ['47$ mensuales']
+                    },
+                    { 
+                      id: 'pro', 
+                      n: 'Suscripción Anual', 
+                      p: '300.00', 
+                      t: '/13mes',
+                      desc: ['12 meses', '+ Un mes de regalo', 'AHORRAS 311$']
+                    },
                   ]"
                   :key="plan.id"
                   @click="form.plan = plan.id"
-                  class="relative p-6 rounded-3xl border cursor-pointer transition-all duration-500 overflow-hidden group"
+                  class="relative p-6 rounded-3xl border cursor-pointer transition-all duration-500 overflow-hidden group flex flex-col justify-between"
                   :class="
                     form.plan === plan.id
                       ? 'bg-primary/5 border-primary/40 shadow-xl'
@@ -313,8 +355,17 @@ const goToLogin = () => router.push({ name: 'login' })
                   <div v-if="form.plan === plan.id" class="absolute top-0 right-0 p-2">
                     <div class="w-1.5 h-1.5 bg-primary rounded-full animate-ping"></div>
                   </div>
-                  <h4 class="text-white text-sm font-black mb-1">{{ plan.n }}</h4>
-                  <p class="text-primary text-xl font-black">
+                  <div>
+                    <h4 class="text-white text-sm font-black mb-2">{{ plan.n }}</h4>
+                    <div class="space-y-1 mb-4 min-h-[60px]">
+                      <p v-for="(line, idx) in plan.desc" :key="idx" 
+                         class="text-[0.65rem] leading-snug"
+                         :class="line.includes('AHORRAS') ? 'text-success font-black mt-2' : 'text-white/60'">
+                        {{ line }}
+                      </p>
+                    </div>
+                  </div>
+                  <p class="text-primary text-xl font-black mt-auto">
                     ${{ plan.p }}<span class="text-[0.55rem] text-white/20 ml-1">{{ plan.t }}</span>
                   </p>
                 </div>
@@ -342,8 +393,8 @@ const goToLogin = () => router.push({ name: 'login' })
 
               <BaseButton
                 v-if="!showPayPal"
+                type="submit"
                 class="!w-full !h-16 !rounded-2xl !text-sm !font-black !tracking-[0.2em] !uppercase border border-primary/20"
-                @click="handleRegister"
                 :disabled="isLoading || !acceptedTerms"
               >
                 <template v-if="!isLoading">Implementar Ecosistema</template>
