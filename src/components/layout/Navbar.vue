@@ -104,18 +104,17 @@ const confirmLogout = async () => {
     <div class="flex items-center flex-1 min-w-0 relative z-10">
       <button 
         @click="emit('toggle-sidebar')" 
-        class="bg-white/5 border border-white/10 text-white/50 text-lg cursor-pointer transition-all mr-8 w-11 h-11 rounded-2xl flex items-center justify-center hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:shadow-[0_0_20px_rgba(247,166,0,0.15)] active:scale-90 group transition-all duration-500"
+        class="bg-white/5 border border-white/10 text-white/50 text-lg cursor-pointer transition-all mr-8 w-11 h-11 rounded-2xl flex items-center justify-center hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/20 hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] active:scale-90 group transition-all duration-500"
       >
         <FontAwesomeIcon icon="fa-solid fa-bars-staggered" class="group-hover:scale-110 transition-transform" />
       </button>
       
       <div class="flex flex-col">
         <div class="flex items-center gap-3 mb-0.5">
-           <img src="@/assets/logo.jpg" alt="Logo" class="h-6 w-auto rounded-lg shadow-sm brightness-110" />
-           <span class="text-[0.6rem] text-white/30 uppercase tracking-[0.4em] font-black leading-none">Console / Core</span>
+           <span class="text-[0.6rem] text-white/30 uppercase tracking-[0.4em] font-black leading-none">Proyecto Jose</span>
         </div>
         <span class="text-xl font-black text-white whitespace-nowrap overflow-hidden text-ellipsis leading-tight tracking-tight">
-          {{ $route.meta.label || 'Sistemas Khepas' }}
+          {{ $route.meta.label || 'Consola Maestra' }}
         </span>
       </div>
     </div>
@@ -130,8 +129,8 @@ const confirmLogout = async () => {
          <div class="relative">
             <button 
               @click="toggleNotifications"
-              class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/20 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5 relative"
-              :class="{ 'bg-primary/10 text-primary border-primary/20': showNotifications }"
+              class="w-9 h-9 rounded-xl bg-white/[0.02] text-white/30 flex items-center justify-center hover:bg-white/5 hover:text-white/60 transition-all border border-transparent hover:border-white/5 relative"
+              :class="{ 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20': showNotifications }"
               title="Solicitudes Pendientes"
             >
                <FontAwesomeIcon icon="fa-solid fa-bell" class="text-xs" />
@@ -140,7 +139,7 @@ const confirmLogout = async () => {
                <span 
                  v-if="requestStore.pendingCount > 0 || supportStore.pendingCount > 0 || subscriptionAlert"
                  class="absolute -top-1 -right-1 w-4 h-4 text-white text-[0.6rem] font-black flex items-center justify-center rounded-full shadow-lg animate-bounce"
-                 :class="subscriptionAlert?.isCritical ? 'bg-danger shadow-danger/50' : 'bg-primary shadow-primary/50'"
+                 :class="subscriptionAlert?.isCritical ? 'bg-danger shadow-danger/50' : 'bg-emerald-500 shadow-emerald-500/50'"
                >
                  {{ (requestStore.pendingCount || 0) + (supportStore.pendingCount || 0) + (subscriptionAlert ? 1 : 0) }}
                </span>
@@ -172,7 +171,7 @@ const confirmLogout = async () => {
                    <!-- Alertas de Soporte (Mini Chat) -->
                    <div 
                      v-if="supportStore.pendingCount > 0" 
-                     class="p-4 mx-2 mt-2 rounded-2xl border border-primary/20 bg-primary/10 text-primary flex gap-3 transition-all cursor-pointer hover:bg-primary/20"
+                     class="p-4 mx-2 mt-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500 flex gap-3 transition-all cursor-pointer hover:bg-emerald-500/20"
                      @click="showNotifications = false"
                    >
                      <FontAwesomeIcon icon="fa-solid fa-headset" class="mt-0.5" />
@@ -194,12 +193,12 @@ const confirmLogout = async () => {
                     @click="goToRequests(); showNotifications = false"
                   >
                     <div class="flex justify-between items-start mb-1">
-                      <span class="text-[0.65rem] font-black text-white group-hover:text-primary transition-colors">REQ-{{ req.id.toString().padStart(5, '0') }}</span>
+                      <span class="text-[0.65rem] font-black text-white group-hover:text-emerald-500 transition-colors">REQ-{{ req.id.toString().padStart(5, '0') }}</span>
                       <span class="text-[0.55rem] font-black text-white/20 uppercase">{{ req.type }}</span>
                     </div>
                     <p class="text-[0.7rem] text-white/60 font-medium truncate">{{ req.client?.name || 'Cliente Desconocido' }}</p>
                     <div class="flex justify-between items-center mt-2">
-                       <span class="text-[0.8rem] font-black text-primary">{{ req.amount.toLocaleString() }} {{ req.currency_code }}</span>
+                       <span class="text-[0.8rem] font-black text-emerald-500">{{ req.amount.toLocaleString() }} {{ req.currency_code }}</span>
                        <span class="text-[0.5rem] text-white/20 uppercase font-black">{{ new Date(req.created_at).toLocaleTimeString() }}</span>
                     </div>
                   </div>
@@ -207,7 +206,7 @@ const confirmLogout = async () => {
 
                 <button 
                   @click="goToRequests(); showNotifications = false"
-                  class="w-full p-4 text-[0.6rem] font-black text-primary uppercase tracking-[0.2em] hover:bg-white/[0.05] transition-all bg-white/[0.02]"
+                  class="w-full p-4 text-[0.6rem] font-black text-emerald-500 uppercase tracking-[0.2em] hover:bg-white/[0.05] transition-all bg-white/[0.02]"
                 >
                   Ver todo el buzón
                 </button>
@@ -219,13 +218,13 @@ const confirmLogout = async () => {
       <!-- Perfil Compacto Premium -->
       <div class="flex items-center gap-4 bg-white/[0.02] py-2 pl-5 pr-2.5 rounded-[22px] border border-white/5 transition-all hover:bg-white/[0.04] group cursor-pointer shadow-inner">
         <div class="flex flex-col items-end mr-1">
-          <span class="text-[0.85rem] font-bold text-white leading-none mb-1 group-hover:text-primary transition-colors">{{ authStore.authUser?.name || 'Usuario' }}</span>
+          <span class="text-[0.85rem] font-bold text-white leading-none mb-1 group-hover:text-emerald-500 transition-colors">{{ authStore.authUser?.name || 'Usuario' }}</span>
           <div class="flex items-center gap-1.5">
             <span class="w-1 w-1 bg-success/60 rounded-full"></span>
             <span class="text-[0.6rem] text-white/30 font-black tracking-widest uppercase">{{ userRole }}</span>
           </div>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-secondary font-black text-xs shadow-[0_5px_15px_rgba(247,166,0,0.3)] group-hover:scale-105 group-hover:rotate-3 transition-all duration-500">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-secondary font-black text-xs shadow-[0_5px_15px_rgba(16,185,129,0.3)] group-hover:scale-105 group-hover:rotate-3 transition-all duration-500">
           {{ authStore.authUser?.name?.charAt(0) || 'U' }}
         </div>
       </div>

@@ -27,10 +27,11 @@ const handleLogin = async () => {
   isLoading.value = true
   try {
     await authStore.login(form)
-    notify.success('Acceso autorizado. Bienvenid@ al ecosistema.')
+    notify.success('Acceso autorizado. Bienvenido a TuConpay.')
+    router.push({ name: 'dashboard' })
   } catch (error) {
     if (!handleAxiosError(error)) {
-      notify.error('Credenciales no válidas o fallo en nodo central.')
+      notify.error('Credenciales no válidas o fallo en el sistema.')
     }
   } finally {
     isLoading.value = false
@@ -42,42 +43,39 @@ const goToRegister = () => router.push({ name: 'register' })
 </script>
 
 <template>
-  <div class="min-h-screen bg-secondary flex overflow-hidden font-sans relative">
+  <div class="login-page min-h-screen bg-[#0b0e11] flex overflow-hidden font-['Inter'] relative text-white">
     
-    <!-- Lado Izquierdo: Branding & Atmósfera (Visible solo en desktop) -->
-    <div class="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-20 overflow-hidden bg-[#0a0b0d]">
-      <!-- Efectos de fondo dinámicos -->
-      <div class="absolute top-[-20%] left-[-10%] w-[80%] h-[80%] bg-primary/10 blur-[120px] rounded-full animate-pulse"></div>
-      <div class="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-info/5 blur-[100px] rounded-full"></div>
-      
-      <!-- Grid decorativa sutil -->
-      <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 40px 40px;"></div>
+    <!-- Ambient Lights (Matching Landing) -->
+    <div class="ambient-light gold-light"></div>
+    <div class="ambient-light blue-light"></div>
 
+    <!-- Lado Izquierdo: Branding & Ecosistema (Desktop) -->
+    <div class="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-20 overflow-hidden bg-black/20 backdrop-blur-3xl border-r border-white/5">
       <div class="relative z-10">
-        <div class="flex items-center gap-4 mb-16">
-          <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-xl p-1 overflow-hidden">
-            <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-xl" />
+        <div class="flex items-center gap-4 mb-16 cursor-pointer" @click="goBack">
+          <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-2xl p-2.5 overflow-hidden border border-white/10">
+            <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-lg" />
           </div>
-          <span class="text-2xl font-black text-white tracking-tighter">TuConpay<span class="text-primary">.</span></span>
+          <span class="text-3xl font-black tracking-tighter italic">TuConpay<span class="text-[#f0b90b]">.</span></span>
         </div>
 
         <div class="max-w-lg">
-          <h2 class="text-6xl font-black text-white leading-[1.1] mb-8 tracking-tight">
-            Gestión <span class="text-primary">Evolucionada</span> de Activos Digitales.
+          <h2 class="text-6xl font-black leading-[1.1] mb-8 tracking-tight italic">
+            El control <span class="text-[#f0b90b] uppercase">Definitivo</span> <br>de tu capital.
           </h2>
-          <p class="text-white/40 text-lg font-medium leading-relaxed mb-12">
-            La consola de auditoría y control de caja más potente del mercado. Multitenancy real, seguridad de grado militar y flujos automatizados.
+          <p class="text-slate-400 text-lg font-medium leading-relaxed mb-12">
+            Accede a la consola de gestión financiera más robusta del mercado. Seguridad bancaria, multi-divisa y auditoría en tiempo real.
           </p>
           
           <div class="flex items-center gap-10">
             <div class="flex flex-col">
-              <span class="text-white text-2xl font-black italic tracking-tighter">99.9%</span>
+              <span class="text-[#f0b90b] text-2xl font-black italic tracking-tighter">99.9%</span>
               <span class="text-white/20 text-[0.6rem] font-black uppercase tracking-[0.2em] mt-1">Sincronización</span>
             </div>
             <div class="w-px h-8 bg-white/5"></div>
             <div class="flex flex-col">
-              <span class="text-white text-2xl font-black italic tracking-tighter">AES-256</span>
-              <span class="text-white/20 text-[0.6rem] font-black uppercase tracking-[0.2em] mt-1">Encriptación</span>
+              <span class="text-[#f0b90b] text-2xl font-black italic tracking-tighter">AES-256</span>
+              <span class="text-white/20 text-[0.6rem] font-black uppercase tracking-[0.2em] mt-1">Protección</span>
             </div>
           </div>
         </div>
@@ -85,87 +83,84 @@ const goToRegister = () => router.push({ name: 'register' })
 
       <div class="relative z-10 flex items-center gap-4 text-white/20 text-[0.6rem] font-black uppercase tracking-[0.4em]">
         <span class="w-2 h-px bg-white/10"></span>
-        Core Node V4.0 / Stable Build
+        TuConpay Financial Engine V2.0
       </div>
     </div>
 
     <!-- Lado Derecho: Formulario de Acceso -->
-    <div class="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-16 bg-secondary relative">
-      <!-- Decoración para móvil -->
-      <div class="lg:hidden absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-         <div class="absolute -top-[20%] -right-[20%] w-[80%] h-[80%] bg-primary/10 blur-[100px] rounded-full"></div>
-      </div>
-
+    <div class="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-16 relative">
       <div class="w-full max-w-[440px] relative z-10 animate-premium-in">
         
         <div class="mb-12">
-          <div class="lg:hidden flex items-center gap-3 mb-8">
-            <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1 overflow-hidden">
-              <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-lg" />
+          <!-- Logo para móvil -->
+          <div class="lg:hidden flex items-center gap-3 mb-10">
+            <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 overflow-hidden border border-white/10">
+               <img src="@/assets/logo.jpg" alt="Logo" class="w-full h-full object-cover rounded-lg" />
             </div>
-            <span class="text-xl font-black text-white tracking-tighter">TuConpay.</span>
+            <span class="text-2xl font-black tracking-tighter italic">TuConpay.</span>
           </div>
-          <h3 class="text-4xl font-black text-white mb-3 tracking-tighter">Acceso de Auditor.</h3>
-          <p class="text-white/30 text-sm font-bold uppercase tracking-widest">Ingresa tus credenciales de nodo</p>
+          
+          <h3 class="text-4xl font-black mb-3 tracking-tighter italic">Identificación<span class="text-[#f0b90b]">.</span></h3>
+          <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Bienvenido al Ecosistema Financiero</p>
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-6">
           <div class="space-y-2">
-            <label class="block text-[0.6rem] font-black text-white/20 uppercase tracking-[0.3em] ml-1">Identidad Digital</label>
+            <label class="block text-[0.6rem] font-black text-white/20 uppercase tracking-[0.3em] ml-1">Email Registrado</label>
             <div class="relative group">
-              <div class="absolute left-6 top-1/2 -translate-y-1/2 text-white/10 group-focus-within:text-primary transition-colors duration-500">
-                <FontAwesomeIcon icon="fa-solid fa-at" />
+              <div class="absolute left-6 top-1/2 -translate-y-1/2 text-white/10 group-focus-within:text-[#f0b90b] transition-colors duration-500">
+                <FontAwesomeIcon :icon="['fas', 'at']" />
               </div>
               <input 
                 v-model="form.email" 
                 type="email" 
-                placeholder="admin@tuconpay.com" 
+                placeholder="usuario@tuconpay.com" 
                 required
-                class="w-full bg-white/[0.02] border border-white/5 rounded-2xl py-5 pl-14 pr-6 text-white text-sm font-bold placeholder:text-white/5 outline-none focus:border-primary/40 focus:bg-white/[0.04] focus:ring-4 focus:ring-primary/5 transition-all shadow-inner"
+                class="w-full bg-white/[0.03] border border-white/5 rounded-2xl py-5 pl-14 pr-6 text-white text-sm font-bold outline-none focus:border-[#f0b90b]/40 focus:bg-white/[0.05] transition-all"
                 @input="clearError('email')"
               />
             </div>
-            <span v-if="getError('email')" class="text-danger text-[0.65rem] ml-1 font-bold">{{ getError('email') }}</span>
+            <span v-if="getError('email')" class="text-red-500 text-[0.65rem] ml-1 font-bold">{{ getError('email') }}</span>
           </div>
 
           <div class="space-y-2">
             <div class="flex justify-between items-center ml-1">
               <label class="block text-[0.6rem] font-black text-white/20 uppercase tracking-[0.3em]">Clave de Protocolo</label>
-              <a href="#" class="text-[0.6rem] text-primary/40 hover:text-primary font-black uppercase tracking-widest transition-colors tracking-tighter italic">Recuperar</a>
+              <a href="#" class="text-[0.6rem] text-[#f0b90b]/60 hover:text-[#f0b90b] font-black uppercase tracking-widest transition-colors italic">Recuperar</a>
             </div>
             <div class="relative group">
-              <div class="absolute left-6 top-1/2 -translate-y-1/2 text-white/10 group-focus-within:text-primary transition-colors duration-500">
-                <FontAwesomeIcon icon="fa-solid fa-lock-open" />
+              <div class="absolute left-6 top-1/2 -translate-y-1/2 text-white/10 group-focus-within:text-[#f0b90b] transition-colors duration-500">
+                <FontAwesomeIcon :icon="['fas', 'lock']" />
               </div>
               <input 
                 v-model="form.password" 
                 type="password" 
                 placeholder="••••••••" 
                 required
-                class="w-full bg-white/[0.02] border border-white/5 rounded-2xl py-5 pl-14 pr-6 text-white text-sm font-bold tracking-[0.3em] placeholder:text-white/5 outline-none focus:border-primary/40 focus:bg-white/[0.04] focus:ring-4 focus:ring-primary/5 transition-all shadow-inner"
+                class="w-full bg-white/[0.03] border border-white/5 rounded-2xl py-5 pl-14 pr-6 text-white text-sm font-bold tracking-[0.3em] outline-none focus:border-[#f0b90b]/40 focus:bg-white/[0.05] transition-all"
                 @input="clearError('password')"
               />
             </div>
-            <span v-if="getError('password')" class="text-danger text-[0.65rem] ml-1 font-bold">{{ getError('password') }}</span>
+            <span v-if="getError('password')" class="text-red-500 text-[0.65rem] ml-1 font-bold">{{ getError('password') }}</span>
           </div>
 
           <div class="pt-4">
-            <BaseButton 
-              class="w-full h-16 !rounded-2xl !text-sm !font-black !tracking-[0.2em] !uppercase border border-primary/20 hover:border-primary/50 transition-all flex items-center justify-center gap-3"
-              @click="handleLogin"
+            <button 
+              type="submit"
+              class="w-full h-16 bg-[#f0b90b] hover:bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] transition-all shadow-[0_10px_30px_rgba(240,185,11,0.2)] active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
               :disabled="isLoading"
             >
-              <span v-if="!isLoading">Sincronizar Nodo</span>
-              <div v-else class="w-5 h-5 border-2 border-secondary/20 border-t-secondary rounded-full animate-spin"></div>
-            </BaseButton>
+              <span v-if="!isLoading">Acceder al Sistema</span>
+              <FontAwesomeIcon v-else :icon="['fas', 'circle-notch']" spin />
+            </button>
           </div>
         </form>
 
         <div class="mt-12 pt-8 border-t border-white/5 space-y-8">
            <div class="text-center">
-             <p class="text-white/20 text-[0.6rem] font-black uppercase tracking-[0.15em] mb-4">¿Sin autorización en el ecosistema?</p>
-             <button @click="goToRegister" class="text-primary hover:text-white transition-colors text-xs font-black uppercase tracking-[0.2em] border-b border-primary/20 pb-1 hover:border-white">
-                Crear Nuevo Nodo
+             <p class="text-white/20 text-[0.6rem] font-black uppercase tracking-[0.15em] mb-4">¿No tienes acceso al ecosistema?</p>
+             <button @click="goToRegister" class="text-[#f0b90b] hover:text-white transition-colors text-xs font-black uppercase tracking-[0.2em] border-b border-[#f0b90b]/20 pb-1 hover:border-white">
+                Crear Nueva Cuenta
              </button>
            </div>
            
@@ -180,6 +175,32 @@ const goToRegister = () => router.push({ name: 'register' })
 </template>
 
 <style scoped>
+.ambient-light {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.15;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.gold-light {
+  top: -100px;
+  right: -100px;
+  width: 500px;
+  height: 500px;
+  background: #f0b90b;
+}
+
+.blue-light {
+  bottom: -100px;
+  left: -100px;
+  width: 600px;
+  height: 600px;
+  background: #1e88e5;
+  opacity: 0.05;
+}
+
 @keyframes slideUpFade {
   from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
@@ -189,7 +210,6 @@ const goToRegister = () => router.push({ name: 'register' })
   animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Efecto de cristal para inputs */
 input {
   backdrop-filter: blur(10px);
 }
